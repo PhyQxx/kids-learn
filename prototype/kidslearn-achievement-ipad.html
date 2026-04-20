@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1024">
+<title>趣学星球 - 成就中心（iPad横屏）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#FF6B6B;--primary-light:#FF8E8E;--accent:#FFE66D;--teal:#4ECDC4;--bg:#F7F7F7;--white:#FFF;--text:#333;--text-light:#999;--radius:16px;--shadow:0 4px 20px rgba(0,0,0,.08)}
+html,body{height:100%;overflow:hidden}
+body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:var(--bg);display:flex}
+
+.sidebar{width:220px;height:100vh;background:var(--white);display:flex;flex-direction:column;align-items:center;border-right:1px solid #F0F0F0;flex-shrink:0;position:relative;z-index:10}
+.sidebar-logo{padding:28px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+.sidebar-emoji{font-size:48px}
+.sidebar-title{font-size:18px;font-weight:800;color:var(--primary)}
+.sidebar-sub{font-size:11px;color:var(--text-light)}
+.nav-items{flex:1;display:flex;flex-direction:column;gap:4px;padding:8px 12px;width:100%}
+.nav-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;border:none;background:none;width:100%;font-size:15px;font-weight:600;color:#666;transition:all .15s;text-align:left}
+.nav-item:hover{background:#FFF5F5;color:var(--primary)}
+.nav-item.active{background:#FFF0F0;color:var(--primary)}
+.nav-item .nav-icon{font-size:22px;flex-shrink:0}
+.sidebar-user{width:100%;padding:16px;border-top:1px solid #F5F5F5;display:flex;align-items:center;gap:12px}
+.user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-light));display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.user-info{flex:1;overflow:hidden}
+.user-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-level{font-size:11px;color:var(--text-light)}
+.user-gems{font-size:20px}
+
+.main{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.top-bar{height:64px;background:var(--white);display:flex;align-items:center;padding:0 32px;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.05);flex-shrink:0}
+.back-btn{width:44px;height:44px;border-radius:12px;background:#F5F5F5;border:none;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.back-btn:hover{background:#EEE}
+.top-title{font-size:20px;font-weight:800;color:var(--text)}
+
+.content-scroll{flex:1;overflow-y:auto;padding:20px 32px 24px}
+
+.summary-card{
+  background:linear-gradient(135deg,#FFE66D,#FFD700);border-radius:var(--radius);
+  padding:20px 24px;display:flex;align-items:center;gap:16px;margin-bottom:20px;
+  box-shadow:0 4px 16px rgba(255,215,0,.3);
+}
+.summary-icon{font-size:52px}
+.summary-info{flex:1}
+.summary-title{font-size:18px;font-weight:800;color:#5D4E60;margin-bottom:4px}
+.summary-sub{font-size:13px;color:#7D6E80}
+.summary-val{font-size:32px;font-weight:900;color:#5D4E60;text-align:right}
+
+/* Tab */
+.tab-nav{background:var(--white);padding:0 4px;display:flex;gap:4px;border-bottom:1px solid #F0F0F0;margin-bottom:16px;border-radius:var(--radius) var(--radius) 0 0}
+.tab-btn{flex:1;height:48px;border:none;background:none;font-size:14px;font-weight:600;color:#999;cursor:pointer;position:relative;border-radius:8px 8px 0 0;transition:all .15s}
+.tab-btn.active{color:var(--primary);background:#FFF5F5}
+.tab-btn.active::after{content:'';position:absolute;bottom:0;left:20%;width:60%;height:3px;background:var(--primary);border-radius:2px}
+
+.achievement-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.achievement-card{
+  background:var(--white);border-radius:var(--radius);padding:18px;
+  display:flex;align-items:center;gap:16px;
+  box-shadow:var(--shadow);transition:all .2s;cursor:pointer;
+}
+.achievement-card:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.1)}
+.achievement-card:active{transform:scale(.98)}
+.achievement-card.locked{opacity:.6}
+.achievement-card.completed{border-left:4px solid #2ECC71}
+.ach-icon{font-size:44px;flex-shrink:0;width:60px;height:60px;border-radius:14px;display:flex;align-items:center;justify-content:center}
+.ach-gold{background:linear-gradient(135deg,#FFE66D,#FFD700)}
+.ach-silver{background:linear-gradient(135deg,#E8E8E8,#C0C0C0)}
+.ach-bronze{background:linear-gradient(135deg,#FFDAB9,#CD7F32)}
+.ach-legend{background:linear-gradient(135deg,#9B59B6,#E8DAEF);animation:glow 2s ease-in-out infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 5px rgba(155,89,182,.3)}50%{box-shadow:0 0 15px rgba(155,89,182,.5)}}
+.ach-info{flex:1;overflow:hidden}
+.ach-name{font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px}
+.ach-desc{font-size:13px;color:var(--text-light);margin-bottom:8px}
+.ach-progress{height:6px;background:#F0F0F0;border-radius:3px;overflow:hidden;margin-bottom:5px}
+.ach-progress-fill{height:100%;border-radius:3px;transition:width .4s ease}
+.ach-prog-text{font-size:12px;color:var(--text-light)}
+.ach-status{font-size:26px;text-align:right;flex-shrink:0}
+
+
+
+.tab-icon{font-size:28px;transition:transform .15s}
+.tab-label{font-size:12px;color:var(--text-light);font-weight:600}
+.tab-item.active .tab-label{color:var(--primary);font-weight:700}
+.tab-item.active .tab-icon{transform:scale(1.1)}
+.sidebar.collapsed{width:60px}
+.sidebar.collapsed .sidebar-title,.sidebar.collapsed .sidebar-sub,.sidebar.collapsed .user-info,.sidebar.collapsed .nav-item span:not(.nav-icon),.sidebar.collapsed .sidebar-user .user-gems{display:none}
+.sidebar.collapsed .nav-item{justify-content:center;padding:14px 0}
+.sidebar.collapsed .sidebar-logo{padding:20px 0}
+.sidebar.collapsed .sidebar-user{justify-content:center;padding:12px 0}
+.sidebar-toggle{cursor:pointer;font-size:20px;padding:8px 0;text-align:center;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo"><div class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开侧边栏">☰</div>
+    <div class="sidebar-emoji">🌟</div>
+    <div class="sidebar-title">趣学星球</div>
+    <div class="sidebar-sub">KidsLearn</div>
+  </div>
+  <nav class="nav-items">
+    <button class="nav-item" onclick="location.href='kidslearn-home-ipad.html'"><span class="nav-icon">🏠</span>首页</button>
+    <button class="nav-item" onclick="location.href='kidslearn-grade-ipad.html'"><span class="nav-icon">📖</span>学习中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-pet-ipad.html'"><span class="nav-icon">🐱</span>宠物养成</button>
+    <button class="nav-item" onclick="location.href='kidslearn-ranking-ipad.html'"><span class="nav-icon">🏆</span>排行榜</button>
+    <button class="nav-item active"><span class="nav-icon">🎖️</span>成就中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-parent-ipad.html'"><span class="nav-icon">👨‍👩‍👧</span>家长中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-vip-ipad.html'"><span class="nav-icon">👑</span>VIP会员</button>
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar">🐱</div>
+    <div class="user-info"><div class="user-name">小明</div><div class="user-level">Lv.5 好奇宝宝</div></div>
+    <div class="user-gems">💎</div>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="top-bar">
+    <button class="back-btn" onclick="history.back()">‹</button>
+    <div class="top-title">🏆 成就中心</div>
+  </header>
+
+  <div class="content-scroll">
+    <div class="summary-card">
+      <div class="summary-icon">🎖️</div>
+      <div class="summary-info">
+        <div class="summary-title">已获得成就</div>
+        <div class="summary-sub">学习小将 · 再获3个解锁「知识小达人」</div>
+      </div>
+      <div class="summary-val">12/36</div>
+    </div>
+
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab(this)">全部</button>
+      <button class="tab-btn" onclick="switchTab(this)">学习</button>
+      <button class="tab-btn" onclick="switchTab(this)">收集</button>
+      <button class="tab-btn" onclick="switchTab(this)">社交</button>
+    </div>
+
+    <div class="achievement-grid">
+      <!-- 已完成 -->
+      <div class="achievement-card completed">
+        <div class="ach-icon ach-gold">🏅</div>
+        <div class="ach-info">
+          <div class="ach-name">初次闯关</div>
+          <div class="ach-desc">完成第一个关卡</div>
+          <div class="ach-progress"><div class="ach-progress-fill" style="width:100%;background:#2ECC71"></div></div>
+          <div class="ach-prog-text">已完成 ✓</div>
+        </div>
+        <div class="ach-status">✅</div>
+      </div>
+
+      <div class="achievement-card completed">
+        <div class="ach-icon ach-silver">⭐</div>
+        <div class="ach-info">
+          <div class="ach-name">三星达人</div>
+          <div class="ach-desc">累计获得50颗星</div>
+          <div class="ach-progress"><div class="ach-progress-fill" style="width:100%;background:#2ECC71"></div></div>
+          <div class="ach-prog-text">已完成 ✓</div>
+        </div>
+        <div class="ach-status">✅</div>
+      </div>
+
+      <div class="achievement-card completed">
+        <div class="ach-icon ach-bronze">📚</div>
+        <div class="ach-info">
+          <div class="ach-name">语文小达人</div>
+          <div class="ach-desc">语文通关30关</div>
+          <div class="ach-progress"><div class="ach-progress-fill" style="width:100%;background:#2ECC71"></div></div>
+          <div class="ach-prog-text">已完成 ✓</div>
+        </div>
+        <div class="ach-status">✅</div>
+      </div>
+
+      <!-- 进行中 -->
+      <div class="achievement-card">
+        <div class="ach-icon ach-gold">🔥</div>
+        <div class="ach-info">
+          <div class="ach-name">连续7天学习</div>
+          <div class="ach-desc">连续学习7天</div>
+          <div class="ach-progress"><div class="ach-progress-fill" style="width:71%;background:#FFE66D"></div></div>
+          <div class="ach-prog-text">5/7天</div>
+        </div>
+        <div class="ach-status">🔄</div>
+      </div>
+
+      <div class="achievement-card">
+        <div class="ach-icon ach-silver">🧮</div>
+        <div class="ach-info">
+          <div class="ach-name">数学小天才</div>
+          <div class="ach-desc">数学通关50关</div>
+          <div class="ach-progress"><div class="ach-progress-fill" style="width:50%;background:#4A90D9"></div></div>
+          <div class="ach-prog-text">25/50关</div>
+        </div>
+        <div class="ach-status">🔄</div>
+      </div>
+
+      <div class="achievement-card">
+        <div class="ach-icon ach-legend">🌟</div>
+        <div class="ach-info">
+          <div class="ach-name">全学科达人</div>
+          <div class="ach-desc">所有学科通关至少10关</div>
+          <div class="ach-progress"><div class="ach-progress-fill" style="width:40%;background:#9B59B6"></div></div>
+          <div class="ach-prog-text">4/6学科</div>
+        </div>
+        <div class="ach-status">🌟</div>
+      </div>
+
+      <!-- 未解锁 -->
+      <div class="achievement-card locked">
+        <div class="ach-icon" style="background:#F0F0F0;filter:grayscale(1)">🏆</div>
+        <div class="ach-info">
+          <div class="ach-name">贴纸收藏家</div>
+          <div class="ach-desc">收集100张贴纸</div>
+          <div class="ach-progress"><div class="ach-progress-fill" style="width:30%;background:#CCC"></div></div>
+          <div class="ach-prog-text">30/100</div>
+        </div>
+        <div class="ach-status">🔒</div>
+      </div>
+
+      <div class="achievement-card locked">
+        <div class="ach-icon" style="background:#F0F0F0;filter:grayscale(1)">👑</div>
+        <div class="ach-info">
+          <div class="ach-name">全国冠军</div>
+          <div class="ach-desc">全国排行榜第1名</div>
+          <div class="ach-progress"><div class="ach-progress-fill" style="width:0%;background:#CCC"></div></div>
+          <div class="ach-prog-text">未开始</div>
+        </div>
+        <div class="ach-status">🔒</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+
+
+<script>
+function switchTab(btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+var sidebarCollapsed=false;function toggleSidebar(){var s=document.querySelector('.sidebar');sidebarCollapsed=!sidebarCollapsed;s.classList.toggle('collapsed',sidebarCollapsed)}</script>
+</body>
+</html>

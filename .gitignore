@@ -1,0 +1,37 @@
+# KidsLearn - 趣学星球
+
+# 后端
+kidslearn-server/**/target/
+kidslearn-server/**/*.class
+kidslearn-server/**/*.jar
+kidslearn-server/**/*.war
+kidslearn-server/**/*.log
+kidslearn-server/**/.factorypath
+
+# 前端
+kidslearn-ui/node_modules/
+kidslearn-ui/dist/
+kidslearn-ui/.env.local
+kidslearn-ui/.env.*.local
+
+# 移动端
+kidslearn-app/node_modules/
+kidslearn-app/dist/
+kidslearn-app/unpackage/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.bak
+*.swp
+*~

@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1024">
+<title>课程列表 - 趣学星球（iPad横屏）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#4A90D9;--teal:#4ECDC4;--gold:#FFD700;--bg:#F0F7FF;--white:#FFF;--text:#333;--text-light:#999;--radius:20px;--shadow:0 4px 20px rgba(0,0,0,.08)}
+html,body{height:100%;overflow:hidden}
+body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:var(--bg);display:flex}
+
+/* 左侧导航 */
+.sidebar{width:220px;height:100vh;background:var(--white);display:flex;flex-direction:column;align-items:center;border-right:1px solid #F0F0F0;flex-shrink:0}
+.sidebar-logo{padding:28px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+.sidebar-emoji{font-size:48px}
+.sidebar-title{font-size:18px;font-weight:800;color:var(--primary)}
+.sidebar-sub{font-size:11px;color:var(--text-light)}
+.nav-items{flex:1;display:flex;flex-direction:column;gap:4px;padding:8px 12px;width:100%}
+.nav-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;border:none;background:none;width:100%;font-size:15px;font-weight:600;color:#666;transition:all .15s;text-align:left}
+.nav-item:hover{background:#F0F7FF;color:var(--primary)}
+.nav-item.active{background:#E8F0FE;color:var(--primary)}
+.nav-item .nav-icon{font-size:22px;flex-shrink:0}
+.sidebar-user{width:100%;padding:16px;border-top:1px solid #F5F5F5;display:flex;align-items:center;gap:12px}
+.user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--teal));display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.user-info{flex:1;overflow:hidden}
+.user-name{font-size:14px;font-weight:700;color:var(--text)}
+.user-level{font-size:11px;color:var(--text-light)}
+
+/* 主内容 */
+.main{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.top-bar{height:64px;background:var(--white);display:flex;align-items:center;padding:0 32px;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.05);flex-shrink:0}
+.top-bar .back-btn{width:44px;height:44px;border-radius:12px;background:#F5F5F5;border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.top-bar h2{flex:1;font-size:22px;font-weight:800;color:var(--text)}
+.subject-badge{display:flex;align-items:center;gap:8px;background:#E8F0FE;padding:8px 16px;border-radius:20px}
+.subject-badge-icon{font-size:22px}
+.subject-badge-name{font-size:15px;font-weight:700;color:var(--primary)}
+.content-scroll{flex:1;overflow-y:auto;padding:28px 32px 24px}
+
+.section-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:16px}
+.course-list{display:flex;flex-direction:column;gap:16px}
+.course-card{
+  background:var(--white);border-radius:var(--radius);padding:24px;
+  display:flex;align-items:center;gap:20px;cursor:pointer;
+  box-shadow:var(--shadow);transition:all .2s;border:3px solid transparent;
+}
+.course-card:hover{border-color:var(--primary);transform:translateX(4px)}
+.course-card.vip{border-color:rgba(255,215,0,.4);background:linear-gradient(135deg,#FFFEF8,#FFF8E1)}
+.course-card.locked{opacity:.6;cursor:not-allowed}
+.course-icon{font-size:56px;flex-shrink:0}
+.course-info{flex:1}
+.course-name{font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px}
+.course-meta{font-size:13px;color:var(--text-light);margin-bottom:8px}
+.course-prog{display:flex;align-items:center;gap:12px}
+.course-prog-bar{flex:1;max-width:200px;height:10px;background:#E8F0FE;border-radius:5px;overflow:hidden}
+.course-prog-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--teal));border-radius:5px}
+.course-prog-text{font-size:13px;font-weight:600;color:var(--primary)}
+.course-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.course-stars{font-size:18px}
+.course-vip{background:linear-gradient(135deg,var(--gold),#FFA500);color:#FFF;font-size:12px;font-weight:700;padding:4px 12px;border-radius:10px}
+.course-lock{font-size:24px;color:#CCC}
+.course-action{background:linear-gradient(135deg,var(--primary),#6BA3E0);border:none;border-radius:14px;padding:12px 22px;font-size:14px;font-weight:700;color:#FFF;cursor:pointer;box-shadow:0 4px 12px rgba(74,144,217,.35)}
+
+/* 底部Tab */
+
+
+.tab-item.active .tab-icon{transform:scale(1.1)}
+.tab-icon{font-size:28px}
+.tab-label{font-size:12px;color:var(--text-light);font-weight:600}
+.tab-item.active .tab-label{color:var(--primary);font-weight:700}
+.sidebar.collapsed{width:60px}
+.sidebar.collapsed .sidebar-title,.sidebar.collapsed .sidebar-sub,.sidebar.collapsed .user-info,.sidebar.collapsed .nav-item span:not(.nav-icon),.sidebar.collapsed .sidebar-user .user-gems{display:none}
+.sidebar.collapsed .nav-item{justify-content:center;padding:14px 0}
+.sidebar.collapsed .sidebar-logo{padding:20px 0}
+.sidebar.collapsed .sidebar-user{justify-content:center;padding:12px 0}
+.sidebar-toggle{cursor:pointer;font-size:20px;padding:8px 0;text-align:center;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo"><div class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开侧边栏">☰</div>
+    <div class="sidebar-emoji">🌟</div>
+    <div class="sidebar-title">趣学星球</div>
+    <div class="sidebar-sub">KidsLearn</div>
+  </div>
+  <nav class="nav-items">
+    <button class="nav-item" onclick="location.href='kidslearn-home-ipad.html'"><span class="nav-icon">🏠</span>首页</button>
+    <button class="nav-item active"><span class="nav-icon">📖</span>学习中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-pet-ipad.html'"><span class="nav-icon">🐱</span>宠物养成</button>
+    <button class="nav-item" onclick="location.href='kidslearn-ranking-ipad.html'"><span class="nav-icon">🏆</span>排行榜</button>
+    <button class="nav-item" onclick="location.href='kidslearn-achievement-ipad.html'"><span class="nav-icon">🎖️</span>成就中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-parent-ipad.html'"><span class="nav-icon">👨‍👩‍👧</span>家长中心</button>
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar">🐱</div>
+    <div class="user-info"><div class="user-name">小明</div><div class="user-level">Lv.5</div></div>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="top-bar">
+    <button class="back-btn" onclick="location.href='kidslearn-grade-ipad.html'">←</button>
+    <h2>课程列表</h2>
+    <div class="subject-badge">
+      <div class="subject-badge-icon">🧡</div>
+      <div class="subject-badge-name">语文 · 低龄组</div>
+    </div>
+  </header>
+
+  <div class="content-scroll">
+    <div class="section-title">📚 全部课程</div>
+    <div class="course-list">
+      <div class="course-card" onclick="location.href='kidslearn-levels-ipad.html'">
+        <div class="course-icon">🔤</div>
+        <div class="course-info">
+          <div class="course-name">拼音入门</div>
+          <div class="course-meta">共8个单元 · 40个关卡</div>
+          <div class="course-prog">
+            <div class="course-prog-bar"><div class="course-prog-fill" style="width:100%"></div></div>
+            <div class="course-prog-text">已完成</div>
+          </div>
+        </div>
+        <div class="course-right">
+          <div class="course-stars">⭐⭐⭐</div>
+          <button class="course-action">复习</button>
+        </div>
+      </div>
+      <div class="course-card" onclick="location.href='kidslearn-levels-ipad.html'">
+        <div class="course-icon">📝</div>
+        <div class="course-info">
+          <div class="course-name">基础识字</div>
+          <div class="course-meta">共10个单元 · 50个关卡</div>
+          <div class="course-prog">
+            <div class="course-prog-bar"><div class="course-prog-fill" style="width:60%"></div></div>
+            <div class="course-prog-text">30/50关</div>
+          </div>
+        </div>
+        <div class="course-right">
+          <div class="course-stars">⭐⭐⭐</div>
+          <button class="course-action">继续</button>
+        </div>
+      </div>
+      <div class="course-card" onclick="location.href='kidslearn-levels-ipad.html'">
+        <div class="course-icon">📖</div>
+        <div class="course-info">
+          <div class="course-name">阅读理解</div>
+          <div class="course-meta">共8个单元 · 40个关卡</div>
+          <div class="course-prog">
+            <div class="course-prog-bar"><div class="course-prog-fill" style="width:25%"></div></div>
+            <div class="course-prog-text">10/40关</div>
+          </div>
+        </div>
+        <div class="course-right">
+          <div class="course-stars">⭐⭐</div>
+          <button class="course-action">学习</button>
+        </div>
+      </div>
+      <div class="course-card" onclick="location.href='kidslearn-levels-ipad.html'">
+        <div class="course-icon">✍️</div>
+        <div class="course-info">
+          <div class="course-name">看图写话</div>
+          <div class="course-meta">共6个单元 · 30个关卡</div>
+          <div class="course-prog">
+            <div class="course-prog-bar"><div class="course-prog-fill" style="width:0%"></div></div>
+            <div class="course-prog-text">0/30关</div>
+          </div>
+        </div>
+        <div class="course-right">
+          <div class="course-stars">⭐</div>
+          <button class="course-action">开始</button>
+        </div>
+      </div>
+      <div class="course-card vip">
+        <div class="course-icon">👑</div>
+        <div class="course-info">
+          <div class="course-name">古诗词启蒙</div>
+          <div class="course-meta">共12个单元 · 60个关卡</div>
+          <div class="course-prog">
+            <div class="course-prog-bar"><div class="course-prog-fill" style="width:0%"></div></div>
+            <div class="course-prog-text">VIP专属</div>
+          </div>
+        </div>
+        <div class="course-right">
+          <div class="course-vip">👑 VIP</div>
+          <button class="course-action" style="background:linear-gradient(135deg,var(--gold),#FFA500);box-shadow:0 4px 12px rgba(255,215,0,.35)">开通VIP</button>
+        </div>
+      </div>
+      <div class="course-card locked">
+        <div class="course-icon">🔒</div>
+        <div class="course-info">
+          <div class="course-name">成语故事</div>
+          <div class="course-meta">需完成「基础识字」解锁</div>
+          <div class="course-prog">
+            <div class="course-prog-bar"><div class="course-prog-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="course-right">
+          <div class="course-lock">🔒</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+
+
+<script>var sidebarCollapsed=false;function toggleSidebar(){var s=document.querySelector('.sidebar');sidebarCollapsed=!sidebarCollapsed;s.classList.toggle('collapsed',sidebarCollapsed)}</script></body>
+</html>

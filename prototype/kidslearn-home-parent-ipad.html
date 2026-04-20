@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1024">
+<title>趣学星球 - 家长模式首页（iPad横屏）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#FF6B6B;--primary-light:#FF8E8E;--accent:#FFE66D;--teal:#4ECDC4;--teal-dark:#26A69A;--bg:#F7F7F7;--white:#FFF;--text:#333;--text-light:#999;--radius:16px;--shadow:0 4px 20px rgba(0,0,0,.08)}
+html,body{height:100%;overflow:hidden}
+body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:var(--bg);display:flex}
+
+/* ========== 左侧导航（家长模式） ========== */
+.sidebar{
+  width:220px;height:100vh;background:var(--white);
+  display:flex;flex-direction:column;align-items:center;
+  border-right:1px solid #F0F0F0;flex-shrink:0;
+  position:relative;z-index:10;
+}
+.sidebar-logo{
+  padding:28px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;
+}
+.sidebar-emoji{font-size:48px}
+.sidebar-title{font-size:18px;font-weight:800;color:var(--teal)}
+.sidebar-sub{font-size:11px;color:var(--text-light)}
+
+.nav-items{flex:1;display:flex;flex-direction:column;gap:4px;padding:8px 12px;width:100%}
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:14px 16px;
+  border-radius:12px;cursor:pointer;border:none;background:none;width:100%;
+  font-size:15px;font-weight:600;color:#666;transition:all .15s;text-align:left;
+}
+.nav-item:hover{background:#F0FAFA;color:var(--teal)}
+.nav-item.active{background:#E8F8F8;color:var(--teal)}
+.nav-item .nav-icon{font-size:22px;flex-shrink:0}
+.nav-item .nav-badge{
+  margin-left:auto;background:var(--teal);color:#FFF;
+  font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;
+}
+
+.sidebar-user{
+  width:100%;padding:16px;border-top:1px solid #F5F5F5;
+  display:flex;align-items:center;gap:12px;
+}
+.user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--teal),var(--teal-dark));display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.user-info{flex:1;overflow:hidden}
+.user-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-level{font-size:11px;color:var(--text-light)}
+.user-gems{font-size:20px;cursor:pointer}
+
+/* ========== 主内容区 ========== */
+.main{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* 顶部栏 */
+.top-bar{
+  height:64px;background:linear-gradient(135deg,var(--teal),var(--teal-dark));
+  display:flex;align-items:center;padding:0 32px;gap:16px;flex-shrink:0;
+  box-shadow:0 2px 8px rgba(78,205,196,.3);
+}
+.top-mode-badge{
+  background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.4);
+  border-radius:20px;padding:6px 16px;
+  font-size:15px;font-weight:700;color:#FFF;
+  display:flex;align-items:center;gap:6px;
+  flex-shrink:0;
+}
+.top-greeting{flex:1}
+.top-greeting h2{font-size:20px;font-weight:800;color:#FFF}
+.top-greeting p{font-size:13px;color:rgba(255,255,255,.8)}
+.top-actions{display:flex;gap:10px}
+
+.top-icon-btn{
+  width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.2);
+  border:1px solid rgba(255,255,255,.3);
+  font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;color:#FFF;
+}
+.top-icon-btn:hover{background:rgba(255,255,255,.3)}
+
+.exit-parent-btn{
+  height:36px;border-radius:18px;border:1px solid rgba(255,255,255,.5);
+  padding:0 16px;background:rgba(255,255,255,.15);
+  color:#FFF;font-size:13px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;gap:6px;
+  transition:all .15s;flex-shrink:0;
+}
+.exit-parent-btn:hover{background:rgba(255,255,255,.3)}
+
+/* 内容滚动区 */
+.content-scroll{flex:1;overflow-y:auto;padding:24px 32px 24px}
+
+/* 家长模式标签条 */
+.mode-strip{
+  background:linear-gradient(135deg,var(--teal),var(--teal-dark));
+  border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;
+  gap:16px;margin-bottom:24px;box-shadow:0 4px 16px rgba(78,205,196,.25);
+}
+.mode-strip-icon{font-size:36px}
+.mode-strip-info{flex:1}
+.mode-strip-title{font-size:16px;font-weight:800;color:#FFF}
+.mode-strip-desc{font-size:13px;color:rgba(255,255,255,.8);margin-top:2px}
+.mode-strip-action{
+  background:#FFF;color:var(--teal);border:none;border-radius:12px;
+  padding:8px 20px;font-size:14px;font-weight:700;cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.1);
+}
+
+/* 双列布局 */
+.content-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+
+/* 卡片通用 */
+.card{background:var(--white);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.card-header{
+  padding:16px 20px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid #F5F5F5;
+}
+.card-title{font-size:16px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+.card-more{font-size:13px;color:var(--text-light);cursor:pointer}
+.card-body{padding:16px 20px}
+
+/* 学习报告 */
+.report-card{grid-column:1/-1}
+.report-body{display:flex;flex-direction:column;gap:14px}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stat-box{background:#F8F9FA;border-radius:12px;padding:16px 8px;text-align:center}
+.stat-emoji{font-size:26px;margin-bottom:6px}
+.stat-val{font-size:24px;font-weight:800;color:var(--text)}
+.stat-label{font-size:13px;color:var(--text-light);margin-top:2px}
+.chart-area{background:#F8F9FA;border-radius:12px;padding:16px}
+.chart-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px}
+.bar-chart{display:flex;align-items:flex-end;gap:8px;height:80px;justify-content:space-around}
+.bar-col{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.bar{width:28px;background:linear-gradient(180deg,var(--teal),var(--teal-dark));border-radius:4px 4px 0 0}
+.bar-label{font-size:11px;color:var(--text-light)}
+.bar-val{font-size:10px;color:var(--text-light);font-weight:600}
+
+/* 管控状态 */
+.control-card{}
+.control-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #F5F5F5}
+.control-item:last-child{border:none}
+.control-left{display:flex;align-items:center;gap:10px}
+.control-icon{font-size:22px}
+.control-name{font-size:15px;font-weight:600;color:var(--text)}
+.control-desc{font-size:12px;color:var(--text-light)}
+.toggle-switch{width:44px;height:24px;background:#CCC;border-radius:12px;position:relative;cursor:pointer;border:none;transition:background .2s}
+.toggle-switch.on{background:#2ECC71}
+.toggle-switch::after{content:'';position:absolute;width:20px;height:20px;background:#FFF;border-radius:50%;top:2px;left:2px;transition:transform .2s}
+.toggle-switch.on::after{transform:translateX(20px)}
+.status-badge{padding:4px 10px;border-radius:10px;font-size:12px;font-weight:600}
+.status-on{background:#E8F8EE;color:#2ECC71}
+.status-off{background:#FFF0F0;color:#E74C3C}
+
+/* 待处理 */
+.alert-card{}
+.alert-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #F5F5F5;cursor:pointer}
+.alert-item:last-child{border:none}
+.alert-icon{font-size:28px;flex-shrink:0}
+.alert-info{flex:1}
+.alert-title{font-size:14px;font-weight:700;color:var(--text)}
+.alert-desc{font-size:12px;color:var(--text-light);margin-top:2px}
+.alert-action{font-size:18px}
+
+/* VIP卡片 */
+.vip-card{background:linear-gradient(135deg,#FFD700,#FFA500);border-radius:var(--radius);padding:18px 24px;display:flex;align-items:center;gap:14px;grid-column:1/-1;box-shadow:0 4px 20px rgba(255,165,0,.25);cursor:pointer}
+.vip-icon{font-size:40px}
+.vip-info{flex:1}
+.vip-title{font-size:16px;font-weight:800;color:#5D3A00}
+.vip-desc{font-size:13px;color:#7D5A00;margin-top:2px}
+.vip-btn{background:#5D3A00;color:#FFD700;border:none;border-radius:12px;padding:8px 18px;font-size:14px;font-weight:700;cursor:pointer}
+
+/* 使用记录 */
+.usage-card{}
+.usage-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #F5F5F5}
+.usage-item:last-child{border:none}
+.usage-left{display:flex;align-items:center;gap:10px}
+.usage-icon{font-size:20px}
+.usage-app{font-size:14px;color:var(--text)}
+.usage-time{font-size:12px;color:var(--text-light)}
+.usage-dur{font-size:14px;font-weight:600;color:var(--text)}
+
+/* 快捷入口 */
+.quick-card{
+  background:var(--white);border-radius:var(--radius);padding:18px 20px;
+  display:flex;align-items:center;gap:14px;cursor:pointer;
+  box-shadow:var(--shadow);transition:all .2s;
+}
+.quick-card:hover{transform:translateY(-2px)}
+.quick-icon{font-size:40px;flex-shrink:0}
+.quick-info{flex:1}
+.quick-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px}
+.quick-desc{font-size:13px;color:var(--text-light)}
+.quick-action{font-size:28px}
+
+/* 退出按钮 */
+.action-btns{display:flex;flex-direction:column;gap:10px;grid-column:1/-1;margin-top:4px}
+.action-btn{height:48px;border-radius:14px;border:none;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s}
+.action-btn:active{transform:scale(.97)}
+.btn-logout{background:#FFF;color:#E74C3C;border:2px solid #E74C3C}
+.btn-report{background:var(--white);color:var(--teal);border:2px solid var(--teal)}
+.btn-alert{background:var(--white);color:#F39C12;border:2px solid #F39C12}
+</style>
+</head>
+<body>
+
+<!-- 左侧导航（家长模式7项完整版） -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-emoji">🌟</div>
+    <div class="sidebar-title">趣学星球</div>
+    <div class="sidebar-sub">KidsLearn</div>
+  </div>
+  <nav class="nav-items">
+    <button class="nav-item" onclick="location.href='kidslearn-parent-ipad.html'">
+      <span class="nav-icon">👨‍👩‍👧</span>家长中心
+    </button>
+    <button class="nav-item" onclick="location.href='kidslearn-vip-ipad.html'">
+      <span class="nav-icon">👑</span>VIP会员
+    </button>
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar">🐱</div>
+    <div class="user-info">
+      <div class="user-name">小明</div>
+      <div class="user-level">👨‍👩‍👧 家长模式</div>
+    </div>
+    <div class="user-gems">💎</div>
+  </div>
+</aside>
+
+<!-- 主内容 -->
+<main class="main">
+  <header class="top-bar">
+    <!-- 家长模式标签 -->
+    <div class="top-mode-badge">👨‍👩‍👧 家长模式</div>
+
+    <div class="top-greeting">
+      <h2>家长中心</h2>
+      <p>查看小明的学习情况 · 2026年4月20日</p>
+    </div>
+
+    <div class="top-actions">
+      <button class="top-icon-btn">🔔</button>
+      <button class="exit-parent-btn" onclick="exitParentMode()">
+        🚪 退出家长模式
+      </button>
+    </div>
+  </header>
+
+  <div class="content-scroll">
+    <!-- 家长模式状态条 -->
+    <div class="mode-strip">
+      <div class="mode-strip-icon">🛡️</div>
+      <div class="mode-strip-info">
+        <div class="mode-strip-title">家长管控已开启</div>
+        <div class="mode-strip-desc">当前查看小明（一年级）的学习数据</div>
+      </div>
+      <button class="mode-strip-action" onclick="location.href='kidslearn-parent-ipad.html'">家长中心 ›</button>
+    </div>
+
+    <div class="content-grid">
+      <!-- 学习报告 -->
+      <div class="card report-card">
+        <div class="card-header">
+          <div class="card-title">📊 本周学习报告</div>
+          <div class="card-more">详细报告 ›</div>
+        </div>
+        <div class="card-body report-body">
+          <div class="stat-grid">
+            <div class="stat-box">
+              <div class="stat-emoji">⏱️</div>
+              <div class="stat-val">4.5h</div>
+              <div class="stat-label">学习时长</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-emoji">✅</div>
+              <div class="stat-val">28</div>
+              <div class="stat-label">完成关卡</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-emoji">🎯</div>
+              <div class="stat-val">85%</div>
+              <div class="stat-label">正确率</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-emoji">🏆</div>
+              <div class="stat-val">328</div>
+              <div class="stat-label">全国排名</div>
+            </div>
+          </div>
+          <div class="chart-area">
+            <div class="chart-title">📈 每日学习时长（分钟）</div>
+            <div class="bar-chart">
+              <div class="bar-col"><div class="bar-val">45</div><div class="bar" style="height:60px"></div><div class="bar-label">一</div></div>
+              <div class="bar-col"><div class="bar-val">60</div><div class="bar" style="height:80px"></div><div class="bar-label">二</div></div>
+              <div class="bar-col"><div class="bar-val">30</div><div class="bar" style="height:40px"></div><div class="bar-label">三</div></div>
+              <div class="bar-col"><div class="bar-val">50</div><div class="bar" style="height:67px"></div><div class="bar-label">四</div></div>
+              <div class="bar-col"><div class="bar-val">55</div><div class="bar" style="height:73px"></div><div class="bar-label">五</div></div>
+              <div class="bar-col"><div class="bar-val">20</div><div class="bar" style="height:27px"></div><div class="bar-label">六</div></div>
+              <div class="bar-col"><div class="bar-val">10</div><div class="bar" style="height:13px"></div><div class="bar-label">日</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 管控状态 -->
+      <div class="card control-card">
+        <div class="card-header">
+          <div class="card-title">⏰ 时间管控状态</div>
+        </div>
+        <div class="card-body">
+          <div class="control-item">
+            <div class="control-left">
+              <div class="control-icon">🕐</div>
+              <div>
+                <div class="control-name">时长上限</div>
+                <div class="control-desc">每日60分钟</div>
+              </div>
+            </div>
+            <span class="status-badge status-on">已启用</span>
+          </div>
+          <div class="control-item">
+            <div class="control-left">
+              <div class="control-icon">🌙</div>
+              <div>
+                <div class="control-name">禁用时段</div>
+                <div class="control-desc">22:00 - 8:00</div>
+              </div>
+            </div>
+            <span class="status-badge status-on">已启用</span>
+          </div>
+          <div class="control-item">
+            <div class="control-left">
+              <div class="control-icon">💎</div>
+              <div>
+                <div class="control-name">充值管控</div>
+                <div class="control-desc">禁止内购</div>
+              </div>
+            </div>
+            <span class="status-badge status-on">已禁止</span>
+          </div>
+          <div class="control-item">
+            <div class="control-left">
+              <div class="control-icon">🔢</div>
+              <div>
+                <div class="control-name">编程学科</div>
+                <div class="control-desc">VIP专属</div>
+              </div>
+            </div>
+            <span class="status-badge status-off">未解锁</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 待处理 -->
+      <div class="card alert-card">
+        <div class="card-header">
+          <div class="card-title">⚠️ 待处理事项</div>
+          <div class="card-more">全部 ›</div>
+        </div>
+        <div class="card-body">
+          <div class="alert-item">
+            <div class="alert-icon">⏰</div>
+            <div class="alert-info">
+              <div class="alert-title">今日时长即将用完</div>
+              <div class="alert-desc">已使用58分钟，剩余2分钟</div>
+            </div>
+            <div class="alert-action">›</div>
+          </div>
+          <div class="alert-item">
+            <div class="alert-icon">👀</div>
+            <div class="alert-info">
+              <div class="alert-title">护眼提醒</div>
+              <div class="alert-desc">已连续使用20分钟，建议休息</div>
+            </div>
+            <div class="alert-action">›</div>
+          </div>
+          <div class="alert-item">
+            <div class="alert-icon">📱</div>
+            <div class="alert-info">
+              <div class="alert-title">新学科解锁申请</div>
+              <div class="alert-desc">小明申请解锁「编程」学科</div>
+            </div>
+            <div class="alert-action">›</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 今日使用 -->
+      <div class="card usage-card">
+        <div class="card-header">
+          <div class="card-title">📱 今日使用记录</div>
+          <div class="card-more">完整记录 ›</div>
+        </div>
+        <div class="card-body">
+          <div class="usage-item">
+            <div class="usage-left">
+              <div class="usage-icon">📖</div>
+              <div><div class="usage-app">语文学习</div><div class="usage-time">09:00 - 09:45</div></div>
+            </div>
+            <div class="usage-dur">45分钟</div>
+          </div>
+          <div class="usage-item">
+            <div class="usage-left">
+              <div class="usage-icon">🔢</div>
+              <div><div class="usage-app">数学学习</div><div class="usage-time">14:00 - 14:20</div></div>
+            </div>
+            <div class="usage-dur">20分钟</div>
+          </div>
+          <div class="usage-item">
+            <div class="usage-left">
+              <div class="usage-icon">🐱</div>
+              <div><div class="usage-app">宠物互动</div><div class="usage-time">19:30 - 19:55</div></div>
+            </div>
+            <div class="usage-dur">25分钟</div>
+          </div>
+        </div>
+      </div>
+
+
+
+      <!-- VIP推广卡片 -->
+      <div class="vip-card" onclick="location.href='kidslearn-vip-ipad.html'">
+        <div class="vip-icon">👑</div>
+        <div class="vip-info">
+          <div class="vip-title">开通VIP，解锁全部学科</div>
+          <div class="vip-desc">编程课 · 编程课 · 进阶数学 · 科学实验</div>
+        </div>
+        <button class="vip-btn">立即开通</button>
+      </div>
+
+      <!-- 操作按钮 -->
+      <div class="action-btns">
+        <button class="action-btn btn-report" onclick="alert('📄 正在生成学习报告...')">📄 导出本周学习报告</button>
+        <button class="action-btn btn-alert" onclick="alert('✅ 异常通知已开启')">⚠️ 开启异常通知</button>
+        <button class="action-btn btn-logout" onclick="exitParentMode()">🚪 退出家长模式</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+function exitParentMode(){
+  sessionStorage.removeItem('kidslearn_parent_mode');
+  var ref = sessionStorage.getItem('kidslearn_gate_ref') || 'kidslearn-home-ipad.html';
+  sessionStorage.removeItem('kidslearn_gate_ref');
+  location.href = ref;
+}
+</script>
+</body>
+</html>

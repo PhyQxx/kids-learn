@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1024">
+<title>趣学星球 - VIP会员（iPad横屏）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#FF6B6B;--primary-light:#FF8E8E;--accent:#FFE66D;--teal:#4ECDC4;--gold:#FFD700;--bg:#F7F7F7;--dark:#1A1A2E;--dark2:#16213E;--white:#FFF;--text:#333;--text-light:#999;--radius:16px;--shadow:0 4px 20px rgba(0,0,0,.08)}
+html,body{height:100%;overflow:hidden}
+body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:var(--dark);display:flex}
+
+.sidebar{width:220px;height:100vh;background:var(--dark2);display:flex;flex-direction:column;align-items:center;border-right:1px solid rgba(255,255,255,.06);flex-shrink:0;position:relative;z-index:10}
+.sidebar-logo{padding:28px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+.sidebar-emoji{font-size:48px}
+.sidebar-title{font-size:18px;font-weight:800;color:var(--gold)}
+.sidebar-sub{font-size:11px;color:rgba(255,255,255,.4)}
+.nav-items{flex:1;display:flex;flex-direction:column;gap:4px;padding:8px 12px;width:100%}
+.nav-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;border:none;background:none;width:100%;font-size:15px;font-weight:600;color:rgba(255,255,255,.5);transition:all .15s;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,.05);color:rgba(255,255,255,.8)}
+.nav-item.active{background:rgba(255,215,0,.1);color:var(--gold)}
+.nav-item .nav-icon{font-size:22px;flex-shrink:0}
+.sidebar-user{width:100%;padding:16px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:12px}
+.user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#FFA500);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.user-info{flex:1;overflow:hidden}
+.user-name{font-size:14px;font-weight:700;color:#FFF;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-level{font-size:11px;color:var(--gold)}
+
+.main{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.top-bar{height:64px;background:var(--dark2);display:flex;align-items:center;padding:0 32px;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.2);flex-shrink:0}
+.back-btn{width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.08);border:none;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#FFF}
+.top-title{font-size:20px;font-weight:800;color:#FFF}
+
+.content-scroll{flex:1;overflow-y:auto;padding:20px 32px 24px}
+
+/* 英雄区 */
+.hero{
+  background:linear-gradient(180deg,#1A1A2E 0%,#2C2C7A 100%);
+  border-radius:var(--radius);padding:32px;text-align:center;
+  position:relative;overflow:hidden;margin-bottom:20px;
+}
+.hero::before{content:'';position:absolute;top:-60px;right:-60px;width:240px;height:240px;background:radial-gradient(circle,rgba(255,215,0,.12),transparent 70%);border-radius:50%}
+.hero-emoji{font-size:80px;margin-bottom:14px;animation:float 3s ease-in-out infinite;display:block}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.hero-title{font-size:30px;font-weight:900;background:linear-gradient(135deg,#FFD700,#FFA500);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+.hero-sub{font-size:14px;color:#A0A0C0;margin-bottom:16px}
+.current-vip{background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);border-radius:12px;padding:10px 24px;display:inline-flex;align-items:center;gap:8px;font-size:14px;color:var(--gold);font-weight:600}
+
+/* 左右布局 */
+.vip-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+
+/* 套餐 */
+.plans{display:flex;flex-direction:column;gap:14px}
+.plan-card{
+  background:#1E1E3F;border-radius:var(--radius);padding:20px 22px;
+  border:2px solid transparent;cursor:pointer;transition:all .2s;
+  position:relative;overflow:hidden;
+}
+.plan-card:hover{transform:translateY(-2px)}
+.plan-card.featured{border-color:var(--gold);background:linear-gradient(135deg,#2A2A4A,#1E1E3F)}
+.plan-card.featured::before{content:'推荐';position:absolute;top:12px;right:-22px;background:var(--gold);color:var(--dark);font-size:11px;font-weight:800;padding:3px 26px;transform:rotate(45deg)}
+.plan-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.plan-name{font-size:17px;font-weight:800;color:#FFF}
+.plan-badge{background:rgba(255,215,0,.2);color:var(--gold);font-size:12px;font-weight:700;padding:3px 10px;border-radius:8px}
+.plan-price{font-size:30px;font-weight:900;color:var(--gold);margin-bottom:4px}
+.plan-price span{font-size:15px;font-weight:400;color:#666;text-decoration:line-through;margin-left:6px}
+.plan-period{font-size:13px;color:#888;margin-bottom:12px}
+.plan-features{list-style:none;display:flex;flex-direction:column;gap:7px;margin-bottom:4px}
+.plan-features li{font-size:13px;color:#D0D0E0;display:flex;align-items:center;gap:8px}
+.plan-features li::before{content:'✓';color:var(--gold);font-weight:700;font-size:14px}
+.plan-btn{width:100%;height:46px;border-radius:23px;border:none;font-size:15px;font-weight:700;cursor:pointer;transition:all .15s;margin-top:12px}
+.plan-card.featured .plan-btn{background:linear-gradient(135deg,#FFD700,#FFA500);color:var(--dark)}
+.plan-card:not(.featured) .plan-btn{background:rgba(255,255,255,.1);color:#FFF}
+.plan-btn:active{transform:scale(.97)}
+
+/* 权益对比 */
+.compare-card{background:#1E1E3F;border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.compare-title{font-size:17px;font-weight:700;color:#FFF;margin-bottom:14px}
+.compare-row{display:flex;align-items:center;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+.compare-row:last-child{border:none}
+.compare-item{flex:1;font-size:14px;color:#D0D0E0;display:flex;align-items:center;gap:8px}
+.compare-free{text-align:center;width:64px;font-size:13px;color:#888}
+.compare-vip{text-align:center;width:64px;font-size:13px;color:var(--gold);font-weight:700}
+.check{color:#2ECC71}.cross{color:#555}
+
+/* FAQ */
+.faq-card{background:#1E1E3F;border-radius:var(--radius);padding:20px;grid-column:1/-1}
+.faq-title{font-size:17px;font-weight:700;color:#FFF;margin-bottom:12px}
+.faq-item{background:#252550;border-radius:12px;padding:14px 16px;margin-bottom:8px;cursor:pointer}
+.faq-q{display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:600;color:#FFF}
+.faq-a{font-size:13px;color:#A0A0C0;margin-top:8px;display:none;line-height:1.6}
+.faq-item.open .faq-a{display:block}
+.faq-item.open .faq-arrow{transform:rotate(180deg)}
+.faq-arrow{font-size:14px;transition:transform .2s;color:#666}
+
+
+
+.tab-icon{font-size:28px;transition:transform .15s}
+.tab-label{font-size:12px;color:rgba(255,255,255,.4);font-weight:600}
+.tab-item.active .tab-label{color:var(--gold);font-weight:700}
+.tab-item.active .tab-icon{transform:scale(1.1)}
+.sidebar.collapsed{width:60px}
+.sidebar.collapsed .sidebar-title,.sidebar.collapsed .sidebar-sub,.sidebar.collapsed .user-info,.sidebar.collapsed .nav-item span:not(.nav-icon),.sidebar.collapsed .sidebar-user .user-gems{display:none}
+.sidebar.collapsed .nav-item{justify-content:center;padding:14px 0}
+.sidebar.collapsed .sidebar-logo{padding:20px 0}
+.sidebar.collapsed .sidebar-user{justify-content:center;padding:12px 0}
+.sidebar-toggle{cursor:pointer;font-size:20px;padding:8px 0;text-align:center;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo"><div class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开侧边栏">☰</div>
+    <div class="sidebar-emoji">🌟</div>
+    <div class="sidebar-title">趣学星球</div>
+    <div class="sidebar-sub">KidsLearn</div>
+  </div>
+  <nav class="nav-items">
+    <button class="nav-item" onclick="location.href='kidslearn-home-ipad.html'"><span class="nav-icon">🏠</span>首页</button>
+    <button class="nav-item" onclick="location.href='kidslearn-grade-ipad.html'"><span class="nav-icon">📖</span>学习中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-pet-ipad.html'"><span class="nav-icon">🐱</span>宠物养成</button>
+    <button class="nav-item" onclick="location.href='kidslearn-ranking-ipad.html'"><span class="nav-icon">🏆</span>排行榜</button>
+    <button class="nav-item" onclick="location.href='kidslearn-achievement-ipad.html'"><span class="nav-icon">🎖️</span>成就中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-parent-ipad.html'"><span class="nav-icon">👨‍👩‍👧</span>家长中心</button>
+    <button class="nav-item active"><span class="nav-icon">👑</span>VIP会员</button>
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar">👑</div>
+    <div class="user-info"><div class="user-name">小明</div><div class="user-level">VIP会员</div></div>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="top-bar">
+    <button class="back-btn" onclick="history.back()">‹</button>
+    <div class="top-title">💎 VIP会员</div>
+  </header>
+
+  <div class="content-scroll">
+    <div class="hero">
+      <div class="hero-emoji">👑</div>
+      <div class="hero-title">趣学星球 VIP</div>
+      <div class="hero-sub">解锁全部优质内容，让孩子学习更出色</div>
+      <div class="current-vip">⭐ 您是尊贵会员，有效期至 2027-04-20</div>
+    </div>
+
+    <div class="vip-grid">
+      <div>
+        <div class="plans">
+          <div class="plan-card">
+            <div class="plan-header">
+              <div class="plan-name">月度会员</div>
+            </div>
+            <div class="plan-price">¥25 <span>¥30</span></div>
+            <div class="plan-period">30天 · 约0.83元/天</div>
+            <ul class="plan-features">
+              <li>全部付费内容畅学</li>
+              <li>无限制离线缓存</li>
+              <li>高级宠物和装扮</li>
+              <li>详细学习报告</li>
+            </ul>
+            <button class="plan-btn">立即订阅</button>
+          </div>
+
+          <div class="plan-card featured">
+            <div class="plan-header">
+              <div class="plan-name">年度会员</div>
+              <div class="plan-badge">限时省40%</div>
+            </div>
+            <div class="plan-price">¥168 <span>¥298</span></div>
+            <div class="plan-period">365天 · 约0.46元/天</div>
+            <ul class="plan-features">
+              <li>全部付费内容畅学</li>
+              <li>无限制离线缓存</li>
+              <li>高级宠物和装扮</li>
+              <li>详细学习报告</li>
+              <li>专属VIP客服</li>
+              <li>优先体验新功能</li>
+            </ul>
+            <button class="plan-btn">立即订阅 ›</button>
+          </div>
+
+          <div class="plan-card">
+            <div class="plan-header">
+              <div class="plan-name">永久买断</div>
+              <div class="plan-badge" style="background:rgba(155,89,182,.3);color:#9B59B6">最划算</div>
+            </div>
+            <div class="plan-price">¥298</div>
+            <div class="plan-period">永久有效 · 一次购买终身享用</div>
+            <ul class="plan-features">
+              <li>全部付费内容永久</li>
+              <li>无限制离线缓存</li>
+              <li>全部宠物和装扮</li>
+              <li>详细学习报告</li>
+              <li>1v1专属客服</li>
+              <li>未来所有内容</li>
+            </ul>
+            <button class="plan-btn">立即买断</button>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <!-- 权益对比 -->
+        <div class="compare-card">
+          <div class="compare-title">⚖️ 权益对比</div>
+          <div class="compare-row">
+            <div class="compare-item">📚 学习内容</div>
+            <div class="compare-free">基础</div>
+            <div class="compare-vip">全部</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-item">🐱 宠物装扮</div>
+            <div class="compare-free">基础款</div>
+            <div class="compare-vip">全解锁</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-item">📊 学习报告</div>
+            <div class="compare-free">基础版</div>
+            <div class="compare-vip">详细版</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-item">💾 离线缓存</div>
+            <div class="compare-free">3个课程</div>
+            <div class="compare-vip">无限制</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-item">⚔️ 挑战赛次数</div>
+            <div class="compare-free">每日3次</div>
+            <div class="compare-vip">无限制</div>
+          </div>
+          <div class="compare-row">
+            <div class="compare-item">🎧 客服优先级</div>
+            <div class="compare-free">普通</div>
+            <div class="compare-vip">优先</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FAQ -->
+      <div class="faq-card">
+        <div class="faq-title">❓ 常见问题</div>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">付费后可以退款吗？<span class="faq-arrow">▼</span></div>
+          <div class="faq-a">订阅制会员（月度/年度）在购买后7天内，如使用时长不超过3天，可申请全额退款。超过7天或使用超过3天后，不支持退款，但可在订阅到期前取消续订。</div>
+        </div>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">如何取消订阅？<span class="faq-arrow">▼</span></div>
+          <div class="faq-a">您可以在手机设置 → Apple ID → 订阅中取消，或在应用内「我的」→「VIP会员」→「取消订阅」中操作。</div>
+        </div>
+        <div class="faq-item" onclick="this.classList.toggle('open')">
+          <div class="faq-q">买断后还需要付费吗？<span class="faq-arrow">▼</span></div>
+          <div class="faq-a">永久买断后，所有当前及未来发布的付费内容均无需额外付费，一次购买终身享用。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+
+
+<script>var sidebarCollapsed=false;function toggleSidebar(){var s=document.querySelector('.sidebar');sidebarCollapsed=!sidebarCollapsed;s.classList.toggle('collapsed',sidebarCollapsed)}</script></body>
+</html>

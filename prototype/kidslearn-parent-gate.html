@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>家长验证 - 趣学星球</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#FF6B6B;--primary-light:#FF8E8E;--teal:#4ECDC4;--text:#333;--text-light:#999;--white:#FFF}
+html,body{height:100%}
+body{
+  font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;
+  background:linear-gradient(145deg,#FFF5F5 0%,#FFF9F9 50%,#F0FAF9 100%);
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+}
+
+.bg-deco{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.bg-circle{position:absolute;border-radius:50%;opacity:.15}
+.bg-circle.c1{width:300px;height:300px;background:var(--primary);top:-80px;right:-60px}
+.bg-circle.c2{width:200px;height:200px;background:var(--teal);bottom:-40px;left:-50px}
+.bg-circle.c3{width:120px;height:120px;background:var(--primary-light);top:40%;left:10%}
+
+.gate-overlay{
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.45);
+  display:flex;align-items:center;justify-content:center;
+  z-index:1000;
+  backdrop-filter:blur(4px);
+}
+
+.gate-card{
+  background:var(--white);border-radius:28px;
+  padding:36px 32px 32px;
+  width:400px;max-width:92vw;
+  box-shadow:0 24px 80px rgba(0,0,0,.18);
+  position:relative;z-index:1;
+  text-align:center;
+  animation:cardIn .3s ease;
+}
+@keyframes cardIn{
+  from{transform:scale(.9) translateY(20px);opacity:0}
+  to{transform:scale(1) translateY(0);opacity:1}
+}
+
+.gate-close{
+  position:absolute;top:16px;right:16px;
+  width:36px;height:36px;border-radius:50%;
+  background:#F5F5F5;border:none;font-size:20px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.gate-close:hover{background:#EEE}
+
+.gate-icon{font-size:64px;margin-bottom:12px;display:block}
+.gate-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:6px}
+.gate-sub{font-size:14px;color:var(--text-light);margin-bottom:24px;line-height:1.5}
+
+/* 验证方式切换 */
+.verify-tabs{
+  display:flex;background:#F5F5F5;border-radius:12px;
+  padding:4px;margin-bottom:22px;
+}
+.vtab{
+  flex:1;height:40px;border-radius:9px;border:none;
+  font-size:14px;font-weight:600;color:var(--text-light);
+  background:none;cursor:pointer;transition:all .2s;
+}
+.vtab.active{
+  background:var(--white);color:var(--primary);
+  box-shadow:0 2px 6px rgba(0,0,0,.08);
+}
+
+/* 表单输入 */
+.form-group{margin-bottom:16px;text-align:left}
+.form-label{font-size:13px;font-weight:600;color:#666;margin-bottom:6px;display:block;padding-left:2px}
+.form-input{
+  width:100%;height:52px;border-radius:14px;
+  border:2px solid #E8E8E8;padding:0 16px;
+  font-size:16px;color:var(--text);
+  outline:none;transition:border-color .2s;
+  background:var(--white);
+}
+.form-input:focus{border-color:var(--primary)}
+.form-input::placeholder{color:#BBB}
+
+.form-row{display:flex;gap:10px}
+.form-row .form-input{flex:1}
+
+/* 获取验证码按钮 */
+.code-btn{
+  height:52px;min-width:120px;border-radius:14px;border:none;
+  background:var(--primary);color:var(--white);
+  font-size:14px;font-weight:700;padding:0 16px;
+  cursor:pointer;white-space:nowrap;transition:all .15s;
+}
+.code-btn:disabled{background:#CCC;cursor:not-allowed}
+.code-btn:hover:not(:disabled){background:var(--primary-light)}
+
+/* 确认按钮 */
+.gate-submit{
+  width:100%;height:52px;border-radius:14px;
+  border:none;background:var(--primary);
+  color:var(--white);font-size:17px;font-weight:700;
+  cursor:pointer;margin-top:8px;
+  box-shadow:0 6px 20px rgba(255,107,107,.35);
+  transition:all .15s;
+}
+.gate-submit:hover{background:var(--primary-light);transform:translateY(-1px)}
+.gate-submit:active{transform:translateY(0)}
+
+/* 密码输入框 */
+.pwd-input-wrap{
+  position:relative;
+}
+.pwd-toggle{
+  position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  background:none;border:none;font-size:18px;cursor:pointer;color:#999;
+  padding:4px;
+}
+
+/* 错误提示 */
+.error-msg{font-size:13px;color:#E74C3C;text-align:center;min-height:20px;margin-top:8px}
+
+/* 底部链接 */
+.gate-links{display:flex;justify-content:center;gap:16px;margin-top:16px}
+.gate-link{font-size:13px;color:var(--text-light);text-decoration:underline;cursor:pointer;background:none;border:none}
+.gate-link:hover{color:var(--primary)}
+
+.gate-brand{margin-top:20px;font-size:12px;color:var(--text-light);display:flex;align-items:center;justify-content:center;gap:6px}
+
+/* 验证成功动画 */
+.success-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);
+  display:flex;align-items:center;justify-content:center;
+  z-index:2000;opacity:0;pointer-events:none;
+  transition:opacity .3s;backdrop-filter:blur(4px);
+}
+.success-overlay.show{opacity:1;pointer-events:all}
+.success-card{
+  background:var(--white);border-radius:24px;padding:40px;
+  text-align:center;transform:scale(.8);
+  transition:transform .4s cubic-bezier(.34,1.56,.64,1);
+}
+.success-overlay.show .success-card{transform:scale(1)}
+.success-icon{font-size:72px;margin-bottom:16px;animation:bounceIn .5s}
+@keyframes bounceIn{0%{transform:scale(0)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+.success-title{font-size:22px;font-weight:800;color:var(--text);margin-bottom:8px}
+.success-sub{font-size:14px;color:var(--text-light)}
+</style>
+</head>
+<body>
+
+<div class="bg-deco">
+  <div class="bg-circle c1"></div>
+  <div class="bg-circle c2"></div>
+  <div class="bg-circle c3"></div>
+</div>
+
+<!-- 验证弹窗 -->
+<div class="gate-overlay" id="gateOverlay">
+  <div class="gate-card">
+    <button class="gate-close" onclick="closeGate()">✕</button>
+    <span class="gate-icon">🛡️</span>
+    <div class="gate-title">家长验证</div>
+    <div class="gate-sub">为了保护孩子的安全<br>请完成身份验证后进入家长模式</div>
+
+    <!-- 验证方式切换 -->
+    <div class="verify-tabs">
+      <button class="vtab active" id="tabPwd" onclick="switchTab('pwd')">🔑 账号密码</button>
+      <button class="vtab" id="tabSms" onclick="switchTab('sms')">📱 短信验证</button>
+    </div>
+
+    <!-- 账号密码验证 -->
+    <div id="pwdPanel">
+      <div class="form-group">
+        <label class="form-label">手机号</label>
+        <input class="form-input" type="tel" id="loginPhone" placeholder="请输入注册手机号" value="13812345678">
+      </div>
+      <div class="form-group">
+        <label class="form-label">密码</label>
+        <div class="pwd-input-wrap">
+          <input class="form-input" type="password" id="loginPwd" placeholder="请输入账号密码" value="123456">
+          <button class="pwd-toggle" onclick="togglePwd()">👁️</button>
+        </div>
+      </div>
+      <button class="gate-submit" onclick="verifyPwd()">验证并进入</button>
+      <div class="error-msg" id="pwdError"></div>
+    </div>
+
+    <!-- 短信验证 -->
+    <div id="smsPanel" style="display:none">
+      <div class="form-group">
+        <label class="form-label">手机号</label>
+        <input class="form-input" type="tel" id="smsPhone" placeholder="请输入注册手机号" value="13812345678">
+      </div>
+      <div class="form-group">
+        <label class="form-label">验证码</label>
+        <div class="form-row">
+          <input class="form-input" type="tel" id="smsCode" placeholder="请输入6位验证码" maxlength="6">
+          <button class="code-btn" id="smsBtn" onclick="sendSms()">获取验证码</button>
+        </div>
+      </div>
+      <button class="gate-submit" onclick="verifySms()">验证并进入</button>
+      <div class="error-msg" id="smsError"></div>
+    </div>
+
+    <div class="gate-links">
+      <button class="gate-link" onclick="alert('请联系客服重置密码')">忘记密码？</button>
+      <button class="gate-link" onclick="closeGate()">取消</button>
+    </div>
+    <div class="gate-brand">🌟 趣学星球 · KidsLearn</div>
+  </div>
+</div>
+
+<!-- 验证成功 -->
+<div class="success-overlay" id="successOverlay">
+  <div class="success-card">
+    <div class="success-icon">✅</div>
+    <div class="success-title">验证成功！</div>
+    <div class="success-sub">正在进入家长模式...</div>
+  </div>
+</div>
+
+<script>
+let smsCountdown = 0;
+const DEMO_PHONE = '13812345678';
+const DEMO_PWD = '123456';
+
+function closeGate() {
+  const ref = sessionStorage.getItem('kidslearn_gate_ref') || 'kidslearn-home-ipad.html';
+  sessionStorage.removeItem('kidslearn_gate_ref');
+  location.href = ref;
+}
+
+function togglePwd() {
+  const inp = document.getElementById('loginPwd');
+  const btn = document.querySelector('.pwd-toggle');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+  else { inp.type = 'password'; btn.textContent = '👁️'; }
+}
+
+function switchTab(tab) {
+  document.getElementById('tabPwd').classList.toggle('active', tab === 'pwd');
+  document.getElementById('tabSms').classList.toggle('active', tab === 'sms');
+  document.getElementById('pwdPanel').style.display = tab === 'pwd' ? 'block' : 'none';
+  document.getElementById('smsPanel').style.display = tab === 'sms' ? 'block' : 'none';
+  document.getElementById('pwdError').textContent = '';
+  document.getElementById('smsError').textContent = '';
+}
+
+function verifyPwd() {
+  const phone = document.getElementById('loginPhone').value.trim();
+  const pwd = document.getElementById('loginPwd').value;
+  if (!phone || !pwd) {
+    document.getElementById('pwdError').textContent = '请输入手机号和密码';
+    return;
+  }
+  // 演示：任意输入即可通过
+  showSuccess();
+}
+
+function sendSms() {
+  if (smsCountdown > 0) return;
+  const phone = document.getElementById('smsPhone').value.trim();
+  if (!phone) { document.getElementById('smsError').textContent = '请输入手机号'; return; }
+  const btn = document.getElementById('smsBtn');
+  btn.textContent = '发送中...';
+  setTimeout(() => {
+    smsCountdown = 60;
+    btn.disabled = true;
+    tickSms();
+    document.getElementById('smsError').innerHTML = '<span style="color:#2ECC71">✅ 验证码已发送（演示：123456）</span>';
+  }, 800);
+}
+
+function tickSms() {
+  const btn = document.getElementById('smsBtn');
+  if (smsCountdown > 0) {
+    btn.textContent = smsCountdown + 's';
+    smsCountdown--;
+    setTimeout(tickSms, 1000);
+  } else {
+    btn.textContent = '重新获取';
+    btn.disabled = false;
+  }
+}
+
+function verifySms() {
+  const code = document.getElementById('smsCode').value.trim();
+  if (code.length < 4) {
+    document.getElementById('smsError').textContent = '请输入验证码';
+    return;
+  }
+  showSuccess();
+}
+
+function showSuccess() {
+  document.getElementById('gateOverlay').style.display = 'none';
+  document.getElementById('successOverlay').classList.add('show');
+  sessionStorage.setItem('kidslearn_parent_mode', '1');
+  setTimeout(() => {
+    const ref = sessionStorage.getItem('kidslearn_gate_ref') || 'kidslearn-home-parent-ipad.html';
+    sessionStorage.removeItem('kidslearn_gate_ref');
+    location.href = ref;
+  }, 1500);
+}
+</script>
+</body>
+</html>

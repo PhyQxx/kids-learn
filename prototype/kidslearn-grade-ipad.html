@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1024">
+<title>学习中心 - 趣学星球（iPad横屏）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#4A90D9;--teal:#4ECDC4;--gold:#FFD700;--bg:#F0F7FF;--white:#FFF;--text:#333;--text-light:#999;--radius:20px;--shadow:0 4px 20px rgba(0,0,0,.08)}
+html,body{height:100%;overflow:hidden}
+body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:var(--bg);display:flex}
+
+/* 左侧导航 */
+.sidebar{width:220px;height:100vh;background:var(--white);display:flex;flex-direction:column;align-items:center;border-right:1px solid #F0F0F0;flex-shrink:0}
+.sidebar-logo{padding:28px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+.sidebar-emoji{font-size:48px}
+.sidebar-title{font-size:18px;font-weight:800;color:var(--primary)}
+.sidebar-sub{font-size:11px;color:var(--text-light)}
+.nav-items{flex:1;display:flex;flex-direction:column;gap:4px;padding:8px 12px;width:100%}
+.nav-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;border:none;background:none;width:100%;font-size:15px;font-weight:600;color:#666;transition:all .15s;text-align:left}
+.nav-item:hover{background:#F0F7FF;color:var(--primary)}
+.nav-item.active{background:#E8F0FE;color:var(--primary)}
+.nav-item .nav-icon{font-size:22px;flex-shrink:0}
+.sidebar-user{width:100%;padding:16px;border-top:1px solid #F5F5F5;display:flex;align-items:center;gap:12px}
+.user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--teal));display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.user-info{flex:1;overflow:hidden}
+.user-name{font-size:14px;font-weight:700;color:var(--text)}
+.user-level{font-size:11px;color:var(--text-light)}
+
+/* 主内容 */
+.main{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.top-bar{height:64px;background:var(--white);display:flex;align-items:center;padding:0 32px;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.05);flex-shrink:0}
+.top-bar .back-btn{width:44px;height:44px;border-radius:12px;background:#F5F5F5;border:none;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.top-bar h2{flex:1;font-size:22px;font-weight:800;color:var(--text)}
+.content-scroll{flex:1;overflow-y:auto;padding:28px 32px 24px}
+
+/* 年龄组 */
+.age-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:28px}
+.age-card{
+  background:var(--white);border-radius:var(--radius);padding:28px 24px;
+  display:flex;flex-direction:column;align-items:center;gap:14px;
+  cursor:pointer;box-shadow:var(--shadow);transition:all .2s;
+  border:3px solid transparent;
+}
+.age-card:hover{border-color:var(--primary);transform:translateY(-3px)}
+.age-card.selected{border-color:var(--primary);background:#F8FBFF}
+.age-icon{font-size:80px}
+.age-name{font-size:20px;font-weight:800;color:var(--text)}
+.age-range{font-size:14px;color:var(--text-light)}
+.age-progress{display:flex;flex-direction:column;gap:6px;width:100%}
+.age-prog-label{font-size:12px;color:var(--text-light);display:flex;justify-content:space-between}
+.age-prog-bar{height:10px;background:#E8F0FE;border-radius:5px;overflow:hidden}
+.age-prog-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--teal));border-radius:5px}
+
+/* 学科列表 */
+.subject-section{margin-bottom:24px}
+.section-title{font-size:20px;font-weight:800;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.subject-list{display:flex;flex-direction:column;gap:14px}
+.subject-row{
+  background:var(--white);border-radius:var(--radius);padding:20px 24px;
+  display:flex;align-items:center;gap:16px;cursor:pointer;
+  box-shadow:var(--shadow);transition:all .2s;
+}
+.subject-row:hover{transform:translateX(4px);box-shadow:0 6px 24px rgba(0,0,0,.1)}
+.subject-icon{font-size:48px;flex-shrink:0}
+.subject-info{flex:1}
+.subject-name{font-size:18px;font-weight:800;color:var(--text);margin-bottom:4px}
+.subject-meta{font-size:13px;color:var(--text-light)}
+.subject-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.subject-levels{font-size:14px;font-weight:700;color:var(--primary)}
+.subject-progress-bar{width:120px;height:8px;background:#E8F0FE;border-radius:4px;overflow:hidden}
+.subject-progress-fill{height:100%;background:linear-gradient(90deg,var(--primary),var(--teal));border-radius:4px}
+.subject-vip{background:linear-gradient(135deg,var(--gold),#FFA500);color:#FFF;font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px}
+
+/* 底部Tab */
+
+
+.tab-item.active .tab-icon{transform:scale(1.1)}
+.tab-icon{font-size:28px}
+.tab-label{font-size:12px;color:var(--text-light);font-weight:600}
+.tab-item.active .tab-label{color:var(--primary);font-weight:700}
+.sidebar.collapsed{width:60px}
+.sidebar.collapsed .sidebar-title,.sidebar.collapsed .sidebar-sub,.sidebar.collapsed .user-info,.sidebar.collapsed .nav-item span:not(.nav-icon),.sidebar.collapsed .sidebar-user .user-gems{display:none}
+.sidebar.collapsed .nav-item{justify-content:center;padding:14px 0}
+.sidebar.collapsed .sidebar-logo{padding:20px 0}
+.sidebar.collapsed .sidebar-user{justify-content:center;padding:12px 0}
+.sidebar-toggle{cursor:pointer;font-size:20px;padding:8px 0;text-align:center;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo"><div class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开侧边栏">☰</div>
+    <div class="sidebar-emoji">🌟</div>
+    <div class="sidebar-title">趣学星球</div>
+    <div class="sidebar-sub">KidsLearn</div>
+  </div>
+  <nav class="nav-items">
+    <button class="nav-item" onclick="location.href='kidslearn-home-ipad.html'"><span class="nav-icon">🏠</span>首页</button>
+    <button class="nav-item active"><span class="nav-icon">📖</span>学习中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-pet-ipad.html'"><span class="nav-icon">🐱</span>宠物养成</button>
+    <button class="nav-item" onclick="location.href='kidslearn-ranking-ipad.html'"><span class="nav-icon">🏆</span>排行榜</button>
+    <button class="nav-item" onclick="location.href='kidslearn-achievement-ipad.html'"><span class="nav-icon">🎖️</span>成就中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-parent-ipad.html'"><span class="nav-icon">👨‍👩‍👧</span>家长中心</button>
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar">🐱</div>
+    <div class="user-info"><div class="user-name">小明</div><div class="user-level">Lv.5</div></div>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="top-bar">
+    <button class="back-btn" onclick="location.href='kidslearn-home-ipad.html'">←</button>
+    <h2>📖 学习中心</h2>
+  </header>
+
+  <div class="content-scroll">
+    <!-- 年龄组选择 -->
+    <div class="section-title">👶 选择年龄段</div>
+    <div class="age-cards">
+      <div class="age-card" onclick="location.href='kidslearn-course-ipad.html'">
+        <div class="age-icon">🐣</div>
+        <div class="age-name">🍼 幼幼组</div>
+        <div class="age-range">3-5岁 · 学前启蒙</div>
+        <div class="age-progress">
+          <div class="age-prog-label"><span>总进度</span><span>60%</span></div>
+          <div class="age-prog-bar"><div class="age-prog-fill" style="width:60%"></div></div>
+        </div>
+      </div>
+      <div class="age-card selected" onclick="location.href='kidslearn-course-ipad.html'">
+        <div class="age-icon">🌱</div>
+        <div class="age-name">🌿 低龄组</div>
+        <div class="age-range">6-8岁 · 小学低年级</div>
+        <div class="age-progress">
+          <div class="age-prog-label"><span>总进度</span><span>45%</span></div>
+          <div class="age-prog-bar"><div class="age-prog-fill" style="width:45%"></div></div>
+        </div>
+      </div>
+      <div class="age-card" onclick="location.href='kidslearn-course-ipad.html'">
+        <div class="age-icon">🌳</div>
+        <div class="age-name">🌳 高龄组</div>
+        <div class="age-range">9-12岁 · 小学高年级</div>
+        <div class="age-progress">
+          <div class="age-prog-label"><span>总进度</span><span>20%</span></div>
+          <div class="age-prog-bar"><div class="age-prog-fill" style="width:20%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 学科 -->
+    <div class="subject-section">
+      <div class="section-title">📚 选择学科 · 低龄组</div>
+      <div class="subject-list">
+        <div class="subject-row" onclick="location.href='kidslearn-levels-ipad.html'">
+          <div class="subject-icon">🧡</div>
+          <div class="subject-info">
+            <div class="subject-name">语文</div>
+            <div class="subject-meta">拼音 · 识字 · 阅读理解</div>
+          </div>
+          <div class="subject-right">
+            <div class="subject-levels">25/50关</div>
+            <div class="subject-progress-bar"><div class="subject-progress-fill" style="width:50%"></div></div>
+          </div>
+        </div>
+        <div class="subject-row" onclick="location.href='kidslearn-levels-ipad.html'">
+          <div class="subject-icon">💙</div>
+          <div class="subject-info">
+            <div class="subject-name">数学</div>
+            <div class="subject-meta">数数 · 加减法 · 认识图形</div>
+          </div>
+          <div class="subject-right">
+            <div class="subject-levels">32/50关</div>
+            <div class="subject-progress-bar"><div class="subject-progress-fill" style="width:64%"></div></div>
+          </div>
+        </div>
+        <div class="subject-row" onclick="location.href='kidslearn-levels-ipad.html'">
+          <div class="subject-icon">💛</div>
+          <div class="subject-info">
+            <div class="subject-name">英语</div>
+            <div class="subject-meta">字母 · 单词 · 简单对话</div>
+          </div>
+          <div class="subject-right">
+            <div class="subject-levels">10/50关</div>
+            <div class="subject-progress-bar"><div class="subject-progress-fill" style="width:20%"></div></div>
+          </div>
+        </div>
+        <div class="subject-row" onclick="location.href='kidslearn-levels-ipad.html'">
+          <div class="subject-icon">💜</div>
+          <div class="subject-info">
+            <div class="subject-name">逻辑思维</div>
+            <div class="subject-meta">规律 · 分类 · 简单推理</div>
+          </div>
+          <div class="subject-right">
+            <div class="subject-levels">18/40关</div>
+            <div class="subject-progress-bar"><div class="subject-progress-fill" style="width:45%"></div></div>
+          </div>
+        </div>
+        <div class="subject-row" onclick="location.href='kidslearn-levels-ipad.html'">
+          <div class="subject-icon">💚</div>
+          <div class="subject-info">
+            <div class="subject-name">科学常识</div>
+            <div class="subject-meta">自然 · 动物 · 植物</div>
+          </div>
+          <div class="subject-right">
+            <div class="subject-levels">5/30关</div>
+            <div class="subject-progress-bar"><div class="subject-progress-fill" style="width:17%"></div></div>
+          </div>
+        </div>
+        <div class="subject-row" style="opacity:.6;cursor:not-allowed">
+          <div class="subject-icon">🔒</div>
+          <div class="subject-info">
+            <div class="subject-name">编程入门</div>
+            <div class="subject-meta">图形化编程 · 逻辑基础</div>
+          </div>
+          <div class="subject-right">
+            <div class="subject-vip">VIP专属</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+
+
+<script>var sidebarCollapsed=false;function toggleSidebar(){var s=document.querySelector('.sidebar');sidebarCollapsed=!sidebarCollapsed;s.classList.toggle('collapsed',sidebarCollapsed)}</script></body>
+</html>

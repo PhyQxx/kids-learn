@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1024">
+<title>趣学星球 - 首页（iPad横屏）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#FF6B6B;--primary-light:#FF8E8E;--accent:#FFE66D;--teal:#4ECDC4;--bg:#F7F7F7;--white:#FFF;--text:#333;--text-light:#999;--radius:16px;--shadow:0 4px 20px rgba(0,0,0,.08)}
+html,body{height:100%;overflow:hidden}
+body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:var(--bg);display:flex}
+
+/* ========== 左侧导航 ========== */
+.sidebar{
+  width:220px;height:100vh;background:var(--white);
+  display:flex;flex-direction:column;align-items:center;
+  border-right:1px solid #F0F0F0;flex-shrink:0;
+  position:relative;z-index:10;
+}
+.sidebar-logo{
+  padding:28px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;
+}
+.sidebar-emoji{font-size:48px}
+.sidebar-title{font-size:18px;font-weight:800;color:var(--primary)}
+.sidebar-sub{font-size:11px;color:var(--text-light)}
+
+.nav-items{flex:1;display:flex;flex-direction:column;gap:4px;padding:8px 12px;width:100%}
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:14px 16px;
+  border-radius:12px;cursor:pointer;border:none;background:none;width:100%;
+  font-size:15px;font-weight:600;color:#666;transition:all .15s;text-align:left;
+}
+.nav-item:hover{background:#FFF5F5;color:var(--primary)}
+.nav-item.active{background:#FFF0F0;color:var(--primary)}
+.nav-item .nav-icon{font-size:22px;flex-shrink:0}
+.nav-item .nav-badge{
+  margin-left:auto;background:var(--primary);color:#FFF;
+  font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;
+}
+
+.sidebar-user{
+  width:100%;padding:16px;border-top:1px solid #F5F5F5;
+  display:flex;align-items:center;gap:12px;
+}
+.user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-light));display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.user-info{flex:1;overflow:hidden}
+.user-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-level{font-size:11px;color:var(--text-light)}
+.user-gems{font-size:20px;cursor:pointer}
+
+/* ========== 主内容区 ========== */
+.main{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+/* 顶部栏 */
+.top-bar{
+  height:64px;background:var(--white);display:flex;align-items:center;
+  padding:0 32px;gap:16px;box-shadow:0 2px 8px rgba(0,0,0,.05);flex-shrink:0;
+}
+.top-greeting{flex:1}
+.top-greeting h2{font-size:20px;font-weight:800;color:var(--text)}
+.top-greeting p{font-size:13px;color:var(--text-light)}
+.top-actions{display:flex;gap:12px}
+.top-icon-btn{
+  width:44px;height:44px;border-radius:12px;background:#F5F5F5;border:none;
+  font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.top-icon-btn:hover{background:#EEE}
+/* 家长模式按钮 */
+.parent-mode-btn{
+  height:36px;border-radius:18px;border:none;padding:0 16px;
+  background:linear-gradient(135deg,var(--teal),#26A69A);
+  color:#FFF;font-size:13px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;gap:6px;
+  box-shadow:0 2px 10px rgba(78,205,196,.35);
+  transition:all .15s;flex-shrink:0;
+}
+.parent-mode-btn:hover{transform:scale(1.04)}
+.parent-mode-btn:active{transform:scale(.97)}
+.top-search{
+  display:flex;align-items:center;gap:8px;background:#F5F5F5;border-radius:22px;
+  padding:0 16px;height:44px;min-width:200px;
+}
+.top-search input{
+  border:none;background:none;outline:none;font-size:14px;color:var(--text);width:140px;
+}
+.top-search input::placeholder{color:#AAA}
+
+/* 内容滚动区 */
+.content-scroll{flex:1;overflow-y:auto;padding:24px 32px 24px}
+
+/* 今日任务 */
+.task-banner{
+  background:linear-gradient(135deg,var(--primary),var(--primary-light));
+  border-radius:var(--radius);padding:20px 24px;display:flex;align-items:center;gap:20px;
+  margin-bottom:24px;
+}
+.task-banner-left{display:flex;align-items:center;gap:12px}
+.task-emoji{font-size:40px}
+.task-info h3{font-size:16px;font-weight:700;color:#FFF}
+.task-info p{font-size:13px;color:rgba(255,255,255,.8);margin-top:2px}
+.task-progress{flex:1;display:flex;flex-direction:column;gap:6px}
+.task-bar{height:8px;background:rgba(255,255,255,.3);border-radius:4px;overflow:hidden}
+.task-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .6s}
+.task-label{font-size:12px;color:rgba(255,255,255,.9);display:flex;justify-content:space-between}
+
+/* 横幅 */
+.rank-banner{
+  background:linear-gradient(135deg,var(--accent),#FFD700);
+  border-radius:var(--radius);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;
+}
+.rank-banner-left{display:flex;align-items:center;gap:12px}
+.rank-emoji{font-size:36px}
+.rank-title{font-size:16px;font-weight:700;color:#5D4E60}
+.rank-sub{font-size:13px;color:#7D6E80;margin-top:2px}
+.rank-btn{
+  background:#FFF;border:none;border-radius:20px;padding:10px 22px;
+  font-size:14px;font-weight:700;color:var(--primary);cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);transition:all .15s;
+}
+.rank-btn:hover{transform:scale(1.03)}
+
+/* 学科网格 */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.section-title{font-size:20px;font-weight:800;color:var(--text)}
+.section-more{font-size:14px;color:var(--text-light);cursor:pointer}
+.subject-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+.subject-card{
+  background:var(--white);border-radius:var(--radius);padding:24px 16px;
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  cursor:pointer;transition:all .2s;box-shadow:var(--shadow);
+}
+.subject-card:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,0,0,.1)}
+.subject-card:active{transform:scale(.97)}
+.subject-icon{font-size:48px;line-height:1}
+.subject-name{font-size:16px;font-weight:700;color:var(--text)}
+.subject-progress{font-size:13px;color:var(--text-light)}
+
+/* 双栏快道 */
+.quick-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.quick-card{
+  background:var(--white);border-radius:var(--radius);padding:20px;
+  display:flex;align-items:center;gap:14px;cursor:pointer;
+  box-shadow:var(--shadow);transition:all .2s;
+}
+.quick-card:hover{transform:translateY(-2px)}
+.quick-icon{font-size:48px;flex-shrink:0}
+.quick-info{flex:1}
+.quick-name{font-size:16px;font-weight:700;color:var(--text);margin-bottom:4px}
+.quick-desc{font-size:13px;color:var(--text-light)}
+.quick-action{font-size:28px}
+
+/* 成就快捷 */
+.achieve-card{
+  background:linear-gradient(135deg,#7B68EE,#9B8BFF);border-radius:var(--radius);
+  padding:20px 24px;display:flex;align-items:center;gap:14px;
+  cursor:pointer;box-shadow:0 4px 20px rgba(123,104,238,.3);
+}
+.achieve-icon{font-size:40px}
+.achieve-info{flex:1}
+.achieve-title{font-size:16px;font-weight:700;color:#FFF;margin-bottom:4px}
+.achieve-desc{font-size:13px;color:rgba(255,255,255,.8)}
+
+/* 底部Tab */
+
+
+.tab-item.active .tab-icon{transform:scale(1.1)}
+.tab-icon{font-size:28px;transition:transform .15s}
+.tab-label{font-size:12px;color:var(--text-light);font-weight:600}
+.tab-item.active .tab-label{color:var(--primary);font-weight:700}
+.sidebar.collapsed{width:60px}
+.sidebar.collapsed .sidebar-title,.sidebar.collapsed .sidebar-sub,.sidebar.collapsed .user-info,.sidebar.collapsed .nav-item span:not(.nav-icon),.sidebar.collapsed .sidebar-user .user-gems{display:none}
+.sidebar.collapsed .nav-item{justify-content:center;padding:14px 0}
+.sidebar.collapsed .sidebar-logo{padding:20px 0}
+.sidebar.collapsed .sidebar-user{justify-content:center;padding:12px 0}
+.sidebar-toggle{cursor:pointer;font-size:20px;padding:8px 0;text-align:center;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<!-- 左侧导航 -->
+<aside class="sidebar">
+  <div class="sidebar-logo"><div class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开侧边栏">☰</div>
+    <div class="sidebar-emoji">🌟</div>
+    <div class="sidebar-title">趣学星球</div>
+    <div class="sidebar-sub">KidsLearn</div>
+  </div>
+  <nav class="nav-items">
+    <button class="nav-item active" onclick="location.href='kidslearn-home-ipad.html'">
+      <span class="nav-icon">🏠</span>首页
+    </button>
+    <button class="nav-item" onclick="location.href='kidslearn-grade-ipad.html'">
+      <span class="nav-icon">📖</span>学习中心
+    </button>
+    <button class="nav-item" onclick="location.href='kidslearn-pet-ipad.html'">
+      <span class="nav-icon">🐱</span>宠物养成
+    </button>
+    <button class="nav-item" onclick="location.href='kidslearn-ranking-ipad.html'">
+      <span class="nav-icon">🏆</span>排行榜
+    </button>
+    <button class="nav-item" onclick="location.href='kidslearn-achievement-ipad.html'">
+      <span class="nav-icon">🎖️</span>成就中心
+    </button>
+
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar">🐱</div>
+    <div class="user-info">
+      <div class="user-name">小明</div>
+      <div class="user-level">Lv.5 好奇宝宝</div>
+    </div>
+    <div class="user-gems">💎</div>
+  </div>
+</aside>
+
+<!-- 主内容 -->
+<main class="main">
+  <header class="top-bar">
+    <div class="top-greeting">
+      <h2>早上好，小明 👋</h2>
+      <p>今日任务 2/3，快来完成吧～</p>
+    </div>
+    <div class="top-search">
+      <span>🔍</span>
+      <input placeholder="搜索课程、成就...">
+    </div>
+    <button class="top-icon-btn">⚙️</button>
+    <button class="top-icon-btn">🔔</button>
+    <button class="parent-mode-btn" onclick="openParentGate()">👨‍👩‍👧 家长模式</button>
+  </header>
+
+  <div class="content-scroll">
+    <!-- 任务横幅 -->
+    <div class="task-banner">
+      <div class="task-banner-left">
+        <div class="task-emoji">📅</div>
+        <div class="task-info">
+          <h3>今日任务 2/3</h3>
+          <p>再完成 1 个即可获得双倍奖励</p>
+        </div>
+      </div>
+      <div class="task-progress">
+        <div class="task-bar"><div class="task-fill" style="width:66%"></div></div>
+        <div class="task-label"><span>完成语文第12关</span><span>66%</span></div>
+      </div>
+    </div>
+
+    <!-- 排行榜横幅 -->
+    <div class="rank-banner">
+      <div class="rank-banner-left">
+        <div class="rank-emoji">🏆</div>
+        <div>
+          <div class="rank-title">全国排行榜开启！</div>
+          <div class="rank-sub">你是第 328 名，快去冲榜～</div>
+        </div>
+      </div>
+      <button class="rank-btn" onclick="location.href='kidslearn-ranking-ipad.html'">去看看 ›</button>
+    </div>
+
+    <!-- 学科 -->
+    <div class="section-header">
+      <div class="section-title">📚 开始学习</div>
+      <div class="section-more" onclick="location.href='kidslearn-grade-ipad.html'">全部 ›</div>
+    </div>
+    <div class="subject-grid">
+      <div class="subject-card" onclick="location.href='kidslearn-course-ipad.html'">
+        <div class="subject-icon">🧡</div>
+        <div class="subject-name">语文</div>
+        <div class="subject-progress">10/50关</div>
+      </div>
+      <div class="subject-card" onclick="location.href='kidslearn-course-ipad.html'">
+        <div class="subject-icon">💙</div>
+        <div class="subject-name">数学</div>
+        <div class="subject-progress">25/50关</div>
+      </div>
+      <div class="subject-card" onclick="location.href='kidslearn-course-ipad.html'">
+        <div class="subject-icon">💛</div>
+        <div class="subject-name">英语</div>
+        <div class="subject-progress">5/50关</div>
+      </div>
+      <div class="subject-card" onclick="location.href='kidslearn-course-ipad.html'">
+        <div class="subject-icon">💜</div>
+        <div class="subject-name">逻辑</div>
+        <div class="subject-progress">18/50关</div>
+      </div>
+      <div class="subject-card" onclick="location.href='kidslearn-course-ipad.html'">
+        <div class="subject-icon">💚</div>
+        <div class="subject-name">科学</div>
+        <div class="subject-progress">2/30关</div>
+      </div>
+      <div class="subject-card" style="background:#F8F8F8;cursor:not-allowed">
+        <div class="subject-icon">🔒</div>
+        <div class="subject-name">编程</div>
+        <div class="subject-progress">VIP专属</div>
+      </div>
+    </div>
+
+    <!-- 宠物+成就快捷 -->
+    <div class="quick-row">
+      <div class="quick-card" onclick="location.href='kidslearn-pet-ipad.html'">
+        <div class="quick-icon">😺</div>
+        <div class="quick-info">
+          <div class="quick-name">小星 Lv.3</div>
+          <div class="quick-desc">心情：开心 😊 · 饱食70%</div>
+        </div>
+        <div class="quick-action">🍖</div>
+      </div>
+      <div class="achieve-card" onclick="location.href='kidslearn-achievement-ipad.html'">
+        <div class="achieve-icon">🏅</div>
+        <div class="achieve-info">
+          <div class="achieve-title">已获得 12 个成就</div>
+          <div class="achieve-desc">再完成 3 个解锁「学习小将」</div>
+        </div>
+        <div style="font-size:28px;color:#FFF">›</div>
+      </div>
+    </div>
+
+    <!-- 排行榜快捷 -->
+    <div class="quick-card" onclick="location.href='kidslearn-ranking-ipad.html'" style="margin-bottom:24px">
+      <div class="quick-icon">🥇</div>
+      <div class="quick-info">
+        <div class="quick-name">好友排行 · 本周</div>
+        <div class="quick-desc">你超越了 80% 的好友</div>
+      </div>
+      <div style="font-size:28px;font-weight:800;color:var(--primary)">第5名</div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+// 打开家长验证
+function openParentGate() {
+  sessionStorage.setItem('kidslearn_gate_ref', location.href);
+  location.href = 'kidslearn-parent-gate.html';
+}
+var sidebarCollapsed=false;function toggleSidebar(){var s=document.querySelector('.sidebar');sidebarCollapsed=!sidebarCollapsed;s.classList.toggle('collapsed',sidebarCollapsed)}</script>
+</body>
+</html>

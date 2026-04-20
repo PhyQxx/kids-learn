@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1024">
+<title>趣学星球 - 排行榜（iPad横屏）</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#FF6B6B;--primary-light:#FF8E8E;--accent:#FFE66D;--teal:#4ECDC4;--bg:#F7F7F7;--white:#FFF;--text:#333;--text-light:#999;--radius:16px;--shadow:0 4px 20px rgba(0,0,0,.08)}
+html,body{height:100%;overflow:hidden}
+body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:var(--bg);display:flex}
+
+.sidebar{width:220px;height:100vh;background:var(--white);display:flex;flex-direction:column;align-items:center;border-right:1px solid #F0F0F0;flex-shrink:0;position:relative;z-index:10}
+.sidebar-logo{padding:28px 16px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+.sidebar-emoji{font-size:48px}
+.sidebar-title{font-size:18px;font-weight:800;color:var(--primary)}
+.sidebar-sub{font-size:11px;color:var(--text-light)}
+.nav-items{flex:1;display:flex;flex-direction:column;gap:4px;padding:8px 12px;width:100%}
+.nav-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;cursor:pointer;border:none;background:none;width:100%;font-size:15px;font-weight:600;color:#666;transition:all .15s;text-align:left}
+.nav-item:hover{background:#FFF5F5;color:var(--primary)}
+.nav-item.active{background:#FFF0F0;color:var(--primary)}
+.nav-item .nav-icon{font-size:22px;flex-shrink:0}
+.sidebar-user{width:100%;padding:16px;border-top:1px solid #F5F5F5;display:flex;align-items:center;gap:12px}
+.user-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--primary-light));display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.user-info{flex:1;overflow:hidden}
+.user-name{font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-level{font-size:11px;color:var(--text-light)}
+.user-gems{font-size:20px}
+
+.main{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+.header{background:linear-gradient(135deg,#FF6B6B,#FF8E8E);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+.header-title{font-size:22px;font-weight:800;color:#FFF}
+.week-tag{background:rgba(255,255,255,.25);color:#FFF;font-size:13px;font-weight:600;padding:5px 14px;border-radius:12px}
+
+/* 领奖台 */
+.podium-section{
+  background:linear-gradient(135deg,#FF6B6B,#FF8E8E);
+  padding:20px 32px 0;display:flex;align-items:flex-end;justify-content:center;gap:16px;flex-shrink:0;
+}
+.podium-item{display:flex;flex-direction:column;align-items:center;gap:6px}
+.podium-avatar{width:60px;height:60px;border-radius:50%;background:#FFF;border:3px solid #FFF;display:flex;align-items:center;justify-content:center;font-size:34px}
+.podium-name{font-size:14px;font-weight:700;color:#FFF;margin-bottom:2px}
+.podium-score{font-size:12px;color:rgba(255,255,255,.8)}
+.podium-rank{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;margin-bottom:2px}
+.rank-2{background:linear-gradient(135deg,#C0C0C0,#E8E8E8);color:#666}
+.rank-1{background:linear-gradient(135deg,#FFD700,#FFE66D);color:#996600}
+.rank-3{background:linear-gradient(135deg,#CD7F32,#E8A060);color:#FFF}
+.podium-base{width:100%;background:#FFF;border-radius:24px 24px 0 0;padding:16px 32px 0;min-height:20px}
+
+.content-scroll{flex:1;overflow-y:auto;padding:16px 32px 24px}
+
+/* Tab */
+.tab-nav{background:var(--white);display:flex;gap:4px;padding:0 4px;margin-bottom:16px;border-radius:var(--radius)}
+.tab-btn{flex:1;height:48px;border:none;background:none;font-size:15px;font-weight:600;color:#999;cursor:pointer;border-radius:8px;transition:all .15s}
+.tab-btn.active{color:var(--primary);background:#FFF5F5}
+
+/* 我的排名卡 */
+.my-rank-card{
+  background:var(--white);border-radius:var(--radius);padding:18px 20px;
+  display:flex;align-items:center;gap:16px;margin-bottom:16px;
+  box-shadow:var(--shadow);border:2px solid var(--accent);
+}
+.my-rank-num{font-size:30px;font-weight:900;color:var(--accent);min-width:48px}
+.my-rank-info{flex:1}
+.my-rank-name{font-size:17px;font-weight:700;color:var(--text);margin-bottom:2px}
+.my-rank-sub{font-size:13px;color:var(--text-light)}
+.my-rank-score{text-align:right}
+.my-rank-score-val{font-size:22px;font-weight:800;color:var(--primary)}
+.my-rank-score-stars{font-size:13px;color:var(--text-light)}
+
+/* 排行列表 */
+.list{display:flex;flex-direction:column;gap:8px}
+.list-item{
+  background:var(--white);border-radius:14px;padding:14px 18px;
+  display:flex;align-items:center;gap:14px;
+  box-shadow:var(--shadow);transition:all .15s;cursor:pointer;
+}
+.list-item:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.1)}
+.list-item:active{transform:scale(.99)}
+.list-item.me{border:2px solid var(--accent)}
+.list-rank{font-size:20px;font-weight:800;color:#CCC;min-width:32px;text-align:center}
+.list-rank.top3{font-size:24px}
+.rank-1c{color:#FFD700}.rank-2c{color:#C0C0C0}.rank-3c{color:#CD7F32}
+.list-avatar{font-size:34px;flex-shrink:0}
+.list-info{flex:1}
+.list-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px}
+.list-meta{font-size:13px;color:var(--text-light)}
+.list-score{text-align:right}
+.list-score-val{font-size:17px;font-weight:800;color:var(--primary)}
+.list-score-stars{font-size:12px;color:var(--text-light)}
+
+
+
+.tab-icon{font-size:28px;transition:transform .15s}
+.tab-label{font-size:12px;color:var(--text-light);font-weight:600}
+.tab-item.active .tab-label{color:var(--primary);font-weight:700}
+.tab-item.active .tab-icon{transform:scale(1.1)}
+.sidebar.collapsed{width:60px}
+.sidebar.collapsed .sidebar-title,.sidebar.collapsed .sidebar-sub,.sidebar.collapsed .user-info,.sidebar.collapsed .nav-item span:not(.nav-icon),.sidebar.collapsed .sidebar-user .user-gems{display:none}
+.sidebar.collapsed .nav-item{justify-content:center;padding:14px 0}
+.sidebar.collapsed .sidebar-logo{padding:20px 0}
+.sidebar.collapsed .sidebar-user{justify-content:center;padding:12px 0}
+.sidebar-toggle{cursor:pointer;font-size:20px;padding:8px 0;text-align:center;display:block;margin-bottom:4px}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo"><div class="sidebar-toggle" onclick="toggleSidebar()" title="收起/展开侧边栏">☰</div>
+    <div class="sidebar-emoji">🌟</div>
+    <div class="sidebar-title">趣学星球</div>
+    <div class="sidebar-sub">KidsLearn</div>
+  </div>
+  <nav class="nav-items">
+    <button class="nav-item" onclick="location.href='kidslearn-home-ipad.html'"><span class="nav-icon">🏠</span>首页</button>
+    <button class="nav-item" onclick="location.href='kidslearn-grade-ipad.html'"><span class="nav-icon">📖</span>学习中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-pet-ipad.html'"><span class="nav-icon">🐱</span>宠物养成</button>
+    <button class="nav-item active"><span class="nav-icon">🏆</span>排行榜</button>
+    <button class="nav-item" onclick="location.href='kidslearn-achievement-ipad.html'"><span class="nav-icon">🎖️</span>成就中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-parent-ipad.html'"><span class="nav-icon">👨‍👩‍👧</span>家长中心</button>
+    <button class="nav-item" onclick="location.href='kidslearn-vip-ipad.html'"><span class="nav-icon">👑</span>VIP会员</button>
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar">🐱</div>
+    <div class="user-info"><div class="user-name">小明</div><div class="user-level">Lv.5 好奇宝宝</div></div>
+    <div class="user-gems">💎</div>
+  </div>
+</aside>
+
+<main class="main">
+  <header class="header">
+    <div class="header-title">🏆 排行榜</div>
+    <div class="week-tag">📅 2026年第16周</div>
+  </header>
+
+  <div class="podium-section">
+    <div class="podium-item">
+      <div class="podium-rank rank-2">2</div>
+      <div class="podium-avatar">🐰</div>
+      <div class="podium-name">小兔子</div>
+      <div class="podium-score">🏅 3280</div>
+      <div style="height:70px"></div>
+    </div>
+    <div class="podium-item">
+      <div class="podium-rank rank-1">1</div>
+      <div class="podium-avatar" style="width:72px;height:72px;font-size:42px">👑</div>
+      <div class="podium-name" style="color:#FFD700;font-weight:800">学习王者</div>
+      <div class="podium-score">⭐ 4520</div>
+      <div style="height:90px"></div>
+    </div>
+    <div class="podium-item">
+      <div class="podium-rank rank-3">3</div>
+      <div class="podium-avatar">🦊</div>
+      <div class="podium-name">小狐狸</div>
+      <div class="podium-score">🏅 2890</div>
+      <div style="height:50px"></div>
+    </div>
+  </div>
+  <div class="podium-base"></div>
+
+  <div class="content-scroll">
+    <div class="tab-nav">
+      <button class="tab-btn active" onclick="switchTab(this)">好友</button>
+      <button class="tab-btn" onclick="switchTab(this)">班级</button>
+      <button class="tab-btn" onclick="switchTab(this)">全国</button>
+    </div>
+
+    <div class="my-rank-card">
+      <div class="my-rank-num">#5</div>
+      <div class="my-rank-info">
+        <div class="my-rank-name">小明</div>
+        <div class="my-rank-sub">Lv.5 · 超越80%好友</div>
+      </div>
+      <div class="my-rank-score">
+        <div class="my-rank-score-val">🏅 2150</div>
+        <div class="my-rank-score-stars">⭐⭐⭐</div>
+      </div>
+    </div>
+
+    <div class="list">
+      <div class="list-item">
+        <div class="list-rank top3 rank-1c">🥇</div>
+        <div class="list-avatar">👑</div>
+        <div class="list-info"><div class="list-name">学习王者</div><div class="list-meta">Lv.12 · 北京</div></div>
+        <div class="list-score"><div class="list-score-val">4520</div><div class="list-score-stars">⭐⭐⭐</div></div>
+      </div>
+      <div class="list-item">
+        <div class="list-rank top3 rank-2c">🥈</div>
+        <div class="list-avatar">🐰</div>
+        <div class="list-info"><div class="list-name">小兔子</div><div class="list-meta">Lv.10 · 上海</div></div>
+        <div class="list-score"><div class="list-score-val">3280</div><div class="list-score-stars">⭐⭐⭐</div></div>
+      </div>
+      <div class="list-item">
+        <div class="list-rank top3 rank-3c">🥉</div>
+        <div class="list-avatar">🦊</div>
+        <div class="list-info"><div class="list-name">小狐狸</div><div class="list-meta">Lv.9 · 广州</div></div>
+        <div class="list-score"><div class="list-score-val">2890</div><div class="list-score-stars">⭐⭐</div></div>
+      </div>
+      <div class="list-item">
+        <div class="list-rank">4</div>
+        <div class="list-avatar">🐼</div>
+        <div class="list-info"><div class="list-name">小熊猫</div><div class="list-meta">Lv.8 · 深圳</div></div>
+        <div class="list-score"><div class="list-score-val">2650</div><div class="list-score-stars">⭐⭐</div></div>
+      </div>
+      <div class="list-item me">
+        <div class="list-rank" style="color:#FFE66D;font-weight:900">#5</div>
+        <div class="list-avatar">🐱</div>
+        <div class="list-info"><div class="list-name">小明（我）</div><div class="list-meta">Lv.5 · 你</div></div>
+        <div class="list-score"><div class="list-score-val">2150</div><div class="list-score-stars">⭐⭐</div></div>
+      </div>
+      <div class="list-item">
+        <div class="list-rank">6</div>
+        <div class="list-avatar">🐸</div>
+        <div class="list-info"><div class="list-name">小青蛙</div><div class="list-meta">Lv.6 · 杭州</div></div>
+        <div class="list-score"><div class="list-score-val">1890</div><div class="list-score-stars">⭐</div></div>
+      </div>
+      <div class="list-item">
+        <div class="list-rank">7</div>
+        <div class="list-avatar">🦁</div>
+        <div class="list-info"><div class="list-name">小狮子</div><div class="list-meta">Lv.5 · 成都</div></div>
+        <div class="list-score"><div class="list-score-val">1650</div><div class="list-score-stars">⭐</div></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+
+
+<script>
+function switchTab(btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+var sidebarCollapsed=false;function toggleSidebar(){var s=document.querySelector('.sidebar');sidebarCollapsed=!sidebarCollapsed;s.classList.toggle('collapsed',sidebarCollapsed)}</script>
+</body>
+</html>

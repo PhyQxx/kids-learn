@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1024">
+<title>趣学星球 · iPad 横屏原型预览</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Helvetica Neue',Arial,sans-serif;background:#F0F7FF;min-height:100vh;padding:40px}
+h1{font-size:32px;font-weight:800;color:#333;text-align:center;margin-bottom:8px}
+.sub{text-align:center;color:#999;font-size:15px;margin-bottom:40px}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;max-width:1200px;margin:0 auto}
+.card{
+  background:#FFF;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.08);
+  transition:all .2s;cursor:pointer;border:2px solid transparent;
+}
+.card:hover{border-color:#4A90D9;transform:translateY(-4px);box-shadow:0 8px 28px rgba(0,0,0,.12)}
+.card-img{height:140px;background:#F0F7FF;display:flex;align-items:center;justify-content:center;font-size:64px}
+.card-body{padding:16px}
+.card-name{font-size:16px;font-weight:800;color:#333;margin-bottom:4px}
+.card-desc{font-size:13px;color:#999}
+.card-tag{display:inline-block;background:#E8F0FE;color:#4A90D9;font-size:11px;font-weight:700;padding:3px 10px;border-radius:8px;margin-top:8px}
+.badge{background:#FF6B6B;color:#FFF;font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;margin-left:8px}
+.footer{text-align:center;margin-top:48px;color:#CCC;font-size:13px}
+</style>
+</head>
+<body>
+
+<h1>📱 趣学星球 · iPad 横屏原型</h1>
+<p class="sub">KidsLearn iPad Landscape — 共 13 个页面 · 分辨率 1024×768</p>
+
+<div class="grid">
+  <div class="card" onclick="location.href='kidslearn-login-ipad.html'">
+    <div class="card-img">🔐</div>
+    <div class="card-body">
+      <div class="card-name">登录/注册</div>
+      <div class="card-desc">年龄选择 + 手机号登录</div>
+      <span class="card-tag">首页入口</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-home-ipad.html'">
+    <div class="card-img">🏠</div>
+    <div class="card-body">
+      <div class="card-name">首页<span class="badge">核心</span></div>
+      <div class="card-desc">学习中心 + 宠物 + 任务</div>
+      <span class="card-tag">主导航</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-grade-ipad.html'">
+    <div class="card-img">📖</div>
+    <div class="card-body">
+      <div class="card-name">年级选择</div>
+      <div class="card-desc">幼幼组 / 低龄组 / 高龄组</div>
+      <span class="card-tag">学习流</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-course-ipad.html'">
+    <div class="card-img">📚</div>
+    <div class="card-body">
+      <div class="card-name">课程列表</div>
+      <div class="card-desc">学科 + 单元 + 进度</div>
+      <span class="card-tag">学习流</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-levels-ipad.html'">
+    <div class="card-img">🔢</div>
+    <div class="card-body">
+      <div class="card-name">关卡列表</div>
+      <div class="card-desc">单元分组 + 星级 + 锁定</div>
+      <span class="card-tag">学习流</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-quiz-ipad.html'">
+    <div class="card-img">✏️</div>
+    <div class="card-body">
+      <div class="card-name">答题闯关<span class="badge">可交互</span></div>
+      <div class="card-desc">计时器 + 答对/答错动效</div>
+      <span class="card-tag">可交互</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-pet-ipad.html'">
+    <div class="card-img">🐱</div>
+    <div class="card-body">
+      <div class="card-name">宠物养成</div>
+      <div class="card-desc">喂食弹窗 + 背包 + 属性</div>
+      <span class="card-tag">游戏化</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-achievement-ipad.html'">
+    <div class="card-img">🎖️</div>
+    <div class="card-body">
+      <div class="card-name">成就中心</div>
+      <div class="card-desc">稀有度 + 进度条 + 筛选</div>
+      <span class="card-tag">游戏化</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-ranking-ipad.html'">
+    <div class="card-img">🏆</div>
+    <div class="card-body">
+      <div class="card-name">排行榜</div>
+      <div class="card-desc">领奖台 + 三榜切换</div>
+      <span class="card-tag">社交</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-challenge-ipad.html'">
+    <div class="card-img">⚔️</div>
+    <div class="card-body">
+      <div class="card-name">挑战赛</div>
+      <div class="card-desc">好友对战 + 排位赛</div>
+      <span class="card-tag">社交</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-parent-ipad.html'">
+    <div class="card-img">👨‍👩‍👧</div>
+    <div class="card-body">
+      <div class="card-name">家长中心</div>
+      <div class="card-desc">学习报告 + 时间管控</div>
+      <span class="card-tag">管控</span>
+    </div>
+  </div>
+  <div class="card" onclick="location.href='kidslearn-vip-ipad.html'">
+    <div class="card-img">👑</div>
+    <div class="card-body">
+      <div class="card-name">VIP会员</div>
+      <div class="card-desc">月卡/年卡/永久 + 深色主题</div>
+      <span class="card-tag">商业化</span>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  趣学星球 KidsLearn iPad 横屏原型 · 2024<br>
+  设计：Des · 分辨率 1024×768
+</div>
+
+</body>
+</html>
