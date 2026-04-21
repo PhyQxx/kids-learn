@@ -1,5 +1,6 @@
 package com.kidslearn.api.controller.admin;
 
+import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kidslearn.api.entity.*;
@@ -65,6 +66,46 @@ public class AdminSystemController {
         User user = userMapper.selectById(id);
         if (user != null) {
             user.setStatus(status);
+            userMapper.updateById(user);
+        }
+        return R.ok();
+    }
+
+    @Operation(summary = "新增/编辑用户")
+    @PostMapping("/user/save")
+    public R<Void> userSave(@RequestBody Map<String, Object> body) {
+        Long id = body.get("id") != null ? Long.valueOf(body.get("id").toString()) : null;
+        if (id == null) {
+            // 新增
+            String username = body.getOrDefault("username", "").toString();
+            Long count = userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getUsername, username));
+            if (count > 0) return R.fail("用户名已存在");
+
+            User user = new User();
+            user.setUsername(username);
+            user.setPassword(DigestUtil.md5Hex(body.getOrDefault("password", "").toString()));
+            user.setNickname(body.getOrDefault("nickname", "").toString());
+            user.setUserType(Integer.valueOf(body.getOrDefault("userType", "1").toString()));
+            user.setStatus(Integer.valueOf(body.getOrDefault("status", "1").toString()));
+            user.setRealName(body.get("realName") != null ? body.get("realName").toString() : null);
+            user.setRoleId(body.get("roleId") != null ? Long.valueOf(body.get("roleId").toString()) : null);
+            user.setTotalExp(0);
+            user.setLevel(1);
+            user.setGold(0);
+            user.setDiamond(0);
+            userMapper.insert(user);
+        } else {
+            // 编辑
+            User user = userMapper.selectById(id);
+            if (user == null) return R.fail("用户不存在");
+            if (body.containsKey("nickname")) user.setNickname(body.get("nickname").toString());
+            if (body.containsKey("status")) user.setStatus(Integer.valueOf(body.get("status").toString()));
+            if (body.containsKey("userType")) user.setUserType(Integer.valueOf(body.get("userType").toString()));
+            if (body.containsKey("realName")) user.setRealName(body.get("realName").toString());
+            if (body.containsKey("roleId")) user.setRoleId(body.get("roleId") != null ? Long.valueOf(body.get("roleId").toString()) : null);
+            if (body.containsKey("password") && !body.get("password").toString().isEmpty()) {
+                user.setPassword(DigestUtil.md5Hex(body.get("password").toString()));
+            }
             userMapper.updateById(user);
         }
         return R.ok();

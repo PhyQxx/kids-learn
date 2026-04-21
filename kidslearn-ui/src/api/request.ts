@@ -71,6 +71,7 @@ export function deleteTitle(id: number) { return del(`/admin/title/${id}`) }
 
 // ==================== 用户管理 ====================
 export function getUserList(params: any) { return get('/admin/user/list', params) }
+export function saveUser(data: any) { return post('/admin/user/save', data) }
 export function updateUserStatus(id: number, status: number) {
   return post(`/admin/user/${id}/status`, null, { params: { status } })
 }
@@ -86,3 +87,11 @@ export function saveConfig(data: any) { return post('/admin/config/save', data) 
 
 // ==================== 操作日志 ====================
 export function getLogList(params: any) { return get('/admin/log/list', params) }
+
+// ==================== 字典管理 ====================
+export function getDictTypeList(params: any) { return get('/admin/dict/type/list', params) }
+export function saveDictType(data: any) { return post('/admin/dict/type/save', data) }
+export function deleteDictType(id: number) { return del(`/admin/dict/type/${id}`) }
+export function getDictDataList(params: any) { return get('/admin/dict/data/list', params) }
+export function saveDictData(data: any) { return post('/admin/dict/data/save', data) }
+export function deleteDictData(id: number) { return del(`/admin/dict/data/${id}`) }
