@@ -16,7 +16,7 @@ import java.util.Map;
 
 @Tag(name = "管理后台-游戏化管理")
 @RestController
-@RequestMapping("/admin/api/v1")
+@RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 public class AdminGameController {
 

@@ -64,12 +64,14 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLoginTime(LocalDateTime.now());
         userMapper.updateById(user);
 
-        // log login
-        UserLoginLog log = new UserLoginLog();
-        log.setUserId(user.getId());
-        log.setLoginType(dto.getLoginType() != null ? dto.getLoginType() : user.getUserType());
-        log.setLoginTime(LocalDateTime.now());
-        userLoginLogMapper.insert(log);
+        // log login (not for admin)
+        if (user.getUserType() != 3) {
+            UserLoginLog log = new UserLoginLog();
+            log.setUserId(user.getId());
+            log.setLoginType(dto.getLoginType() != null ? dto.getLoginType() : user.getUserType());
+            log.setLoginTime(LocalDateTime.now());
+            userLoginLogMapper.insert(log);
+        }
 
         return buildToken(user);
     }
@@ -83,6 +85,11 @@ public class AuthServiceImpl implements AuthService {
         );
         if (count > 0) {
             throw new BusinessException("用户名已存在");
+        }
+
+        // admin registration not allowed
+        if (dto.getUserType() != null && dto.getUserType() == 3) {
+            throw new BusinessException("不允许注册管理员账号");
         }
 
         // create user
@@ -150,7 +157,12 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private TokenVO buildToken(User user) {
-        String userType = user.getUserType() == 1 ? "CHILD" : "PARENT";
+        String userType;
+        switch (user.getUserType()) {
+            case 3:  userType = "ADMIN"; break;
+            case 2:  userType = "PARENT"; break;
+            default: userType = "CHILD"; break;
+        }
         String accessToken = JwtUtil.generateToken(user.getId(), userType, RedisConstants.TOKEN_EXPIRE);
         String refreshToken = JwtUtil.generateToken(user.getId(), userType, RedisConstants.REFRESH_TOKEN_EXPIRE);
 

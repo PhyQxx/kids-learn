@@ -17,12 +17,11 @@ import java.util.Map;
 
 @Tag(name = "管理后台-系统管理")
 @RestController
-@RequestMapping("/admin/api/v1")
+@RequestMapping("/api/v1/admin")
 @RequiredArgsConstructor
 public class AdminSystemController {
 
     private final UserMapper userMapper;
-    private final AdminUserMapper adminUserMapper;
     private final AdminRoleMapper adminRoleMapper;
     private final AppConfigMapper appConfigMapper;
     private final OperationLogMapper operationLogMapper;
@@ -74,11 +73,11 @@ public class AdminSystemController {
     // ==================== 管理员管理 ====================
 
     @GetMapping("/admin-user/list")
-    public R<PageResult<AdminUser>> adminUserList(
+    public R<PageResult<User>> adminUserList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer pageSize) {
-        Page<AdminUser> p = adminUserMapper.selectPage(new Page<>(page, pageSize),
-            new LambdaQueryWrapper<AdminUser>().orderByDesc(AdminUser::getCreateTime));
+        Page<User> p = userMapper.selectPage(new Page<>(page, pageSize),
+            new LambdaQueryWrapper<User>().eq(User::getUserType, 3).orderByDesc(User::getCreateTime));
         return R.ok(new PageResult<>(p.getRecords(), p.getTotal(), page, pageSize));
     }
 

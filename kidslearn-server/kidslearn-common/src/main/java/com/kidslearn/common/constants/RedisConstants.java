@@ -7,10 +7,8 @@ public class RedisConstants {
 
     private static final String PREFIX = "kidslearn:";
 
-    /** 用户Token前缀 */
+    /** 用户Token前缀（所有角色共用） */
     public static final String USER_TOKEN = PREFIX + "token:user:";
-    /** 管理员Token前缀 */
-    public static final String ADMIN_TOKEN = PREFIX + "token:admin:";
     /** 验证码 */
     public static final String SMS_CODE = PREFIX + "sms:";
     /** 每日统计 */
