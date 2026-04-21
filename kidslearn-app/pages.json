@@ -1,92 +1,38 @@
 {
-  "pages": [
-    {
-      "path": "pages/index/index",
-      "style": {
+    "pages": [
+        { "path": "pages/login/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
+        { "path": "pages/login/register", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
+        { "path": "pages/index/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "首页" } },
+        { "path": "pages/learn/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "学习中心" } },
+        { "path": "pages/learn/courses", "style": { "navigationStyle": "custom", "navigationBarTitleText": "课程列表" } },
+        { "path": "pages/learn/levels", "style": { "navigationStyle": "custom", "navigationBarTitleText": "关卡列表" } },
+        { "path": "pages/learn/quiz", "style": { "navigationStyle": "custom", "navigationBarTitleText": "答题" } },
+        { "path": "pages/learn/result", "style": { "navigationStyle": "custom", "navigationBarTitleText": "结果" } },
+        { "path": "pages/pet/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "我的宠物" } },
+        { "path": "pages/pet/dress", "style": { "navigationStyle": "custom", "navigationBarTitleText": "换装" } },
+        { "path": "pages/pet/shop", "style": { "navigationStyle": "custom", "navigationBarTitleText": "商店" } },
+        { "path": "pages/achievement/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "成就" } },
+        { "path": "pages/achievement/sticker", "style": { "navigationStyle": "custom", "navigationBarTitleText": "贴纸册" } },
+        { "path": "pages/ranking/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "排行榜" } },
+        { "path": "pages/challenge/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "挑战赛" } },
+        { "path": "pages/parent/gate", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
+        { "path": "pages/parent/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "家长中心" } },
+        { "path": "pages/parent/report", "style": { "navigationStyle": "custom", "navigationBarTitleText": "学习报告" } },
+        { "path": "pages/parent/time-control", "style": { "navigationStyle": "custom", "navigationBarTitleText": "时间管理" } },
+        { "path": "pages/parent/family", "style": { "navigationStyle": "custom", "navigationBarTitleText": "家庭组" } },
+        { "path": "pages/mine/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "个人中心" } },
+        { "path": "pages/mine/records", "style": { "navigationStyle": "custom", "navigationBarTitleText": "学习记录" } },
+        { "path": "pages/mine/wrong", "style": { "navigationStyle": "custom", "navigationBarTitleText": "错题本" } },
+        { "path": "pages/mine/vip", "style": { "navigationStyle": "custom", "navigationBarTitleText": "VIP" } },
+        { "path": "pages/mine/settings", "style": { "navigationStyle": "custom", "navigationBarTitleText": "设置" } }
+    ],
+    "globalStyle": {
+        "navigationBarTextStyle": "black",
         "navigationBarTitleText": "趣学星球",
-        "navigationStyle": "custom"
-      }
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "backgroundColor": "#F7F7F7",
+        "navigationStyle": "custom",
+        "pageOrientation": "landscape"
     },
-    {
-      "path": "pages/learn/index",
-      "style": {
-        "navigationBarTitleText": "学习中心"
-      }
-    },
-    {
-      "path": "pages/pet/index",
-      "style": {
-        "navigationBarTitleText": "我的宠物"
-      }
-    },
-    {
-      "path": "pages/achievement/index",
-      "style": {
-        "navigationBarTitleText": "成就"
-      }
-    },
-    {
-      "path": "pages/mine/index",
-      "style": {
-        "navigationBarTitleText": "我的"
-      }
-    },
-    {
-      "path": "pages/login/index",
-      "style": {
-        "navigationBarTitleText": "登录",
-        "navigationStyle": "custom"
-      }
-    },
-    {
-      "path": "pages/parent/index",
-      "style": {
-        "navigationBarTitleText": "家长中心"
-      }
-    }
-  ],
-  "globalStyle": {
-    "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "趣学星球",
-    "navigationBarBackgroundColor": "#FFFFFF",
-    "backgroundColor": "#F7F7F7"
-  },
-  "tabBar": {
-    "color": "#999999",
-    "selectedColor": "#FF6B6B",
-    "borderStyle": "black",
-    "backgroundColor": "#FFFFFF",
-    "list": [
-      {
-        "pagePath": "pages/index/index",
-        "iconPath": "static/tabbar/home.png",
-        "selectedIconPath": "static/tabbar/home-active.png",
-        "text": "首页"
-      },
-      {
-        "pagePath": "pages/learn/index",
-        "iconPath": "static/tabbar/learn.png",
-        "selectedIconPath": "static/tabbar/learn-active.png",
-        "text": "学习"
-      },
-      {
-        "pagePath": "pages/pet/index",
-        "iconPath": "static/tabbar/pet.png",
-        "selectedIconPath": "static/tabbar/pet-active.png",
-        "text": "宠物"
-      },
-      {
-        "pagePath": "pages/achievement/index",
-        "iconPath": "static/tabbar/achieve.png",
-        "selectedIconPath": "static/tabbar/achieve-active.png",
-        "text": "成就"
-      },
-      {
-        "pagePath": "pages/mine/index",
-        "iconPath": "static/tabbar/mine.png",
-        "selectedIconPath": "static/tabbar/mine-active.png",
-        "text": "我的"
-      }
-    ]
-  }
+    "uniIdRouter": {}
 }

@@ -31,6 +31,7 @@ import { useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { login } from '@/api/request'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -51,11 +52,15 @@ async function handleLogin() {
   await formRef.value?.validate()
   loading.value = true
   try {
-    // TODO: 调用登录API
-    userStore.setToken('mock-admin-token')
-    userStore.setUserInfo({ realName: '超级管理员' })
-    ElMessage.success('登录成功')
-    router.push('/dashboard')
+    const res = await login(form)
+    if (res.code === 200) {
+      userStore.setToken(res.data.accessToken)
+      userStore.setUserInfo(res.data.userInfo)
+      ElMessage.success('登录成功')
+      router.push('/dashboard')
+    } else {
+      ElMessage.error(res.msg || '登录失败')
+    }
   } catch (e: any) {
     ElMessage.error(e.message || '登录失败')
   } finally {

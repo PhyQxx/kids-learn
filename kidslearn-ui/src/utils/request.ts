@@ -28,7 +28,8 @@ request.interceptors.response.use(
       }
       return Promise.reject(new Error(res.msg))
     }
-    return res
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return res as any
   },
   (error) => {
     ElMessage.error(error.message || '网络异常')

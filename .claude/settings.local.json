@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn compile *)",
+      "Bash(npm run *)",
+      "Bash(where mvn *)",
+      "Bash(ls D:/phy/kids-learn/kidslearn-server/mvnw*)",
+      "Bash(where java *)",
+      "Bash(java -version)",
+      "Bash(npx vue-tsc *)",
+      "Bash(npm ls *)",
+      "Bash(npm install *)",
+      "Bash(npx vite *)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx uni *)",
+      "Bash(ls D:/phy/kids-learn/kidslearn-app/vite.config.*)",
+      "Bash(ls D:/phy/kids-learn/kidslearn-app/*.json)",
+      "Bash(rm -rf node_modules package-lock.json)",
+      "Bash(rm -rf src)",
+      "Bash(/d/work/HBuilderX/plugins/node/node.exe /d/work/HBuilderX/plugins/uniapp-cli-vite/index.js build --platform h5 --inputDir \"D:/phy/kids-learn/kidslearn-app\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:v for k,v in d.items\\(\\) if k in ['name','version','dependencies','devDependencies']}, indent=2\\)\\)\")",
+      "Bash(/d/work/HBuilderX/plugins/uniapp-cli-vite/node_modules/.bin/uni build *)",
+      "Bash(mkdir -p src)",
+      "Bash(cp manifest.json pages.json App.vue main.js common.scss src/)",
+      "Bash(cp -r pages static api store src/)",
+      "Bash(mv App.vue common.scss main.js manifest.json pages.json uni.scss manifest.json src/)",
+      "Bash(mv pages *)",
+      "Bash(curl -s http://localhost:5173)",
+      "mcp__puppeteer__puppeteer_navigate",
+      "mcp__puppeteer__puppeteer_screenshot",
+      "mcp__puppeteer__puppeteer_evaluate",
+      "Bash(curl -s \"http://localhost:5173/src/pages/index/index.vue\")",
+      "Bash(curl *)",
+      "Bash(pkill -f \"vite\")"
+    ]
+  }
+}
