@@ -3,12 +3,12 @@ import { get, post } from './request'
 // 获取今日任务
 export const getDailyTasks = () => get('/learn/daily-tasks')
 
-// 获取学科列表
-export const getSubjects = () => get('/learn/subjects')
+// 获取学科列表 (gradeLevelId: 年级ID，可选)
+export const getSubjects = (gradeLevelId) => get('/learn/subjects', { gradeLevelId })
 
 // 获取课程列表 (分页)
-export const getCourses = (subjectId, page = 1, pageSize = 20) =>
-  get('/learn/courses', { subjectId, page, pageSize })
+export const getCourses = (subjectId, gradeLevelId, page = 1, pageSize = 20) =>
+  get('/learn/courses', { subjectId, gradeLevelId, page, pageSize })
 
 // 获取关卡列表
 export const getLevels = (courseId) => get('/learn/levels', { courseId })

@@ -41,9 +41,11 @@
 import { ref, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { useLearnStore } from '@/store/learn'
+import { useUserStore } from '@/store/user'
 import { getCourses } from '@/api/learn'
 
 const learnStore = useLearnStore()
+const userStore = useUserStore()
 const subjectName = ref(learnStore.currentSubject?.name || '学科')
 
 const courses = ref([])
@@ -54,7 +56,8 @@ onMounted(async () => {
   const subjectId = page.$page?.options?.subjectId || learnStore.currentSubject?.id
   if (subjectId) {
     try {
-      const res = await getCourses(subjectId)
+      const gradeLevelId = userStore.userInfo?.gradeLevelId || null
+      const res = await getCourses(subjectId, gradeLevelId)
       if (res && res.list) {
         courses.value = res.list.map(c => ({
           id: c.id, name: c.courseName, icon: '📚',

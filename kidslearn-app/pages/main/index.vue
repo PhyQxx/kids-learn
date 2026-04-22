@@ -78,6 +78,13 @@
       </scroll-view>
     </view>
   </view>
+
+  <!-- 年级配置弹框（首次登录或未配置年级时弹出） -->
+  <GradeSelectPopup
+    :visible.sync="showGradePopup"
+    :current-grade="userStore.userInfo?.gradeLevelId"
+    @confirm="handleGradeConfirm"
+  />
 </template>
 
 <script setup>
@@ -85,6 +92,7 @@ import { ref, computed, provide, onMounted, reactive } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { useLearnStore } from '@/store/learn'
+import { getUserInfo, updateChildProfile } from '@/api/user'
 
 import HomeContent from '@/components/home/HomeContent.vue'
 import LearnContent from '@/components/learn/LearnContent.vue'
@@ -92,6 +100,7 @@ import PetContent from '@/components/pet/PetContent.vue'
 import RankingContent from '@/components/ranking/RankingContent.vue'
 import AchievementContent from '@/components/achievement/AchievementContent.vue'
 import ParentContent from '@/components/parent/ParentContent.vue'
+import GradeSelectPopup from '@/components/GradeSelectPopup.vue'
 
 const userStore = useUserStore()
 const learnStore = useLearnStore()
@@ -99,6 +108,7 @@ const learnStore = useLearnStore()
 const activeTab = ref('home')
 const collapsed = computed(() => userStore.sidebarCollapsed)
 const loadedTabs = reactive(new Set(['home']))
+const showGradePopup = ref(false)
 
 // 标记首次加载
 function switchTab(key) {
@@ -178,11 +188,40 @@ function goCourses(subject) {
   uni.navigateTo({ url: `/pages/learn/courses?subjectId=${subject.id}` })
 }
 
+async function checkGradeSetup() {
+  // 获取最新用户信息
+  try {
+    const info = await getUserInfo()
+    if (info) {
+      userStore.setUserInfo(info)
+      // 如果没有配置年级，弹出设置弹框
+      if (!info.gradeLevelId) {
+        showGradePopup.value = true
+      }
+    }
+  } catch (e) {
+    console.log('检查年级配置失败', e)
+  }
+}
+
+async function handleGradeConfirm(grade) {
+  try {
+    await updateChildProfile({ gradeLevel: grade })
+    const info = await getUserInfo()
+    if (info) userStore.setUserInfo(info)
+    uni.showToast({ title: '年级配置成功', icon: 'success' })
+  } catch (e) {
+    uni.showToast({ title: '配置失败', icon: 'none' })
+  }
+}
+
 onMounted(() => {
   if (userStore.isParentMode) {
     loadedTabs.add('parent')
     activeTab.value = 'parent'
   }
+  // 检测年级配置
+  checkGradeSetup()
 })
 
 onShow(() => {

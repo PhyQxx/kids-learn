@@ -12,9 +12,9 @@ public interface LearnService {
 
     DailyTaskVO getDailyTasks(Long userId);
 
-    List<Map<String, Object>> getSubjects(Long userId);
+    List<Map<String, Object>> getSubjects(Long userId, Long gradeLevelId);
 
-    PageResult<Map<String, Object>> getCourses(Long userId, Long subjectId, Integer page, Integer pageSize);
+    PageResult<Map<String, Object>> getCourses(Long userId, Long subjectId, Long gradeLevelId, Integer page, Integer pageSize);
 
     List<Map<String, Object>> getLevels(Long userId, Long courseId);
 

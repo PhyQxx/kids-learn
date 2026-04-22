@@ -40,8 +40,8 @@
 
         <!-- 题目区域 -->
         <view class="question-area">
-          <text class="question-emoji">{{ currentQuestion.emoji }}</text>
-          <text class="question-text text-title text-bold">{{ currentQuestion.text }}</text>
+          <text class="question-emoji" @click="questionToSpeech(currentQuestion.text)">{{ currentQuestion.emoji }}</text>
+          <text class="question-text text-title text-bold" @click="questionToSpeech(currentQuestion.text)">{{ currentQuestion.text }}</text>
 
           <!-- 选项网格 -->
           <view class="options-grid">
@@ -154,8 +154,48 @@ const timeLimit = ref(60)
 
 // 题目列表，由后端加载
 const questions = ref([])
+// 科大讯飞语音播报插件（仅在 App 端初始化）
+let xfyunVoicePlugin = null
+// #ifdef APP-PLUS
+xfyunVoicePlugin = uni.requireNativePlugin('Tellsea-XfyunVoicePlugin');
+console.log('科大讯飞语音播报插件：' + JSON.stringify(xfyunVoicePlugin));
+// #endif
+
+// 初始化插件
+const init = () => {
+  // #ifdef APP-PLUS
+  if (!xfyunVoicePlugin) return
+  // APPID：你在讯飞语音控制台创建应用的APPID，下面是测试APPID，需要更换成你自己的
+  xfyunVoicePlugin.init('ae085245', (e) => {
+    let res = JSON.parse(e);
+    console.log(res);
+    if (res.code == 200) {
+      uni.showToast({ title: res.msg, icon: 'none' });
+    } else {
+      uni.showToast({ title: res.msg, icon: 'none' });
+    }
+  });
+  // #endif
+}
+
+// 语音播报
+const questionToSpeech = (text) => {
+  // #ifdef APP-PLUS
+  if (!xfyunVoicePlugin) return
+  xfyunVoicePlugin.textToSpeech(text + '测试播放', (e) => {
+    let res = JSON.parse(e);
+    console.log(res);
+    if (res.code == 200) {
+      uni.showToast({ title: res.msg, icon: 'none' });
+    } else {
+      uni.showToast({ title: res.msg, icon: 'none' });
+    }
+  });
+  // #endif
+}
 
 onMounted(async () => {
+  init();
   const pages = getCurrentPages()
   const page = pages[pages.length - 1]
   levelId.value = page.$page?.options?.levelId || learnStore.currentLevel?.id
@@ -181,7 +221,10 @@ onMounted(async () => {
 })
 
 const totalQuestions = computed(() => questions.value.length)
-const currentQuestion = computed(() => questions.value[currentIndex.value] || {})
+const currentQuestion = computed(() => {
+  questionToSpeech(questions.value[currentIndex.value].text)
+  return questions.value[currentIndex.value] || {}
+})
 const correctCount = ref(0)
 const totalScore = ref(0)
 const earnedStars = ref(0)

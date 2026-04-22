@@ -43,6 +43,11 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="精英关"><el-switch v-model="form.isElite" :active-value="1" :inactive-value="0" /></el-form-item>
+        <el-form-item label="适用年级">
+          <el-select v-model="form.gradeLevelIds" multiple placeholder="选择适用年级" style="width:100%">
+            <el-option v-for="g in gradeOptions" :key="g.id" :label="g.levelName" :value="g.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sortOrder" :min="0" /></el-form-item>
         <el-form-item label="状态"><el-switch v-model="form.status" :active-value="1" :inactive-value="0" /></el-form-item>
       </el-form>
@@ -57,7 +62,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCourseList, saveCourse, deleteCourse } from '@/api/request'
+import { getCourseList, saveCourse, deleteCourse, getGradeLevelList, getCourseGrades, bindCourseGrades } from '@/api/request'
 
 const props = defineProps<{
   subject: any
@@ -79,8 +84,21 @@ const editingId = ref<number | null>(null)
 
 const form = reactive({
   courseName: '', subjectId: null as number | null, courseDesc: '', coverUrl: '',
-  difficulty: 1, isElite: 0, sortOrder: 0, status: 1
+  difficulty: 1, isElite: 0, sortOrder: 0, status: 1,
+  gradeLevelIds: [] as number[]
 })
+
+const gradeOptions = ref<any[]>([])
+
+async function fetchGradeOptions() {
+  const res = await getGradeLevelList()
+  if (res.code === 200) gradeOptions.value = res.data
+}
+
+async function fetchCourseGrades(courseId: number) {
+  const res = await getCourseGrades(courseId)
+  if (res.code === 200) form.gradeLevelIds = res.data.map((id: any) => Number(id))
+}
 
 async function fetchData() {
   loading.value = true
@@ -92,15 +110,18 @@ async function fetchData() {
   } finally { loading.value = false }
 }
 
-function openDialog(row?: any) {
+async function openDialog(row?: any) {
+  await fetchGradeOptions()
   if (row) {
     editingId.value = row.id
     Object.assign(form, row)
+    form.gradeLevelIds = []
+    await fetchCourseGrades(row.id)
   } else {
     editingId.value = null
     Object.assign(form, {
       courseName: '', subjectId: props.subject.id, courseDesc: '', coverUrl: '',
-      difficulty: 1, isElite: 0, sortOrder: 0, status: 1
+      difficulty: 1, isElite: 0, sortOrder: 0, status: 1, gradeLevelIds: []
     })
   }
   dialogVisible.value = true
@@ -109,9 +130,18 @@ function openDialog(row?: any) {
 async function handleSave() {
   saving.value = true
   try {
-    const res = await saveCourse({ ...form, id: editingId.value })
-    if (res.code === 200) { ElMessage.success('保存成功'); dialogVisible.value = false; fetchData() }
-    else ElMessage.error(res.msg)
+    const { gradeLevelIds, ...courseData } = form
+    const res = await saveCourse({ ...courseData, id: editingId.value })
+    if (res.code === 200) {
+      // bind grades
+      const courseId = editingId.value || res.data
+      if (courseId && gradeLevelIds.length > 0) {
+        await bindCourseGrades({ courseId, gradeLevelIds })
+      } else if (courseId) {
+        await bindCourseGrades({ courseId, gradeLevelIds: [] })
+      }
+      ElMessage.success('保存成功'); dialogVisible.value = false; fetchData()
+    } else ElMessage.error(res.msg)
   } finally { saving.value = false }
 }
 

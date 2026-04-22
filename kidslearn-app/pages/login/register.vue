@@ -37,21 +37,15 @@
           <input class="input" v-model="nickname" placeholder="给孩子取个名字" placeholder-class="input-placeholder" />
         </view>
 
-        <!-- 年龄组 -->
+        <!-- 年级 -->
         <view class="form-group">
-          <text class="text-sm text-bold">选择年龄组</text>
-          <view class="age-group-row">
-            <view
-              v-for="g in ageGroups"
-              :key="g.key"
-              class="age-card"
-              :class="{ active: selectedAge === g.key }"
-              @tap="selectedAge = g.key"
-            >
-              <text class="age-emoji">{{ g.icon }}</text>
-              <text class="text-xs">{{ g.name }}</text>
+          <text class="text-sm text-bold">选择年级</text>
+          <picker mode="selector" :range="gradeOptions" range-key="label" @change="onGradeChange">
+            <view class="grade-picker-input">
+              <text class="text-sm">{{ selectedGradeLabel }}</text>
+              <text class="text-light">▼</text>
             </view>
-          </view>
+          </picker>
         </view>
 
         <!-- 手机号 -->
@@ -102,23 +96,45 @@ const phone = ref('')
 const code = ref('')
 const password = ref('')
 const username = ref('')
-const selectedAge = ref(2)
+const selectedGrade = ref(4)
 const codeSent = ref(false)
 const countdown = ref(60)
 const errorMsg = ref('')
 
-const ageGroups = ref([
-  { key: 1, name: '幼幼组', icon: '👶' },
-  { key: 2, name: '低龄组', icon: '🧒' },
-  { key: 3, name: '高龄组', icon: '👦' }
-])
+const gradeOptions = [
+  { value: 1, label: '小班' }, { value: 2, label: '中班' }, { value: 3, label: '大班' },
+  { value: 4, label: '一年级' }, { value: 5, label: '二年级' }, { value: 6, label: '三年级' },
+  { value: 7, label: '四年级' }, { value: 8, label: '五年级' }, { value: 9, label: '六年级' }
+]
 
-onMounted(() => {
-  const pages = getCurrentPages()
-  const page = pages[pages.length - 1]
-  const group = page.$page?.options?.learnAgeGroup
-  if (group) selectedAge.value = parseInt(group)
-})
+const selectedGradeLabel = ref('一年级')
+
+function onGradeChange(e) {
+  const idx = e.detail.value
+  selectedGrade.value = gradeOptions[idx].value
+  selectedGradeLabel.value = gradeOptions[idx].label
+}
+
+onMounted(() => {})
+
+async function doRegister() {
+  if (!username.value) { errorMsg.value = '请输入账号'; return }
+  if (!nickname.value) { errorMsg.value = '请输入昵称'; return }
+  if (!phone.value) { errorMsg.value = '请输入手机号'; return }
+  if (!code.value) { errorMsg.value = '请输入验证码'; return }
+  if (!password.value || password.value.length < 6) { errorMsg.value = '密码至少6位'; return }
+
+  errorMsg.value = ''
+  uni.showLoading({ title: '注册中...' })
+  try {
+    const res = await registerApi({
+      username: username.value,
+      password: password.value,
+      nickname: nickname.value,
+      loginType: 1,
+      phone: phone.value,
+      gradeLevel: selectedGrade.value
+    })
 
 function sendCode() {
   if (codeSent.value || !phone.value) return
@@ -147,7 +163,6 @@ async function doRegister() {
       username: username.value,
       password: password.value,
       nickname: nickname.value,
-      userType: 1,
       loginType: 1,
       phone: phone.value,
       learnAgeGroup: selectedAge.value
@@ -237,25 +252,15 @@ function goLogin() {
   gap: 10px;
 }
 
-.age-card {
-  flex: 1;
+.grade-picker-input {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  gap: 4px;
-  padding: 10px;
+  padding: 10px 14px;
   border-radius: $radius;
   background: #F8F8F8;
   cursor: pointer;
-  border: 2px solid transparent;
-
-  &.active {
-    border-color: $primary;
-    background: #FFF0F0;
-  }
 }
-
-.age-emoji { font-size: 24px; }
 
 .sms-row {
   display: flex;

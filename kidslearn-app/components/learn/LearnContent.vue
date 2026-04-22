@@ -7,21 +7,9 @@
     </view>
 
     <template v-else>
-    <!-- 学科年级选择 -->
-    <view class="grade-section">
-      <view class="grade-tabs">
-        <view
-          v-for="g in ageGroups"
-          :key="g.key"
-          class="grade-tab"
-          :class="{ active: activeAge === g.key }"
-          @tap="activeAge = g.key"
-        >
-          <text class="grade-emoji">{{ g.icon }}</text>
-          <text class="grade-label">{{ g.name }}</text>
-          <text class="grade-age text-xs text-light">{{ g.range }}</text>
-        </view>
-      </view>
+    <!-- 当前年级提示 -->
+    <view v-if="gradeName" class="grade-banner">
+      <text class="text-sm text-light">当前年级：{{ gradeName }}</text>
     </view>
 
     <!-- 学科网格 -->
@@ -86,20 +74,16 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useLearnStore } from '@/store/learn'
-import { getSubjects, getCourses, getRecords } from '@/api/learn'
+import { useUserStore } from '@/store/user'
+import { getSubjects, getRecords } from '@/api/learn'
 
 defineEmits(['go-courses'])
 
 const learnStore = useLearnStore()
+const userStore = useUserStore()
 
 const loading = ref(true)
-const activeAge = ref('young')
-
-const ageGroups = ref([
-  { key: 'baby', name: '幼幼组', range: '3-5岁', icon: '👶' },
-  { key: 'young', name: '低龄组', range: '6-8岁', icon: '🧒' },
-  { key: 'old', name: '高龄组', range: '9-12岁', icon: '👦' }
-])
+const gradeName = ref(userStore.userInfo?.gradeLevelName || '')
 
 const iconMap = {
   'CHINESE': { icon: '📖', color: '#FF6B6B', bg: '#FFF0F0' },
@@ -111,7 +95,6 @@ const iconMap = {
 }
 
 const subjects = ref([])
-
 const recentLearn = ref([])
 
 function applyMockData() {
@@ -133,8 +116,9 @@ function applyMockData() {
 async function loadData() {
   loading.value = true
   try {
+    const gradeLevelId = userStore.userInfo?.gradeLevelId || null
     const results = await Promise.allSettled([
-      getSubjects(),
+      getSubjects(gradeLevelId),
       getRecords().catch(() => null)
     ])
 
@@ -211,40 +195,12 @@ function goCourse(item) {
   padding: 80px 0;
 }
 
-.grade-section {
+.grade-banner {
   background: $white;
   border-radius: $radius-md;
-  padding: 16px 20px;
+  padding: 12px 20px;
+  text-align: center;
 }
-
-.grade-tabs {
-  display: flex;
-  gap: 12px;
-}
-
-.grade-tab {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 16px;
-  border-radius: $radius;
-  background: #F8F8F8;
-  cursor: pointer;
-  transition: all $transition-fast;
-  border: 2px solid transparent;
-
-  &:active { transform: scale(0.97); }
-  &.active {
-    background: #E8F0FE;
-    border-color: $learn-blue;
-  }
-}
-
-.grade-emoji { font-size: 36px; }
-.grade-label { font-size: 15px; font-weight: 600; }
-.grade-age { font-size: 12px; }
 
 .section-title-row {
   display: flex;
@@ -346,7 +302,6 @@ function goCourse(item) {
   .subject-emoji { font-size: 22px; }
   .subject-icon-wrap { width: 44px; height: 44px; }
   .subject-card { padding: 14px 10px; }
-  .grade-emoji { font-size: 28px; }
   .recent-card { flex-wrap: wrap; }
 }
 </style>

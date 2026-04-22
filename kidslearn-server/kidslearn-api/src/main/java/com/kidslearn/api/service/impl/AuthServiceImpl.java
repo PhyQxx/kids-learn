@@ -28,6 +28,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserMapper userMapper;
     private final ChildProfileMapper childProfileMapper;
     private final ParentProfileMapper parentProfileMapper;
+    private final GradeLevelMapper gradeLevelMapper;
     private final UserLoginLogMapper userLoginLogMapper;
     private final PetMapper petMapper;
     private final UserPetMapper userPetMapper;
@@ -92,12 +93,12 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("不允许注册管理员账号");
         }
 
-        // create user
+        // create user (always family account)
         User user = new User();
         user.setUsername(dto.getUsername());
         user.setPassword(DigestUtil.md5Hex(dto.getPassword()));
         user.setNickname(dto.getNickname() != null ? dto.getNickname() : dto.getUsername());
-        user.setUserType(dto.getUserType() != null ? dto.getUserType() : 1);
+        user.setUserType(1);
         user.setStatus(1);
         user.setTotalExp(0);
         user.setLevel(1);
@@ -105,27 +106,33 @@ public class AuthServiceImpl implements AuthService {
         user.setDiamond(0);
         userMapper.insert(user);
 
-        // create profile
-        if (user.getUserType() == 1) {
-            // child
-            ChildProfile profile = new ChildProfile();
-            profile.setUserId(user.getId());
-            profile.setGradeLevel(dto.getGradeLevel());
-            profile.setGender(dto.getGender() != null ? dto.getGender() : 0);
-            profile.setLearnAgeGroup(dto.getLearnAgeGroup() != null ? dto.getLearnAgeGroup() : 1);
-            childProfileMapper.insert(profile);
-
-            // assign default pet
-            assignDefaultPet(user.getId());
+        // always create child profile (learning settings)
+        Integer ageGroup = dto.getLearnAgeGroup() != null ? dto.getLearnAgeGroup() : 2;
+        ChildProfile childProfile = new ChildProfile();
+        childProfile.setUserId(user.getId());
+        childProfile.setLearnAgeGroup(ageGroup);
+        childProfile.setGender(dto.getGender() != null ? dto.getGender() : 0);
+        if (dto.getGradeLevel() != null) {
+            childProfile.setGradeLevel(dto.getGradeLevel());
         } else {
-            // parent
-            ParentProfile profile = new ParentProfile();
-            profile.setUserId(user.getId());
-            profile.setRealName(dto.getRealName());
-            profile.setPhone(dto.getPhone());
-            profile.setRelationship(dto.getRelationship());
-            parentProfileMapper.insert(profile);
+            childProfile.setGradeLevel(switch (ageGroup) {
+                case 1 -> 1;
+                case 3 -> 7;
+                default -> 4;
+            });
         }
+        childProfileMapper.insert(childProfile);
+
+        // always create parent profile (contact info)
+        ParentProfile parentProfile = new ParentProfile();
+        parentProfile.setUserId(user.getId());
+        parentProfile.setRealName(dto.getRealName());
+        parentProfile.setPhone(dto.getPhone());
+        parentProfile.setRelationship(dto.getRelationship());
+        parentProfileMapper.insert(parentProfile);
+
+        // assign default pet
+        assignDefaultPet(user.getId());
 
         return buildToken(user);
     }
@@ -158,10 +165,10 @@ public class AuthServiceImpl implements AuthService {
 
     private TokenVO buildToken(User user) {
         String userType;
-        switch (user.getUserType()) {
-            case 3:  userType = "ADMIN"; break;
-            case 2:  userType = "PARENT"; break;
-            default: userType = "CHILD"; break;
+        if (user.getUserType() == 3) {
+            userType = "ADMIN";
+        } else {
+            userType = "CHILD";  // family accounts all use CHILD type
         }
         String accessToken = JwtUtil.generateToken(user.getId(), userType, RedisConstants.TOKEN_EXPIRE);
         String refreshToken = JwtUtil.generateToken(user.getId(), userType, RedisConstants.REFRESH_TOKEN_EXPIRE);
@@ -179,6 +186,24 @@ public class AuthServiceImpl implements AuthService {
         UserVO userInfo = new UserVO();
         BeanUtils.copyProperties(user, userInfo);
         userInfo.setUserId(user.getId());
+        // populate gradeLevel from child profile
+        ChildProfile childProfile = childProfileMapper.selectOne(
+            new LambdaQueryWrapper<ChildProfile>().eq(ChildProfile::getUserId, user.getId())
+        );
+        if (childProfile != null && childProfile.getGradeLevel() != null) {
+            GradeLevel gl = gradeLevelMapper.selectById(childProfile.getGradeLevel());
+            if (gl != null) {
+                userInfo.setGradeLevelId(gl.getId());
+                userInfo.setGradeLevelName(gl.getLevelName());
+            }
+        }
+        // populate phone from parent profile
+        ParentProfile parentProfile = parentProfileMapper.selectOne(
+            new LambdaQueryWrapper<ParentProfile>().eq(ParentProfile::getUserId, user.getId())
+        );
+        if (parentProfile != null) {
+            userInfo.setPhone(parentProfile.getPhone());
+        }
         vo.setUserInfo(userInfo);
 
         return vo;

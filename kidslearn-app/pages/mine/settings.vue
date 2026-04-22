@@ -26,6 +26,18 @@
         </view>
       </view>
 
+      <!-- 学习设置 -->
+      <view class="settings-group card">
+        <text class="text-md text-bold" style="margin-bottom: 12px;">📚 学习设置</text>
+        <view class="setting-item" @tap="showGradePopup = true">
+          <text class="text-sm">年级</text>
+          <view class="setting-right">
+            <text class="text-sm" :class="currentGrade ? '' : 'text-light'">{{ currentGradeLabel }}</text>
+            <text class="menu-arrow">→</text>
+          </view>
+        </view>
+      </view>
+
       <!-- 通知设置 -->
       <view class="settings-group card">
         <text class="text-md text-bold" style="margin-bottom: 12px;">🔔 通知设置</text>
@@ -85,15 +97,26 @@
       <tn-button shape="round" block @click="clearCache">清除缓存</tn-button>
     </view>
   </AppLayout>
+
+  <!-- 年级选择弹框 -->
+  <GradeSelectPopup
+    :visible.sync="showGradePopup"
+    :current-grade="currentGrade"
+    @confirm="handleGradeConfirm"
+    @close="showGradePopup = false"
+  />
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
+import GradeSelectPopup from '@/components/GradeSelectPopup.vue'
 import { useUserStore } from '@/store/user'
-import { getUserInfo } from '@/api/user'
+import { getUserInfo, updateChildProfile } from '@/api/user'
 
 const userStore = useUserStore()
+
+const showGradePopup = ref(false)
 
 const settings = ref({
   studyReminder: true,
@@ -110,6 +133,27 @@ const themes = ref([
   { key: 'purple', color: '#9B59B6' }
 ])
 
+const currentGrade = ref(null)
+
+const currentGradeLabel = computed(() => {
+  if (!currentGrade.value) return '请选择'
+  const labels = { 1: '小班', 2: '中班', 3: '大班', 4: '一年级', 5: '二年级', 6: '三年级', 7: '四年级', 8: '五年级', 9: '六年级' }
+  return labels[currentGrade.value] || '请选择'
+})
+
+async function handleGradeConfirm(grade) {
+  currentGrade.value = grade
+  try {
+    await updateChildProfile({ gradeLevel: grade })
+    const info = await getUserInfo()
+    if (info) userStore.setUserInfo(info)
+    uni.showToast({ title: '已更新年级', icon: 'success' })
+  } catch (e) {
+    uni.showToast({ title: '更新失败', icon: 'none' })
+  }
+  showGradePopup.value = false
+}
+
 const maskedPhone = computed(() => {
   const phone = userStore.userInfo?.phone || '13812345678'
   return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
@@ -117,7 +161,11 @@ const maskedPhone = computed(() => {
 
 // 刷新用户信息
 getUserInfo().then(info => {
-  if (info) userStore.setUserInfo(info)
+  if (info) {
+    userStore.setUserInfo(info)
+    // init grade from gradeLevelId returned by backend
+    currentGrade.value = info.gradeLevelId || null
+  }
 }).catch(() => {})
 
 function editPhone() { uni.showToast({ title: '修改手机号', icon: 'none' }) }
@@ -163,6 +211,12 @@ function clearCache() {
 }
 
 .menu-arrow { color: $text-light; font-size: 14px; }
+
+.grade-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .theme-options {
   display: flex;

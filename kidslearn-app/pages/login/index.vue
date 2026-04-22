@@ -5,19 +5,9 @@
       <text class="app-title">趣学星球</text>
       <text class="app-desc">让孩子在趣味中学习成长</text>
     </view>
-    <view class="age-cards" v-if="!showLogin">
-      <view class="age-card" v-for="group in ageGroups" :key="group.name" @click="selectAge(group)">
-        <text class="age-icon">{{ group.icon }}</text>
-        <view class="age-info">
-          <text class="age-name">{{ group.name }}</text>
-          <text class="age-desc">{{ group.desc }}</text>
-        </view>
-        <text class="age-arrow">›</text>
-      </view>
-    </view>
 
     <!-- 登录表单 -->
-    <view class="login-form" v-if="showLogin">
+    <view class="login-form">
       <view class="form-group">
         <text class="form-label">账号</text>
         <input class="form-input" v-model="loginForm.username" placeholder="请输入账号" placeholder-class="input-placeholder" />
@@ -46,22 +36,11 @@ import { useUserStore } from '@/store/user'
 export default {
   data() {
     return {
-      showLogin: false,
-      selectedAgeGroup: null,
-      ageGroups: [
-        { icon: '🧒', name: '幼幼组 (3-6岁)', desc: '幼儿园阶段 · 认字拼音数学启蒙', group: 1 },
-        { icon: '👦', name: '低年龄组 (6-9岁)', desc: '小学1-3年级 · 语文数学英语', group: 2 },
-        { icon: '🧑', name: '高年龄组 (9-12岁)', desc: '小学4-6年级 · 进阶学习挑战', group: 3 },
-      ],
       loginForm: { username: '', password: '' },
       loginError: '',
     }
   },
   methods: {
-    selectAge(group) {
-      this.selectedAgeGroup = group.group
-      this.showLogin = true
-    },
     async handleLogin() {
       const { username, password } = this.loginForm
       if (!username) { this.loginError = '请输入账号'; return }
@@ -83,7 +62,7 @@ export default {
       }
     },
     goRegister() {
-      uni.navigateTo({ url: `/pages/login/register?learnAgeGroup=${this.selectedAgeGroup || 2}` })
+      uni.navigateTo({ url: '/pages/login/register' })
     },
   },
 }

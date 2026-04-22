@@ -6,7 +6,7 @@
           <el-breadcrumb-item @click="goToLevel('subject')" style="cursor:pointer">
             <span :style="{ color: state.level === 'subject' ? '#FF6B6B' : '', fontWeight: state.level === 'subject' ? '600' : '' }">内容管理</span>
           </el-breadcrumb-item>
-          <el-breadcrumb-item v-if="state.level !== 'subject'" @click="goToLevel('course')" style="cursor:pointer">
+          <el-breadcrumb-item v-if="state.level !== 'subject' && state.level !== 'grade'" @click="goToLevel('course')" style="cursor:pointer">
             <span :style="{ color: state.level === 'course' ? '#FF6B6B' : '', fontWeight: state.level === 'course' ? '600' : '' }">{{ state.subject?.subjectName }}</span>
           </el-breadcrumb-item>
           <el-breadcrumb-item v-if="state.level === 'level' || state.level === 'question'" @click="goToLevel('level')" style="cursor:pointer">
@@ -16,6 +16,8 @@
             <span style="color:#FF6B6B;font-weight:600">{{ state.courseLevel?.levelName }}</span>
           </el-breadcrumb-item>
         </el-breadcrumb>
+        <el-button v-if="state.level === 'subject'" link type="primary" @click="goToLevel('grade')" style="margin-left:auto">年级管理</el-button>
+        <el-button v-if="state.level === 'grade'" link type="primary" @click="goToLevel('subject')" style="margin-left:auto">返回内容管理</el-button>
       </div>
     </template>
 
@@ -23,6 +25,9 @@
       v-if="state.level === 'subject'"
       v-model:ageGroup="state.ageGroup"
       @select="onSubjectSelect"
+    />
+    <GradePanel
+      v-else-if="state.level === 'grade'"
     />
     <CoursePanel
       v-else-if="state.level === 'course'"
@@ -45,11 +50,12 @@
 <script setup lang="ts">
 import { reactive } from 'vue'
 import SubjectPanel from './panels/SubjectPanel.vue'
+import GradePanel from './panels/GradePanel.vue'
 import CoursePanel from './panels/CoursePanel.vue'
 import LevelPanel from './panels/LevelPanel.vue'
 import QuestionPanel from './panels/QuestionPanel.vue'
 
-type DrillLevel = 'subject' | 'course' | 'level' | 'question'
+type DrillLevel = 'subject' | 'grade' | 'course' | 'level' | 'question'
 
 const state = reactive({
   level: 'subject' as DrillLevel,
@@ -76,6 +82,10 @@ function onLevelSelect(row: any) {
 
 function goToLevel(target: DrillLevel) {
   if (target === 'subject') {
+    state.subject = null
+    state.course = null
+    state.courseLevel = null
+  } else if (target === 'grade') {
     state.subject = null
     state.course = null
     state.courseLevel = null

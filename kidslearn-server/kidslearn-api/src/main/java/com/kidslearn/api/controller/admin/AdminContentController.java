@@ -96,13 +96,13 @@ public class AdminContentController {
 
     @Operation(summary = "新增/编辑课程")
     @PostMapping("/course/save")
-    public R<Void> courseSave(@RequestBody Course course) {
+    public R<Long> courseSave(@RequestBody Course course) {
         if (course.getId() == null) {
             courseMapper.insert(course);
         } else {
             courseMapper.updateById(course);
         }
-        return R.ok();
+        return R.ok(course.getId());
     }
 
     @Operation(summary = "删除课程")

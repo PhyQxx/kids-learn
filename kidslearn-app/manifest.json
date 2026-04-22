@@ -1,28 +1,28 @@
 {
-    "name": "趣学星球",
-    "appid": "__UNI__4C03CD5",
-    "description": "专为3-12岁儿童打造的游戏化学习平台",
-    "versionName": "1.0.0",
-    "versionCode": "100",
-    "transformPx": false,
-    "globalStyle": {
-        "pageOrientation": "landscape"
+    "name" : "趣学星球",
+    "appid" : "__UNI__4C03CD5",
+    "description" : "专为3-12岁儿童打造的游戏化学习平台",
+    "versionName" : "1.0.0",
+    "versionCode" : "100",
+    "transformPx" : false,
+    "globalStyle" : {
+        "pageOrientation" : "landscape"
     },
-    "app-plus": {
-        "usingComponents": true,
-        "nvueStyleCompiler": "uni-app",
-        "compilerVersion": 3,
-        "splashscreen": {
-            "alwaysShowBeforeRender": true,
-            "waiting": true,
-            "autoclose": true,
-            "delay": 0
+    "app-plus" : {
+        "usingComponents" : true,
+        "nvueStyleCompiler" : "uni-app",
+        "compilerVersion" : 3,
+        "splashscreen" : {
+            "alwaysShowBeforeRender" : true,
+            "waiting" : true,
+            "autoclose" : true,
+            "delay" : 0
         },
-        "modules": {},
-        "distribute": {
-            "android": {
-                "screenOrientation": "landscape",
-                "permissions": [
+        "modules" : {},
+        "distribute" : {
+            "android" : {
+                "screenOrientation" : "landscape",
+                "permissions" : [
                     "<uses-permission android:name=\"android.permission.CHANGE_NETWORK_STATE\"/>",
                     "<uses-permission android:name=\"android.permission.ACCESS_NETWORK_STATE\"/>",
                     "<uses-permission android:name=\"android.permission.VIBRATE\"/>",
@@ -30,31 +30,48 @@
                     "<uses-feature android:name=\"android.hardware.camera.autofocus\"/>"
                 ]
             },
-            "ios": {
-                "UISupportedInterfaceOrientations": [
+            "ios" : {
+                "UISupportedInterfaceOrientations" : [
                     "UIInterfaceOrientationLandscapeLeft",
                     "UIInterfaceOrientationLandscapeRight"
-                ]
+                ],
+                "dSYMs" : false
             },
-            "sdkConfigs": {}
+            "sdkConfigs" : {}
+        },
+        "nativePlugins" : {
+            "Tellsea-XfyunVoicePlugin" : {
+                "__plugin_info__" : {
+                    "name" : "讯飞语音播报插件（在线语音合成流式版） - [试用版，仅用于自定义调试基座]",
+                    "description" : "讯飞语音播报插件，在线语音合成流式版",
+                    "platforms" : "Android",
+                    "url" : "https://ext.dcloud.net.cn/plugin?id=8287",
+                    "android_package_name" : "",
+                    "ios_bundle_id" : "",
+                    "isCloud" : true,
+                    "bought" : 0,
+                    "pid" : "8287",
+                    "parameters" : {}
+                }
+            }
         }
     },
-    "quickapp": {},
-    "mp-weixin": {
-        "appid": "",
-        "setting": {
-            "urlCheck": false
+    "quickapp" : {},
+    "mp-weixin" : {
+        "appid" : "",
+        "setting" : {
+            "urlCheck" : false
         },
-        "usingComponents": true,
-        "pageOrientation": "landscape"
+        "usingComponents" : true,
+        "pageOrientation" : "landscape"
     },
-    "mp-alipay": {
-        "usingComponents": true,
-        "pageOrientation": "landscape"
+    "mp-alipay" : {
+        "usingComponents" : true,
+        "pageOrientation" : "landscape"
     },
-    "uniStatistics": {
-        "enable": false
+    "uniStatistics" : {
+        "enable" : false
     },
-    "vueVersion": "3",
-    "fallbackLocale": "zh-Hans"
+    "vueVersion" : "3",
+    "fallbackLocale" : "zh-Hans"
 }

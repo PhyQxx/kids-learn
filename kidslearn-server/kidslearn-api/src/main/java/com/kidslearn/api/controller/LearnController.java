@@ -32,9 +32,11 @@ public class LearnController {
 
     @Operation(summary = "获取学科列表")
     @GetMapping("/subjects")
-    public R<List<Map<String, Object>>> getSubjects(HttpServletRequest request) {
+    public R<List<Map<String, Object>>> getSubjects(
+            HttpServletRequest request,
+            @RequestParam(required = false) Long gradeLevelId) {
         Long userId = (Long) request.getAttribute("userId");
-        return R.ok(learnService.getSubjects(userId));
+        return R.ok(learnService.getSubjects(userId, gradeLevelId));
     }
 
     @Operation(summary = "获取课程列表")
@@ -42,10 +44,11 @@ public class LearnController {
     public R<PageResult<Map<String, Object>>> getCourses(
             HttpServletRequest request,
             @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) Long gradeLevelId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer pageSize) {
         Long userId = (Long) request.getAttribute("userId");
-        return R.ok(learnService.getCourses(userId, subjectId, page, pageSize));
+        return R.ok(learnService.getCourses(userId, subjectId, gradeLevelId, page, pageSize));
     }
 
     @Operation(summary = "获取关卡列表")

@@ -12,4 +12,7 @@ public class UserVO {
     private Integer totalExp;
     private Integer gold;
     private Integer diamond;
+    private Long gradeLevelId;
+    private String gradeLevelName;
+    private String phone;
 }

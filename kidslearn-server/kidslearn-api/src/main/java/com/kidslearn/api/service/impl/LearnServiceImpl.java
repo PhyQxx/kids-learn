@@ -37,6 +37,8 @@ public class LearnServiceImpl implements LearnService {
     private final StickerMapper stickerMapper;
     private final RewardLogMapper rewardLogMapper;
     private final UserStickerMapper userStickerMapper;
+    private final GradeLevelMapper gradeLevelMapper;
+    private final CourseGradeMapper courseGradeMapper;
 
     @Override
     public DailyTaskVO getDailyTasks(Long userId) {
@@ -91,10 +93,21 @@ public class LearnServiceImpl implements LearnService {
     }
 
     @Override
-    public List<Map<String, Object>> getSubjects(Long userId) {
+    public List<Map<String, Object>> getSubjects(Long userId, Long gradeLevelId) {
+        // resolve courseIds for the grade level
+        Set<Long> gradeCourseIds = null;
+        if (gradeLevelId != null) {
+            gradeCourseIds = getCourseIdsByGradeLevel(gradeLevelId);
+            if (gradeCourseIds.isEmpty()) {
+                return List.of();
+            }
+        }
+
         List<Subject> subjects = subjectMapper.selectList(
             new LambdaQueryWrapper<Subject>().eq(Subject::getStatus, 1).orderByAsc(Subject::getSortOrder)
         );
+
+        final Set<Long> finalGradeCourseIds = gradeCourseIds;
         return subjects.stream().map(s -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", s.getId());
@@ -102,21 +115,44 @@ public class LearnServiceImpl implements LearnService {
             map.put("name", s.getSubjectName());
             map.put("icon", s.getIconUrl());
             map.put("color", s.getColor());
-            // count courses
-            Long courseCount = courseMapper.selectCount(
-                new LambdaQueryWrapper<Course>().eq(Course::getSubjectId, s.getId()).eq(Course::getStatus, 1)
-            );
+            LambdaQueryWrapper<Course> countWrapper = new LambdaQueryWrapper<Course>()
+                .eq(Course::getSubjectId, s.getId()).eq(Course::getStatus, 1);
+            if (finalGradeCourseIds != null) {
+                countWrapper.in(Course::getId, finalGradeCourseIds);
+            }
+            Long courseCount = courseMapper.selectCount(countWrapper);
             map.put("courseCount", courseCount);
+            map.put("_hasCourses", courseCount > 0);
             return map;
-        }).collect(Collectors.toList());
+        }).filter(m -> (boolean) m.get("_hasCourses")).collect(Collectors.toList());
+    }
+
+    /**
+     * Get course IDs that belong to a given grade level via course_grade.
+     */
+    private Set<Long> getCourseIdsByGradeLevel(Long gradeLevelId) {
+        List<Long> courseIds = courseGradeMapper.selectList(
+            new LambdaQueryWrapper<CourseGrade>().eq(CourseGrade::getGradeLevelId, gradeLevelId)
+        ).stream().map(CourseGrade::getCourseId).collect(Collectors.toList());
+        return new HashSet<>(courseIds);
     }
 
     @Override
-    public PageResult<Map<String, Object>> getCourses(Long userId, Long subjectId, Integer page, Integer pageSize) {
+    public PageResult<Map<String, Object>> getCourses(Long userId, Long subjectId, Long gradeLevelId, Integer page, Integer pageSize) {
         LambdaQueryWrapper<Course> wrapper = new LambdaQueryWrapper<Course>()
             .eq(Course::getStatus, 1)
-            .eq(subjectId != null, Course::getSubjectId, subjectId)
-            .orderByAsc(Course::getSortOrder);
+            .eq(subjectId != null, Course::getSubjectId, subjectId);
+
+        // filter by grade level via course_grade
+        if (gradeLevelId != null) {
+            Set<Long> gradeCourseIds = getCourseIdsByGradeLevel(gradeLevelId);
+            if (gradeCourseIds.isEmpty()) {
+                return new PageResult<>(List.of(), 0L, page, pageSize);
+            }
+            wrapper.in(Course::getId, gradeCourseIds);
+        }
+
+        wrapper.orderByAsc(Course::getSortOrder);
 
         Page<Course> coursePage = courseMapper.selectPage(new Page<>(page, pageSize), wrapper);
 

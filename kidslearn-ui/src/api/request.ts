@@ -25,6 +25,13 @@ export function getCourseList(params: any) { return get('/admin/course/list', pa
 export function saveCourse(data: any) { return post('/admin/course/save', data) }
 export function deleteCourse(id: number) { return del(`/admin/course/${id}`) }
 
+// ==================== 年级管理 ====================
+export function getGradeLevelList(params?: any) { return get('/admin/grade-level/list', params) }
+export function saveGradeLevel(data: any) { return post('/admin/grade-level/save', data) }
+export function deleteGradeLevel(id: number) { return del(`/admin/grade-level/${id}`) }
+export function bindCourseGrades(data: { courseId: number; gradeLevelIds: number[] }) { return post('/admin/grade-level/course-bind', data) }
+export function getCourseGrades(courseId: number) { return get('/admin/grade-level/course-grades', { courseId }) }
+
 // ==================== 关卡管理 ====================
 export function getLevelList(params: any) { return get('/admin/level/list', params) }
 export function saveLevel(data: any) { return post('/admin/level/save', data) }
