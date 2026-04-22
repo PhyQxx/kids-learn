@@ -64,3 +64,17 @@ $topbar-height: 64px;
 // ===== 动画 =====
 $transition-fast: 0.15s ease;
 $transition-normal: 0.3s ease;
+
+// ===== 响应式断点（横屏） =====
+// 小屏横屏: ~640px (如手机横屏)
+// 中屏横屏: ~800px (如小平板)
+// 大屏横屏: ~1024px+ (如iPad横屏)
+
+$screen-sm: 640px;
+$screen-md: 800px;
+$screen-lg: 1024px;
+
+// 响应式混合宏
+@mixin respond-sm { @media (max-width: #{$screen-sm}) { @content; } }
+@mixin respond-md { @media (max-width: #{$screen-md}) { @content; } }
+@mixin respond-lg { @media (min-width: #{$screen-lg}) { @content; } }

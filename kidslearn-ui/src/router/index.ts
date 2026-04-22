@@ -21,28 +21,10 @@ const routes: RouteRecordRaw[] = [
       },
       // 内容管理
       {
-        path: 'content/subject',
-        name: 'Subject',
-        component: () => import('@/views/content/subject.vue'),
-        meta: { title: '学科管理' },
-      },
-      {
-        path: 'content/course',
-        name: 'Course',
-        component: () => import('@/views/content/course.vue'),
-        meta: { title: '课程管理' },
-      },
-      {
-        path: 'content/level',
-        name: 'Level',
-        component: () => import('@/views/content/level.vue'),
-        meta: { title: '关卡管理' },
-      },
-      {
-        path: 'content/question',
-        name: 'Question',
-        component: () => import('@/views/content/question.vue'),
-        meta: { title: '题目管理' },
+        path: 'content',
+        name: 'ContentExplorer',
+        component: () => import('@/views/content/ContentExplorer.vue'),
+        meta: { title: '内容管理' },
       },
       // 游戏化管理
       {

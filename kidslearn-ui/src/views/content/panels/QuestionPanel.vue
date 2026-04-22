@@ -1,15 +1,10 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700">题目管理</span>
-        <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增题目</el-button>
-      </div>
-    </template>
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:600">{{ courseLevel.levelName }} - 题目列表</span>
+      <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增题目</el-button>
+    </div>
     <div style="margin-bottom:16px;display:flex;gap:12px">
-      <el-select v-model="filterLevelId" placeholder="筛选关卡" clearable @change="fetchData" style="width:200px">
-        <el-option v-for="l in levels" :key="l.id" :label="l.levelName" :value="l.id" />
-      </el-select>
       <el-select v-model="filterType" placeholder="题型" clearable @change="fetchData" style="width:120px">
         <el-option label="选择题" :value="1" /><el-option label="判断题" :value="2" /><el-option label="填空题" :value="3" />
       </el-select>
@@ -37,8 +32,8 @@
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑题目' : '新增题目'" width="700">
       <el-form :model="form" label-width="80px">
         <el-form-item label="所属关卡">
-          <el-select v-model="form.courseLevelId" style="width:100%">
-            <el-option v-for="l in levels" :key="l.id" :label="l.levelName" :value="l.id" />
+          <el-select v-model="form.courseLevelId" style="width:100%" disabled>
+            <el-option :label="courseLevel.levelName" :value="courseLevel.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="题型">
@@ -71,13 +66,17 @@
         <el-button type="primary" @click="handleSave" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
-  </el-card>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getQuestionList, saveQuestion, deleteQuestion, getLevelList } from '@/api/request'
+import { getQuestionList, saveQuestion, deleteQuestion, getQuestionOptions } from '@/api/request'
+
+const props = defineProps<{
+  courseLevel: any
+}>()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -85,8 +84,6 @@ const tableData = ref<any[]>([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
-const levels = ref<any[]>([])
-const filterLevelId = ref<number | ''>('')
 const filterType = ref<number | ''>('')
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -109,25 +106,32 @@ async function fetchData() {
   try {
     const res = await getQuestionList({
       page: currentPage.value, pageSize: pageSize.value,
-      courseLevelId: filterLevelId.value || undefined,
+      courseLevelId: props.courseLevel.id,
       questionType: filterType.value || undefined
     })
     if (res.code === 200) { tableData.value = res.data.list; total.value = res.data.total }
   } finally { loading.value = false }
 }
 
-async function fetchLevels() {
-  const res = await getLevelList({ page: 1, pageSize: 200 })
-  if (res.code === 200) levels.value = res.data.list
-}
-
-function openDialog(row?: any) {
+async function openDialog(row?: any) {
   if (row) {
     editingId.value = row.id
-    Object.assign(form, { ...row, options: JSON.parse(JSON.stringify(defaultOptions)) })
+    // 加载已有选项
+    let existingOptions = JSON.parse(JSON.stringify(defaultOptions))
+    try {
+      const optRes = await getQuestionOptions(row.id)
+      if (optRes.code === 200 && optRes.data && optRes.data.length > 0) {
+        existingOptions = optRes.data
+      }
+    } catch { /* ignore */ }
+    Object.assign(form, { ...row, options: existingOptions })
   } else {
     editingId.value = null
-    Object.assign(form, { courseLevelId: null, questionType: 1, questionContent: '', difficulty: 1, score: 10, timeLimit: 0, analysis: '', sortOrder: 0, correctAnswer: '', options: JSON.parse(JSON.stringify(defaultOptions)) })
+    Object.assign(form, {
+      courseLevelId: props.courseLevel.id, questionType: 1, questionContent: '',
+      difficulty: 1, score: 10, timeLimit: 0, analysis: '', sortOrder: 0,
+      correctAnswer: '', options: JSON.parse(JSON.stringify(defaultOptions))
+    })
   }
   dialogVisible.value = true
 }
@@ -147,5 +151,5 @@ async function handleDelete(id: number) {
   if (res.code === 200) { ElMessage.success('删除成功'); fetchData() }
 }
 
-onMounted(() => { fetchLevels(); fetchData() })
+onMounted(() => fetchData())
 </script>

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kidslearn.api.entity.Subject;
 import com.kidslearn.api.entity.Course;
 import com.kidslearn.api.entity.CourseLevel;
+import com.kidslearn.api.entity.GradeLevel;
 import com.kidslearn.api.entity.Question;
 import com.kidslearn.api.entity.QuestionOption;
 import com.kidslearn.api.mapper.*;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Tag(name = "管理后台-内容管理")
 @RestController
@@ -30,6 +32,7 @@ public class AdminContentController {
     private final CourseLevelMapper courseLevelMapper;
     private final QuestionMapper questionMapper;
     private final QuestionOptionMapper questionOptionMapper;
+    private final GradeLevelMapper gradeLevelMapper;
 
     // ==================== 学科管理 ====================
 
@@ -72,11 +75,21 @@ public class AdminContentController {
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer pageSize,
             @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) Integer ageGroup,
             @RequestParam(required = false) String keyword) {
         LambdaQueryWrapper<Course> wrapper = new LambdaQueryWrapper<Course>()
             .eq(subjectId != null, Course::getSubjectId, subjectId)
-            .like(keyword != null && !keyword.isEmpty(), Course::getCourseName, keyword)
-            .orderByAsc(Course::getSortOrder);
+            .like(keyword != null && !keyword.isEmpty(), Course::getCourseName, keyword);
+        if (ageGroup != null) {
+            List<Long> gradeIds = gradeLevelMapper.selectList(
+                new LambdaQueryWrapper<GradeLevel>().eq(GradeLevel::getAgeGroup, ageGroup)
+            ).stream().map(GradeLevel::getId).collect(Collectors.toList());
+            if (gradeIds.isEmpty()) {
+                return R.ok(new PageResult<>(List.of(), 0L, page, pageSize));
+            }
+            wrapper.in(Course::getGradeLevelId, gradeIds);
+        }
+        wrapper.orderByAsc(Course::getSortOrder);
         Page<Course> p = courseMapper.selectPage(new Page<>(page, pageSize), wrapper);
         return R.ok(new PageResult<>(p.getRecords(), p.getTotal(), page, pageSize));
     }

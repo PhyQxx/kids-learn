@@ -67,6 +67,10 @@ public class LearnServiceImpl implements LearnService {
                 new LambdaQueryWrapper<Course>().eq(Course::getSubjectId, subject.getId())
             ).stream().map(Course::getId).collect(Collectors.toSet());
 
+            if (courseIds.isEmpty()) {
+                continue;
+            }
+
             Set<Long> levelIds = courseLevelMapper.selectList(
                 new LambdaQueryWrapper<CourseLevel>().in(CourseLevel::getCourseId, courseIds)
             ).stream().map(CourseLevel::getId).collect(Collectors.toSet());

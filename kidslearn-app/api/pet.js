@@ -4,19 +4,19 @@ import { get, post } from './request'
 export const getPetStatus = () => get('/pet/status')
 
 // 获取商店列表
-export const getShopItems = () => get('/pet/shop')
+export const getShopItems = (itemType) => get('/pet/shop', { itemType })
 
 // 获取背包
 export const getInventory = () => get('/pet/inventory')
 
-// 喂食
-export const feedPet = (data) => post('/pet/feed', data)
+// 喂食 (petItemId 通过 query param)
+export const feedPet = (petItemId) => post('/pet/feed?petItemId=' + petItemId)
 
 // 玩耍
-export const playPet = (data) => post('/pet/play', data)
+export const playPet = () => post('/pet/play')
 
-// 换装
-export const dressPet = (data) => post('/pet/dress', data)
+// 换装 (body: List<Long> 装饰ID数组)
+export const dressPet = (decorationIds) => post('/pet/dress', decorationIds)
 
-// 购买道具
-export const buyItem = (data) => post('/pet/shop/buy', data)
+// 购买道具 (itemId, quantity 通过 query param)
+export const buyItem = (itemId, quantity = 1) => post(`/pet/shop/buy?itemId=${itemId}&quantity=${quantity}`)

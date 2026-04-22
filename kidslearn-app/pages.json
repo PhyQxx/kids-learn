@@ -1,8 +1,14 @@
 {
+    "easycom": {
+        "custom": {
+            "^tn-(.*)-(item|group)$": "@tuniao/tnui-vue3-uniapp/components/$1/src/$1-$2.vue",
+            "^tn-(.*)": "@tuniao/tnui-vue3-uniapp/components/$1/src/$1.vue"
+        }
+    },
     "pages": [
         { "path": "pages/login/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
         { "path": "pages/login/register", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
-        { "path": "pages/index/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "首页" } },
+        { "path": "pages/main/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "趣学星球" } },
         { "path": "pages/learn/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "学习中心" } },
         { "path": "pages/learn/courses", "style": { "navigationStyle": "custom", "navigationBarTitleText": "课程列表" } },
         { "path": "pages/learn/levels", "style": { "navigationStyle": "custom", "navigationBarTitleText": "关卡列表" } },

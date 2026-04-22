@@ -88,6 +88,9 @@ export function saveConfig(data: any) { return post('/admin/config/save', data) 
 // ==================== 操作日志 ====================
 export function getLogList(params: any) { return get('/admin/log/list', params) }
 
+// ==================== 字典查询 ====================
+export function getDictDataByType(dictType: string) { return get(`/admin/dict/data/${dictType}`) }
+
 // ==================== 字典管理 ====================
 export function getDictTypeList(params: any) { return get('/admin/dict/type/list', params) }
 export function saveDictType(data: any) { return post('/admin/dict/type/save', data) }

@@ -18,16 +18,10 @@
           <template #title>首页概览</template>
         </el-menu-item>
 
-        <el-sub-menu index="content">
-          <template #title>
-            <el-icon><Reading /></el-icon>
-            <span>内容管理</span>
-          </template>
-          <el-menu-item index="/content/subject">学科管理</el-menu-item>
-          <el-menu-item index="/content/course">课程管理</el-menu-item>
-          <el-menu-item index="/content/level">关卡管理</el-menu-item>
-          <el-menu-item index="/content/question">题目管理</el-menu-item>
-        </el-sub-menu>
+        <el-menu-item index="/content">
+          <el-icon><Reading /></el-icon>
+          <template #title>内容管理</template>
+        </el-menu-item>
 
         <el-sub-menu index="pet">
           <template #title>

@@ -1,16 +1,20 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700">学科管理</span>
-        <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增学科</el-button>
-      </div>
-    </template>
+  <div>
+    <div style="margin-bottom:16px">
+      <el-tabs v-model="activeAgeGroup" @tab-change="onAgeGroupChange">
+        <el-tab-pane label="全部" :name="''" />
+        <el-tab-pane v-for="ag in ageGroups" :key="ag.dictValue" :label="ag.dictLabel" :name="ag.dictValue" />
+      </el-tabs>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:600">学科列表</span>
+      <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增学科</el-button>
+    </div>
     <el-table :data="tableData" stripe v-loading="loading">
-      <el-table-column prop="subjectCode" label="学科代码" />
-      <el-table-column prop="subjectName" label="学科名称" />
+      <el-table-column prop="subjectCode" label="学科代码" width="120" />
+      <el-table-column prop="subjectName" label="学科名称" width="120" />
       <el-table-column prop="iconUrl" label="图标URL" show-overflow-tooltip />
-      <el-table-column prop="color" label="主题色">
+      <el-table-column prop="color" label="主题色" width="100">
         <template #default="{ row }">
           <span v-if="row.color" :style="{ color: row.color, fontWeight: 'bold' }">{{ row.color }}</span>
         </template>
@@ -21,8 +25,9 @@
           <el-tag :type="row.status === 1 ? 'success' : 'danger'">{{ row.status === 1 ? '启用' : '禁用' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180">
+      <el-table-column label="操作" width="240">
         <template #default="{ row }">
+          <el-button link type="primary" @click="$emit('select', row)">管理课程</el-button>
           <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
           <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
         </template>
@@ -36,26 +41,26 @@
         <el-form-item label="学科代码"><el-input v-model="form.subjectCode" placeholder="如 CHINESE" /></el-form-item>
         <el-form-item label="学科名称"><el-input v-model="form.subjectName" placeholder="如 语文" /></el-form-item>
         <el-form-item label="图标URL"><el-input v-model="form.iconUrl" /></el-form-item>
-        <el-form-item label="主题色">
-          <el-color-picker v-model="form.color" />
-        </el-form-item>
+        <el-form-item label="主题色"><el-color-picker v-model="form.color" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="form.sortOrder" :min="0" /></el-form-item>
-        <el-form-item label="状态">
-          <el-switch v-model="form.status" :active-value="1" :inactive-value="0" />
-        </el-form-item>
+        <el-form-item label="状态"><el-switch v-model="form.status" :active-value="1" :inactive-value="0" /></el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSave" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
-  </el-card>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getSubjectList, saveSubject, deleteSubject } from '@/api/request'
+import { getSubjectList, saveSubject, deleteSubject, getDictDataByType } from '@/api/request'
+
+const emit = defineEmits<{
+  select: [row: any]
+}>()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -65,10 +70,19 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
+const ageGroups = ref<any[]>([])
+const activeAgeGroup = ref<string>('')
 
 const form = reactive({
   subjectCode: '', subjectName: '', iconUrl: '', color: '#FF6B6B', sortOrder: 0, status: 1
 })
+
+async function fetchAgeGroups() {
+  try {
+    const res = await getDictDataByType('age_group')
+    if (res.code === 200) ageGroups.value = res.data || []
+  } catch { /* 字典未配置时忽略 */ }
+}
 
 async function fetchData() {
   loading.value = true
@@ -79,6 +93,10 @@ async function fetchData() {
       total.value = res.data.total
     }
   } finally { loading.value = false }
+}
+
+function onAgeGroupChange(val: string) {
+  emit('update:ageGroup', val ? Number(val) : null)
 }
 
 function openDialog(row?: any) {
@@ -112,5 +130,5 @@ async function handleDelete(id: number) {
   else { ElMessage.error(res.msg) }
 }
 
-onMounted(() => fetchData())
+onMounted(() => { fetchAgeGroups(); fetchData() })
 </script>

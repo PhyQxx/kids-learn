@@ -1,21 +1,11 @@
 <template>
-  <el-card>
-    <template #header>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-weight:700">课程管理</span>
-        <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增课程</el-button>
-      </div>
-    </template>
-    <div style="margin-bottom:16px;display:flex;gap:12px">
-      <el-select v-model="filterSubjectId" placeholder="筛选学科" clearable @change="fetchData" style="width:160px">
-        <el-option v-for="s in subjects" :key="s.id" :label="s.subjectName" :value="s.id" />
-      </el-select>
+  <div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <span style="font-size:15px;font-weight:600">{{ subject.subjectName }} - 课程列表</span>
+      <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增课程</el-button>
     </div>
     <el-table :data="tableData" stripe v-loading="loading">
       <el-table-column prop="courseName" label="课程名称" />
-      <el-table-column prop="subjectId" label="学科" width="100">
-        <template #default="{ row }">{{ getSubjectName(row.subjectId) }}</template>
-      </el-table-column>
       <el-table-column prop="difficulty" label="难度" width="80">
         <template #default="{ row }">{{ ['', '简单', '普通', '困难'][row.difficulty] }}</template>
       </el-table-column>
@@ -28,6 +18,7 @@
       </el-table-column>
       <el-table-column label="操作" width="240">
         <template #default="{ row }">
+          <el-button link type="primary" @click="$emit('select', row)">管理关卡</el-button>
           <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
           <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
         </template>
@@ -41,7 +32,7 @@
         <el-form-item label="课程名称"><el-input v-model="form.courseName" /></el-form-item>
         <el-form-item label="学科">
           <el-select v-model="form.subjectId" style="width:100%">
-            <el-option v-for="s in subjects" :key="s.id" :label="s.subjectName" :value="s.id" />
+            <el-option :label="subject.subjectName" :value="subject.id" disabled />
           </el-select>
         </el-form-item>
         <el-form-item label="课程描述"><el-input v-model="form.courseDesc" type="textarea" :rows="3" /></el-form-item>
@@ -60,13 +51,22 @@
         <el-button type="primary" @click="handleSave" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
-  </el-card>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getCourseList, saveCourse, deleteCourse, getSubjectList } from '@/api/request'
+import { getCourseList, saveCourse, deleteCourse } from '@/api/request'
+
+const props = defineProps<{
+  subject: any
+  ageGroup: number | null
+}>()
+
+defineEmits<{
+  select: [row: any]
+}>()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -74,8 +74,6 @@ const tableData = ref<any[]>([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
-const subjects = ref<any[]>([])
-const filterSubjectId = ref<number | ''>('')
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 
@@ -84,27 +82,27 @@ const form = reactive({
   difficulty: 1, isElite: 0, sortOrder: 0, status: 1
 })
 
-function getSubjectName(id: number) {
-  const s = subjects.value.find(s => s.id === id)
-  return s ? s.subjectName : '-'
-}
-
 async function fetchData() {
   loading.value = true
   try {
-    const res = await getCourseList({ page: currentPage.value, pageSize: pageSize.value, subjectId: filterSubjectId.value || undefined })
+    const params: any = { page: currentPage.value, pageSize: pageSize.value, subjectId: props.subject.id }
+    if (props.ageGroup != null) params.ageGroup = props.ageGroup
+    const res = await getCourseList(params)
     if (res.code === 200) { tableData.value = res.data.list; total.value = res.data.total }
   } finally { loading.value = false }
 }
 
-async function fetchSubjects() {
-  const res = await getSubjectList({ page: 1, pageSize: 100 })
-  if (res.code === 200) subjects.value = res.data.list
-}
-
 function openDialog(row?: any) {
-  if (row) { editingId.value = row.id; Object.assign(form, row) }
-  else { editingId.value = null; Object.assign(form, { courseName: '', subjectId: null, courseDesc: '', coverUrl: '', difficulty: 1, isElite: 0, sortOrder: 0, status: 1 }) }
+  if (row) {
+    editingId.value = row.id
+    Object.assign(form, row)
+  } else {
+    editingId.value = null
+    Object.assign(form, {
+      courseName: '', subjectId: props.subject.id, courseDesc: '', coverUrl: '',
+      difficulty: 1, isElite: 0, sortOrder: 0, status: 1
+    })
+  }
   dialogVisible.value = true
 }
 
@@ -124,5 +122,6 @@ async function handleDelete(id: number) {
   else ElMessage.error(res.msg)
 }
 
-onMounted(() => { fetchSubjects(); fetchData() })
+watch(() => props.ageGroup, () => { currentPage.value = 1; fetchData() })
+onMounted(() => fetchData())
 </script>

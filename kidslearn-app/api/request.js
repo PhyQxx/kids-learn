@@ -1,5 +1,5 @@
 // API 请求封装
-const BASE_URL = 'http://localhost:8088/api/v1'
+const BASE_URL = 'http://localhost:19084/api/v1'
 
 const request = (options) => {
   return new Promise((resolve, reject) => {
