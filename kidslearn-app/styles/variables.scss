@@ -1,5 +1,6 @@
 // 趣学星球 - 全局样式变量
-// 基于原型HTML设计规范
+// SCSS 变量保持实际值，用于编译时
+// CSS 自定义属性在 tokens.scss 中定义，用于运行时主题切换
 
 // ===== 主题色 =====
 $primary: #FF6B6B;
@@ -62,8 +63,10 @@ $sidebar-collapsed: 60px;
 $topbar-height: 64px;
 
 // ===== 动画 =====
-$transition-fast: 0.15s ease;
-$transition-normal: 0.3s ease;
+$transition-fast: 0.15s;
+$transition-normal: 0.3s;
+$ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+$ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
 // ===== 响应式断点（横屏） =====
 // 小屏横屏: ~640px (如手机横屏)

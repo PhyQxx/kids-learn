@@ -17,7 +17,7 @@
           </view>
         </view>
         <view class="banner-progress">
-          <tn-line-progress :percent="taskProgress" active-color="#FFE66D" inactive-color="rgba(255,255,255,0.3)" :height="10" :show-percent="false" />
+          <tn-line-progress :percent="taskProgress" active-color="#FFE66D" inactive-color="rgba(255,255,255,0.3)" :height="12" :show-percent="false" />
         </view>
       </view>
 
@@ -59,7 +59,7 @@
             <text class="pet-emoji animate-float">🐱</text>
             <view>
               <text class="pet-name">{{ petStore.name }}</text>
-              <text class="pet-status-text text-xs text-light">{{ petStore.moodText }} · Lv.{{ petStore.level }}</text>
+              <text class="pet-status-text text-base text-light">{{ petStore.moodText }} · Lv.{{ petStore.level }}</text>
             </view>
           </view>
           <text class="text-primary text-sm">去看看 →</text>
@@ -169,10 +169,10 @@ async function loadData() {
       const list = results[1].value
       subjects.value = (Array.isArray(list) ? list : []).map(s => ({
         id: s.id,
-        name: s.subjectName || s.name,
-        icon: s.iconUrl || { 'CHINESE': '📖', 'MATH': '🔢', 'ENGLISH': '🔤', 'LOGIC': '🧩', 'SCIENCE': '🔬', 'MUSIC': '🎵' }[s.subjectCode] || '📚',
+        name: s.name || s.subjectName,
+        icon: s.icon || s.iconUrl || { 'CHINESE': '📖', 'MATH': '🔢', 'ENGLISH': '🔤', 'LOGIC': '🧩', 'SCIENCE': '🔬', 'MUSIC': '🎵' }[s.code || s.subjectCode] || '📚',
         progress: s.progress || 0,
-        locked: s.status === 0 || s.isVip
+        locked: s.status === 0 || s.isVip || s.locked
       }))
     }
 
@@ -257,8 +257,8 @@ function goAchievement() { switchTab('achievement') }
 .section-title-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
 .subject-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .subject-card {
-  padding: 24px 16px; text-align: center; cursor: pointer; transition: all $transition-fast;
-  &:active { transform: scale(0.97); }
+  padding: 24px 16px; text-align: center; cursor: pointer;
+  &:active { transform: scale(0.94); opacity: 0.9; }
   &.locked { opacity: 0.5; background: #F5F5F5; box-shadow: none; }
 }
 .subject-emoji { font-size: 48px; display: block; margin-bottom: 8px; }
@@ -269,7 +269,7 @@ function goAchievement() { switchTab('achievement') }
 .quick-card {
   display: flex; align-items: center; justify-content: space-between;
   padding: 20px 24px; cursor: pointer;
-  &:active { transform: scale(0.97); }
+  &:active { transform: scale(0.94); opacity: 0.9; }
 }
 .quick-pet-info { display: flex; align-items: center; gap: 12px; }
 .pet-emoji { font-size: 48px; }

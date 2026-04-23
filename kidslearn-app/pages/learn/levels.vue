@@ -36,29 +36,21 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import AppLayout from '@/components/AppLayout.vue'
 import { useLearnStore } from '@/store/learn'
+import { useUserStore } from '@/store/user'
 import { getLevels } from '@/api/learn'
+import { getUserInfo } from '@/api/user'
 
 const learnStore = useLearnStore()
+const userStore = useUserStore()
 const courseName = ref(learnStore.currentCourse?.name || '课程')
 
 const units = ref([])
 
-function statusText(level) {
-  const map = { completed: '已完成', current: '进行中', locked: '未解锁' }
-  return map[level.status] || ''
-}
-
-function startQuiz(level) {
-  learnStore.setLevel(level)
-  uni.navigateTo({ url: `/pages/learn/quiz?levelId=${level.id}` })
-}
-
-onMounted(async () => {
-  const pages = getCurrentPages()
-  const page = pages[pages.length - 1]
-  const courseId = page.$page?.options?.courseId || learnStore.currentCourse?.id
+async function loadLevels() {
+  const courseId = learnStore.currentCourse?.id
   if (courseId) {
     try {
       const res = await getLevels(courseId)
@@ -95,6 +87,29 @@ onMounted(async () => {
       }
     } catch (e) { console.log('使用模拟数据') }
   }
+}
+
+function statusText(level) {
+  const map = { completed: '已完成', current: '进行中', locked: '未解锁' }
+  return map[level.status] || ''
+}
+
+function startQuiz(level) {
+  learnStore.setLevel(level)
+  uni.navigateTo({ url: `/pages/learn/quiz?levelId=${level.id}` })
+}
+
+onMounted(() => {
+  loadLevels()
+})
+
+// 返回时刷新关卡数据和用户信息
+onShow(async () => {
+  loadLevels()
+  try {
+    const info = await getUserInfo()
+    if (info) userStore.setUserInfo(info)
+  } catch (e) { console.log('刷新用户信息失败') }
 })
 </script>
 

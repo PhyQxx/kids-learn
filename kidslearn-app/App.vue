@@ -24,5 +24,6 @@ export default {
 </style>
 
 <style lang="scss">
+@import '@/styles/tokens.scss';
 @import '@/styles/common.scss';
 </style>

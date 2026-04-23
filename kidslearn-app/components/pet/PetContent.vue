@@ -24,24 +24,24 @@
             <text class="text-sm text-bold">进化进度</text>
             <text class="text-xs text-light">{{ petExp.current }}/{{ petExp.max }} XP</text>
           </view>
-          <tn-line-progress :percent="petExp.current / petExp.max * 100" active-color="#FF6B6B" inactive-color="rgba(255,255,255,0.3)" :height="10" :show-percent="false" />
+          <tn-line-progress :percent="petExp.current / petExp.max * 100" active-color="#FF6B6B" inactive-color="rgba(255,255,255,0.3)" :height="12" :show-percent="false" />
         </view>
 
         <!-- 状态条 -->
         <view class="stats-bars">
           <view class="stat-row">
-            <text class="stat-label text-xs">🍖 饱食度</text>
-            <tn-line-progress :percent="petStore.hunger" active-color="#FFB74D" :height="8" :show-percent="false" style="flex: 1;" />
+            <text class="stat-label text-sm">🍖 饱食度</text>
+            <tn-line-progress :percent="petStore.hunger" active-color="#FFB74D" :height="12" :show-percent="false" style="flex: 1;" />
             <text class="text-xs text-light">{{ petStore.hunger }}%</text>
           </view>
           <view class="stat-row">
-            <text class="stat-label text-xs">😊 心情</text>
-            <tn-line-progress :percent="petMood" active-color="#4ECDC4" :height="8" :show-percent="false" style="flex: 1;" />
+            <text class="stat-label text-sm">😊 心情</text>
+            <tn-line-progress :percent="petMood" active-color="#4ECDC4" :height="12" :show-percent="false" style="flex: 1;" />
             <text class="text-xs text-light">{{ petStore.moodText }}</text>
           </view>
           <view class="stat-row">
-            <text class="stat-label text-xs">⚡ 活力</text>
-            <tn-line-progress :percent="petEnergy" active-color="#2ECC71" :height="8" :show-percent="false" style="flex: 1;" />
+            <text class="stat-label text-sm">⚡ 活力</text>
+            <tn-line-progress :percent="petEnergy" active-color="#2ECC71" :height="12" :show-percent="false" style="flex: 1;" />
             <text class="text-xs text-light">{{ petEnergy }}%</text>
           </view>
         </view>
@@ -340,11 +340,13 @@ function confirmFeed() {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  padding: 12px;
+  padding: 14px;
   cursor: pointer;
-
-  &:active { transform: scale(0.95); }
+  min-height: 72px;
+  min-width: 72px;
+  &:active { transform: scale(0.94); opacity: 0.9; }
 }
 
 .action-emoji { font-size: 28px; }

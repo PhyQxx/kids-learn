@@ -30,7 +30,7 @@
     </tn-tabs>
 
     <!-- 成就网格 -->
-    <view class="achieve-grid stagger-list">
+    <view class="achieve-grid stagger-spring">
       <view
         v-for="ach in achievements"
         :key="ach.id"
@@ -45,7 +45,7 @@
           <text class="text-xs text-light">{{ ach.desc }}</text>
           <!-- 进度 -->
           <view v-if="ach.status === 'progress'" class="achieve-progress">
-            <tn-line-progress :percent="ach.percent" :height="6" :show-percent="false" style="flex: 1;" />
+            <tn-line-progress :percent="ach.percent" :height="10" :show-percent="false" style="flex: 1;" />
             <text class="text-xs text-light">{{ ach.current }}/{{ ach.target }}</text>
           </view>
           <!-- 已完成 -->

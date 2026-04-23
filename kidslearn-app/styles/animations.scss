@@ -1,0 +1,187 @@
+/* ========================================
+   趣学星球 - 动画系统 (Animation System)
+   Spring physics animations for kids UI
+   ======================================== */
+@import './variables.scss';
+
+/* 点击弹跳动画 */
+@keyframes tap-bounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(0.92); }
+  60% { transform: scale(1.04); }
+  80% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+/* 奖励弹出动画 */
+@keyframes reward-pop {
+  0% { transform: scale(0) rotate(-20deg); opacity: 0; }
+  50% { transform: scale(1.3) rotate(10deg); }
+  70% { transform: scale(0.9) rotate(-5deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* 彩色纸屑下落动画 */
+@keyframes confetti-fall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+/* 星星旋转动画 */
+@keyframes star-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.3); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* 进度条填充动画 */
+@keyframes progress-fill {
+  0% { width: 0%; }
+  100% { width: var(--target-width, 100%); }
+}
+
+/* 浮动动画 - 宠物/装饰 */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* 脉冲动画 - 强调/提示 */
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+}
+
+/* 抖动动画 - 错误提示 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+/* 滑入动画 */
+@keyframes slideUp {
+  from { transform: translateY(30px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* 发光动画 - 传说品质 */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(155, 89, 182, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(155, 89, 182, 0.8); }
+}
+
+/* 弹入动画 */
+@keyframes popIn {
+  0% { transform: scale(0); opacity: 0; }
+  70% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 淡入动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 滑入左右 */
+@keyframes slideInLeft {
+  from { transform: translateX(-30px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(30px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* 弹跳进入 */
+@keyframes bounceIn {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.1); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 闪光效果 */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* 放大进入 */
+@keyframes zoomIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ===== 动画类 ===== */
+
+/* 基础动画类 */
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-pulse { animation: pulse 2s ease-in-out infinite; }
+.animate-shake { animation: shake 0.3s ease; }
+.animate-slide-up { animation: slideUp 0.3s ease; }
+.animate-pop-in { animation: popIn 0.5s ease; }
+.animate-fade-in { animation: fadeIn 0.3s ease; }
+.animate-bounce-in { animation: bounceIn 0.6s ease; }
+.animate-slide-left { animation: slideInLeft 0.3s ease; }
+.animate-slide-right { animation: slideInRight 0.3s ease; }
+.animate-glow { animation: glow-pulse 2s ease-in-out infinite; }
+.animate-tap-bounce { animation: tap-bounce 0.4s var(--ease-spring); }
+.animate-reward-pop { animation: reward-pop 0.5s var(--ease-bounce); }
+.animate-star-spin { animation: star-spin 1s ease-in-out; }
+
+/* 交错列表动画 - 弹簧效果 */
+.stagger-spring > * {
+  animation: slideUp 0.4s var(--ease-spring) both;
+}
+.stagger-spring > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-spring > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-spring > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-spring > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-spring > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-spring > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-spring > *:nth-child(7) { animation-delay: 360ms; }
+.stagger-spring > *:nth-child(8) { animation-delay: 420ms; }
+
+/* 交错列表动画 - 滑入效果 */
+.stagger-list > * {
+  animation: slideUp 0.3s ease both;
+}
+.stagger-list > *:nth-child(1) { animation-delay: 0s; }
+.stagger-list > *:nth-child(2) { animation-delay: 0.05s; }
+.stagger-list > *:nth-child(3) { animation-delay: 0.1s; }
+.stagger-list > *:nth-child(4) { animation-delay: 0.15s; }
+.stagger-list > *:nth-child(5) { animation-delay: 0.2s; }
+.stagger-list > *:nth-child(6) { animation-delay: 0.25s; }
+
+/* 骨架屏加载 */
+.skeleton {
+  background: linear-gradient(90deg, #F0F0F0 25%, #E0E0E0 50%, #F0F0F0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* 答案反馈动画 */
+.answer-correct {
+  animation: reward-pop 0.5s var(--ease-bounce);
+  color: var(--color-success);
+}
+
+.answer-wrong {
+  animation: shake 0.4s ease;
+  color: var(--color-error);
+}
+
+/* 正确答案 - 星星爆发效果 */
+.star-burst {
+  position: relative;
+  .star {
+    position: absolute;
+    animation: star-spin 0.6s ease-out forwards;
+  }
+}

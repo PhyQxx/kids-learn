@@ -11,7 +11,6 @@ import com.kidslearn.api.service.LearnService;
 import com.kidslearn.common.exception.BusinessException;
 import com.kidslearn.common.result.PageResult;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -123,6 +122,36 @@ public class LearnServiceImpl implements LearnService {
             Long courseCount = courseMapper.selectCount(countWrapper);
             map.put("courseCount", courseCount);
             map.put("_hasCourses", courseCount > 0);
+
+            // 计算学科进度：已完成关卡数 / 总关卡数
+            List<Course> subjectCourses = courseMapper.selectList(
+                new LambdaQueryWrapper<Course>()
+                    .eq(Course::getSubjectId, s.getId())
+                    .eq(Course::getStatus, 1)
+            );
+            if (!subjectCourses.isEmpty()) {
+                Set<Long> courseIdsSet = subjectCourses.stream()
+                    .filter(c -> finalGradeCourseIds == null || finalGradeCourseIds.contains(c.getId()))
+                    .map(Course::getId)
+                    .collect(Collectors.toSet());
+                if (!courseIdsSet.isEmpty()) {
+                    Long totalLevels = courseLevelMapper.selectCount(
+                        new LambdaQueryWrapper<CourseLevel>()
+                            .in(CourseLevel::getCourseId, courseIdsSet)
+                            .eq(CourseLevel::getStatus, 1)
+                    );
+                    String inClause = courseIdsSet.stream().map(String::valueOf).collect(Collectors.joining(","));
+                    Long completedLevels = learningRecordMapper.selectCount(
+                        new LambdaQueryWrapper<LearningRecord>()
+                            .eq(LearningRecord::getUserId, userId)
+                            .eq(LearningRecord::getIsPass, 1)
+                            .apply("course_level_id IN (SELECT id FROM course_level WHERE course_id IN (" + inClause + "))")
+                    );
+                    int progress = totalLevels > 0 ? (int) (completedLevels * 100 / totalLevels) : 0;
+                    map.put("progress", progress);
+                }
+            }
+
             return map;
         }).filter(m -> (boolean) m.get("_hasCourses")).collect(Collectors.toList());
     }
@@ -207,11 +236,9 @@ public class LearnServiceImpl implements LearnService {
                 .orderByAsc(CourseLevel::getLevelNum)
         );
 
-        // first level always unlocked
-        boolean prevPassed = true;
-
         List<Map<String, Object>> result = new ArrayList<>();
-        for (CourseLevel level : levels) {
+        for (int i = 0; i < levels.size(); i++) {
+            CourseLevel level = levels.get(i);
             Map<String, Object> map = new HashMap<>();
             map.put("id", level.getId());
             map.put("levelNum", level.getLevelNum());
@@ -223,9 +250,6 @@ public class LearnServiceImpl implements LearnService {
             map.put("expReward", level.getExpReward());
             map.put("goldReward", level.getGoldReward());
 
-            boolean isUnlock = level.getLevelNum() == 1 || prevPassed || level.getIsUnlock() == 1;
-            map.put("isUnlock", isUnlock);
-
             // user best record
             LearningRecord bestRecord = learningRecordMapper.selectOne(
                 new LambdaQueryWrapper<LearningRecord>()
@@ -234,13 +258,71 @@ public class LearnServiceImpl implements LearnService {
                     .orderByDesc(LearningRecord::getStars)
                     .last("LIMIT 1")
             );
-            map.put("myStars", bestRecord != null ? bestRecord.getStars() : 0);
-            map.put("isPassed", bestRecord != null && bestRecord.getIsPass() == 1);
+            int myStars = bestRecord != null ? bestRecord.getStars() : 0;
+            boolean isPassed = bestRecord != null && bestRecord.getIsPass() == 1;
+            map.put("myStars", myStars);
+            map.put("isPassed", isPassed);
 
-            prevPassed = bestRecord != null && bestRecord.getIsPass() == 1;
+            // 判断关卡是否解锁
+            // 1. 第一关默认解锁
+            // 2. 已通过的关卡自动解锁下一关
+            // 3. 手动设置解锁的关卡
+            // 4. 需要满足 unlockCondition 中的星星数要求
+            boolean isUnlock = level.getIsUnlock() == 1;
+            if (!isUnlock && i > 0) {
+                // 检查前置关卡的通过情况和星星数
+                CourseLevel prevLevel = levels.get(i - 1);
+                LearningRecord prevRecord = learningRecordMapper.selectOne(
+                    new LambdaQueryWrapper<LearningRecord>()
+                        .eq(LearningRecord::getUserId, userId)
+                        .eq(LearningRecord::getCourseLevelId, prevLevel.getId())
+                        .orderByDesc(LearningRecord::getStars)
+                        .last("LIMIT 1")
+                );
+                if (prevRecord != null && prevRecord.getIsPass() == 1) {
+                    // 检查 unlockCondition 中的 minStars 要求
+                    String unlockCondition = level.getUnlockCondition();
+                    if (unlockCondition != null && unlockCondition.contains("minStars")) {
+                        // 解析 JSON 格式的 unlockCondition: {"preLevelId":X,"minStars":Y}
+                        try {
+                            if (unlockCondition.contains("\"" + prevLevel.getId() + "\"")) {
+                                // 包含前置关卡ID，检查 minStars
+                                int minStars = extractMinStars(unlockCondition);
+                                isUnlock = prevRecord.getStars() >= minStars;
+                            } else {
+                                // 前置关卡不匹配，默认不解锁
+                                isUnlock = false;
+                            }
+                        } catch (Exception e) {
+                            // 解析失败，默认解锁（兼容旧数据）
+                            isUnlock = true;
+                        }
+                    } else {
+                        // 没有 minStars 要求，只要通过即可解锁
+                        isUnlock = true;
+                    }
+                } else {
+                    isUnlock = false;
+                }
+            }
+            map.put("isUnlock", isUnlock);
             result.add(map);
         }
         return result;
+    }
+
+    /**
+     * 从 unlockCondition JSON 中提取 minStars 值
+     */
+    private int extractMinStars(String unlockCondition) {
+        try {
+            // 简单解析 {"preLevelId":1,"minStars":1} 格式
+            String minStarsPart = unlockCondition.substring(unlockCondition.indexOf("minStars") + 9);
+            int minStars = Integer.parseInt(minStarsPart.split("[,}")[0]);
+            return minStars;
+        } catch (Exception e) {
+            return 1; // 默认要求1颗星
+        }
     }
 
     @Override
@@ -399,7 +481,7 @@ public class LearnServiceImpl implements LearnService {
             }
 
             // unlock next level
-            boolean unlockedNext = unlockNextLevel(level);
+            boolean unlockedNext = unlockNextLevel(level, userId, stars);
             vo.setUnlockedNextLevel(unlockedNext);
 
             // update daily stats
@@ -437,19 +519,40 @@ public class LearnServiceImpl implements LearnService {
         return 10 + (totalExp - 5500) / 1200 + 1;
     }
 
-    private boolean unlockNextLevel(CourseLevel currentLevel) {
+    private boolean unlockNextLevel(CourseLevel currentLevel, Long userId, int earnedStars) {
         CourseLevel nextLevel = courseLevelMapper.selectOne(
             new LambdaQueryWrapper<CourseLevel>()
                 .eq(CourseLevel::getCourseId, currentLevel.getCourseId())
                 .eq(CourseLevel::getLevelNum, currentLevel.getLevelNum() + 1)
                 .last("LIMIT 1")
         );
-        if (nextLevel != null && nextLevel.getIsUnlock() == 0) {
-            nextLevel.setIsUnlock(1);
-            courseLevelMapper.updateById(nextLevel);
-            return true;
+        if (nextLevel == null) {
+            return false;
         }
-        return false;
+
+        // 如果下一关已经解锁，直接返回
+        if (nextLevel.getIsUnlock() == 1) {
+            return false;
+        }
+
+        // 检查 unlockCondition 中的 minStars 要求
+        String unlockCondition = nextLevel.getUnlockCondition();
+        if (unlockCondition != null && unlockCondition.contains("minStars")) {
+            try {
+                int minStars = extractMinStars(unlockCondition);
+                if (earnedStars < minStars) {
+                    // 星星数不够，不解锁
+                    return false;
+                }
+            } catch (Exception e) {
+                // 解析失败，默认可以解锁
+            }
+        }
+
+        // 解锁下一关
+        nextLevel.setIsUnlock(1);
+        courseLevelMapper.updateById(nextLevel);
+        return true;
     }
 
     private void saveWrongTopic(Long userId, Long questionId, String wrongAnswer, String correctAnswer) {

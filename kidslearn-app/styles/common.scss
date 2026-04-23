@@ -1,5 +1,7 @@
 /* 趣学星球 - 全局公共样式 */
 @import './variables.scss';
+@import './tokens.scss';
+@import './animations.scss';
 
 /* 全局重置 */
 page {
@@ -62,11 +64,12 @@ uni-page-body, html, body {
   border-radius: $radius-md;
   box-shadow: $shadow;
   padding: 20px;
-  transition: transform $transition-fast, box-shadow $transition-fast;
+  transition: transform $transition-fast $ease-spring, box-shadow $transition-fast;
 }
 
 .card-hover:active {
-  transform: scale(0.97);
+  transform: scale(0.94);
+  opacity: 0.9;
 }
 
 /* ===== 按钮 ===== */
@@ -143,16 +146,17 @@ uni-page-body, html, body {
 
 /* ===== 进度条 ===== */
 .progress-bar {
-  height: 8px;
+  height: 12px;
   background: #E8F0FE;
-  border-radius: 4px;
+  border-radius: $radius;
   overflow: hidden;
 
   .progress-fill {
     height: 100%;
-    border-radius: 4px;
+    border-radius: $radius;
     background: linear-gradient(90deg, $primary, $teal);
-    transition: width 0.3s ease;
+    transition: width 0.4s $ease-spring;
+    position: relative;
   }
 }
 

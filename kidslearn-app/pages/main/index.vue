@@ -269,11 +269,11 @@ onShow(() => {
 }
 
 .hamburger {
-  width: 36px; height: 36px;
+  width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;
   border-radius: $radius; background: #F5F5F5;
   cursor: pointer; flex-shrink: 0;
-  &:active { transform: scale(0.9); }
+  &:active { transform: scale(0.92); }
 }
 
 .hamburger-icon { font-size: 18px; color: $text; }
@@ -356,10 +356,10 @@ onShow(() => {
 .greeting-text { font-size: 14px; color: $text; margin-right: 4px; }
 
 .action-btn {
-  width: 36px; height: 36px; border-radius: $radius;
+  width: 44px; height: 44px; border-radius: $radius;
   background: #F5F5F5; display: flex; align-items: center; justify-content: center;
   font-size: 18px; cursor: pointer;
-  &:active { transform: scale(0.9); }
+  &:active { transform: scale(0.92); }
 }
 
 .parent-mode-btn {

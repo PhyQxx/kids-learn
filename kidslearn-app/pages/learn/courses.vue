@@ -39,6 +39,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import AppLayout from '@/components/AppLayout.vue'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
@@ -50,7 +51,7 @@ const subjectName = ref(learnStore.currentSubject?.name || '学科')
 
 const courses = ref([])
 
-onMounted(async () => {
+async function loadCourses() {
   const pages = getCurrentPages()
   const page = pages[pages.length - 1]
   const subjectId = page.$page?.options?.subjectId || learnStore.currentSubject?.id
@@ -72,6 +73,15 @@ onMounted(async () => {
       console.log('courses: API 失败，列表为空')
     }
   }
+}
+
+onMounted(() => {
+  loadCourses()
+})
+
+// 返回时刷新课程进度
+onShow(() => {
+  loadCourses()
 })
 
 function goLevels(course) {

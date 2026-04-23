@@ -1,0 +1,115 @@
+/* ========================================
+   趣学星球 - SCSS 混入 (Mixins)
+   Reusable patterns for touch targets, cards, animations
+   ======================================== */
+@import './variables.scss';
+
+/* 触摸目标最小尺寸 */
+@mixin touch-target($size: 44px) {
+  min-width: $size;
+  min-height: $size;
+  width: $size;
+  height: $size;
+}
+
+/* 触摸目标（仅高度） */
+@mixin touch-height($size: 44px) {
+  min-height: $size;
+  height: $size;
+}
+
+/* 卡片基础样式 - 儿童友好 */
+@mixin card-kids {
+  background: var(--color-white);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+  padding: var(--space-lg);
+}
+
+/* 按钮基础样式 */
+@mixin btn-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  transition: transform var(--duration-fast) var(--ease-spring),
+              box-shadow var(--duration-fast);
+}
+
+/* 点击反馈 - 弹跳效果 */
+@mixin tap-bounce {
+  &:active {
+    transform: scale(0.94);
+    opacity: 0.9;
+  }
+  transition: transform var(--duration-fast) var(--ease-spring),
+              opacity var(--duration-fast);
+}
+
+/* 进度条样式 */
+@mixin progress-bar {
+  height: 12px;
+  background: #E8F0FE;
+  border-radius: var(--radius);
+  overflow: hidden;
+
+  .progress-fill {
+    height: 100%;
+    border-radius: var(--radius);
+    background: linear-gradient(90deg, var(--color-primary), var(--color-teal));
+    transition: width 0.4s var(--ease-spring);
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      animation: shimmer 2s infinite;
+    }
+  }
+}
+
+/* 弹性布局 */
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 文字截断 */
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 响应式断点 */
+@mixin respond-sm {
+  @media (max-width: 640px) { @content; }
+}
+
+@mixin respond-md {
+  @media (max-width: 800px) { @content; }
+}
+
+@mixin respond-lg {
+  @media (min-width: 1024px) { @content; }
+}

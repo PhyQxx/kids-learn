@@ -102,6 +102,8 @@ function handleConfirm() {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/variables.scss';
+
 .grade-popup-mask {
   position: fixed;
   top: 0;
@@ -118,10 +120,10 @@ function handleConfirm() {
 .grade-popup {
   width: 100%;
   max-width: 600rpx;
-  background: #fff;
-  border-radius: 32rpx 32rpx 0 0;
-  padding: 40rpx 32rpx;
-  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
+  background: $white;
+  border-radius: $radius-xl $radius-xl 0 0;
+  padding: 24px 20px;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
   animation: slideUp 0.3s ease;
 }
 
@@ -138,100 +140,101 @@ function handleConfirm() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12rpx;
+  margin-bottom: 12px;
 }
 
 .popup-title {
-  font-size: 36rpx;
+  font-size: 22px;
   font-weight: 700;
-  color: #333;
+  color: $text;
 }
 
 .close-btn {
-  width: 56rpx;
-  height: 56rpx;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #F5F5F5;
   border-radius: 50%;
-  font-size: 28rpx;
+  font-size: 18px;
   color: #999;
+  &:active { transform: scale(0.92); }
 }
 
 .popup-subtitle {
-  font-size: 26rpx;
-  color: #999;
-  margin-bottom: 32rpx;
+  font-size: 14px;
+  color: $text-light;
+  margin-bottom: 20px;
 }
 
 .grade-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 20rpx;
-  margin-bottom: 40rpx;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .grade-item {
   position: relative;
   background: #F8F8F8;
-  border-radius: 20rpx;
-  padding: 28rpx 16rpx;
+  border-radius: $radius-md;
+  padding: 18px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8rpx;
+  gap: 6px;
   transition: all 0.2s ease;
+  cursor: pointer;
+  &:active { transform: scale(0.96); }
 
   &.selected {
     background: linear-gradient(135deg, #FFF0F0, #FFE8E8);
-    border: 2rpx solid #FF6B6B;
-  }
-
-  &:active {
-    transform: scale(0.95);
+    border: 2px solid $primary;
   }
 }
 
 .grade-emoji {
-  font-size: 48rpx;
+  font-size: 32px;
 }
 
 .grade-label {
-  font-size: 28rpx;
+  font-size: 14px;
   font-weight: 600;
-  color: #333;
+  color: $text;
 }
 
 .check-badge {
   position: absolute;
-  top: -8rpx;
-  right: -8rpx;
-  width: 36rpx;
-  height: 36rpx;
-  background: #FF6B6B;
+  top: -6px;
+  right: -6px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  background: $primary;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20rpx;
-  color: #fff;
+  font-size: 14px;
+  color: $white;
   font-weight: bold;
 }
 
 .confirm-btn {
   width: 100%;
-  height: 88rpx;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
-  border-radius: 44rpx;
+  height: 52px;
+  min-height: 52px;
+  background: linear-gradient(135deg, $primary, $primary-light);
+  border-radius: $radius-lg;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8rpx 24rpx rgba(255, 107, 107, 0.3);
-
-  &:active {
-    opacity: 0.9;
-    transform: scale(0.98);
-  }
+  box-shadow: 0 4px 16px rgba(255, 107, 107, 0.3);
+  cursor: pointer;
+  &:active { opacity: 0.9; transform: scale(0.98); }
 }
 </style>

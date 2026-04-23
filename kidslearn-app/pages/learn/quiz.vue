@@ -134,9 +134,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { useLearnStore } from '@/store/learn'
+import { useUserStore } from '@/store/user'
 import { getQuestions, submitAnswer, completeLevel } from '@/api/learn'
+import { getUserInfo } from '@/api/user'
 
 const learnStore = useLearnStore()
+const userStore = useUserStore()
 
 const screen = ref('start')
 const currentIndex = ref(0)
@@ -207,10 +210,11 @@ onMounted(async () => {
           id: q.id,
           emoji: '❓',
           text: q.questionContent,
+          score: q.score || 10,
           options: (q.options || []).map((opt, i) => ({
             label: opt.optionLabel || String.fromCharCode(65 + i),
             text: opt.optionContent,
-            correct: false // 后端不返回正确答案，由 submitAnswer 判定
+            correct: false
           }))
         }))
       }
@@ -326,6 +330,7 @@ async function finishQuiz() {
   if (levelId.value) {
     try {
       const res = await completeLevel(levelId.value, totalScore.value, usedTime.value, wrongCount)
+      console.log('completeLevel result:', res)
       if (res) {
         earnedStars.value = res.stars || earnedStars.value
         rewards.value = {
@@ -333,8 +338,18 @@ async function finishQuiz() {
           exp: res.exp || 10 + earnedStars.value * 5,
           stickers: res.stickerId ? 1 : (earnedStars.value >= 2 ? 1 : 0)
         }
+        if (res.gold !== undefined || res.exp !== undefined) {
+          try {
+            const userInfo = await getUserInfo()
+            if (userInfo) userStore.setUserInfo(userInfo)
+          } catch (e) {
+            console.log('更新用户信息失败:', e)
+          }
+        }
       }
     } catch (e) {
+      console.error('关卡完成失败:', e)
+      uni.showToast({ title: '保存成绩失败: ' + (e.message || '请检查网络'), icon: 'none' })
       rewards.value = {
         gold: 10 + earnedStars.value * 10,
         exp: 10 + earnedStars.value * 5,
