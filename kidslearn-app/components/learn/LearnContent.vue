@@ -9,13 +9,20 @@
     <template v-else>
     <!-- 当前年级提示 -->
     <view v-if="gradeName" class="grade-banner">
-      <text class="text-sm text-light">当前年级：{{ gradeName }}</text>
+      <text class="grade-emoji">🎒</text>
+      <view class="grade-copy">
+        <text class="grade-title">当前年级：{{ gradeName }}</text>
+        <text class="grade-desc">题目会按你的年级自动调整</text>
+      </view>
     </view>
 
     <!-- 学科网格 -->
     <view class="subject-section">
       <view class="section-title-row">
-        <text class="text-lg text-bold">📚 选择学科</text>
+        <view class="section-title-copy">
+          <text class="text-lg text-bold">📚 选择学科</text>
+          <text class="section-hint">先选熟悉的，再挑战新的</text>
+        </view>
       </view>
       <view class="subject-grid stagger-list">
         <view
@@ -48,7 +55,7 @@
       <view class="recent-list">
         <view
           v-for="item in recentLearn"
-          :key="item.id"
+          :key="item.courseId"
           class="recent-card card card-hover"
           @tap="goCourse(item)"
         >
@@ -56,14 +63,14 @@
             <text class="recent-emoji">{{ item.icon }}</text>
           </view>
           <view class="recent-info">
-            <text class="text-md text-bold">{{ item.course }}</text>
-            <text class="text-xs text-light">{{ item.subject }} · 第{{ item.level }}关</text>
+            <text class="text-md text-bold">{{ item.courseName }}</text>
+            <text class="text-xs text-light">{{ item.subjectName }} · {{ item.levelName }}</text>
           </view>
           <view class="recent-progress">
             <tn-line-progress :percent="item.progress" :active-color="item.color" :height="8" :show-percent="false" style="width: 120px;" />
             <text class="text-xs text-light">{{ item.progress }}%</text>
           </view>
-          <tn-button type="primary" size="sm" shape="round">继续</tn-button>
+          <view class="continue-pill">继续</view>
         </view>
       </view>
     </view>
@@ -72,7 +79,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
 import { getSubjects, getRecords } from '@/api/learn'
@@ -83,7 +91,8 @@ const learnStore = useLearnStore()
 const userStore = useUserStore()
 
 const loading = ref(true)
-const gradeName = ref(userStore.userInfo?.gradeLevelName || '')
+const gradeLevelId = computed(() => userStore.userInfo?.gradeLevelId || null)
+const gradeName = computed(() => userStore.userInfo?.gradeLevelName || '')
 
 const iconMap = {
   'CHINESE': { icon: '📖', color: '#FF6B6B', bg: '#FFF0F0' },
@@ -107,18 +116,17 @@ function applyMockData() {
     { id: 6, name: '编程', icon: '💻', progress: 0, color: '#FFD700', bg: '#FFF8E0', locked: true }
   ]
   recentLearn.value = [
-    { id: 1, course: '拼音入门', subject: '语文', level: 8, progress: 60, icon: '📖', color: '#FF6B6B', bg: '#FFF0F0' },
-    { id: 2, course: '加减法', subject: '数学', level: 5, progress: 40, icon: '🔢', color: '#4A90D9', bg: '#E8F0FE' },
-    { id: 3, course: '字母认知', subject: '英语', level: 3, progress: 25, icon: '🔤', color: '#4ECDC4', bg: '#E0F7F7' }
+    { courseId: 1, courseName: '拼音入门', subjectName: '语文', levelName: '第8关', progress: 60, icon: '📖', color: '#FF6B6B', bg: '#FFF0F0' },
+    { courseId: 2, courseName: '加减法', subjectName: '数学', levelName: '第5关', progress: 40, icon: '🔢', color: '#4A90D9', bg: '#E8F0FE' },
+    { courseId: 3, courseName: '字母认知', subjectName: '英语', levelName: '第3关', progress: 25, icon: '🔤', color: '#4ECDC4', bg: '#E0F7F7' }
   ]
 }
 
 async function loadData() {
   loading.value = true
   try {
-    const gradeLevelId = userStore.userInfo?.gradeLevelId || null
     const results = await Promise.allSettled([
-      getSubjects(gradeLevelId),
+      getSubjects(gradeLevelId.value),
       getRecords().catch(() => null)
     ])
 
@@ -132,7 +140,7 @@ async function loadData() {
             id: s.id,
             name: s.name,
             icon: s.icon || mapped.icon,
-            progress: 0,
+            progress: s.progress,
             color: s.color || mapped.color,
             bg: mapped.bg,
             locked: false
@@ -143,21 +151,28 @@ async function loadData() {
 
     // 学习记录（最近学习）
     if (results[1].status === 'fulfilled' && results[1].value) {
-      const records = results[1].value
-      if (Array.isArray(records) && records.length > 0) {
+      const records = (Array.isArray(results[1].value) ? results[1].value : [])
+        .filter(r => {
+          if (!gradeLevelId.value) return true
+          if (!Array.isArray(r.gradeLevelIds) || r.gradeLevelIds.length === 0) return false
+          return r.gradeLevelIds.some(id => Number(id) === Number(gradeLevelId.value))
+        })
+      if (records.length > 0) {
         recentLearn.value = records.slice(0, 5).map(r => {
           const mapped = iconMap[r.subjectName] || { icon: '📚', color: '#9E9E9E', bg: '#F5F5F5' }
           return {
-            id: r.id,
-            course: r.courseName || r.levelName || '',
-            subject: r.subjectName || '',
-            level: r.levelName || '',
+            courseId: r.courseLevelId,
+            courseName: r.courseName || '',
+            subjectName: r.subjectName || '',
+            levelName: r.levelName || '',
             progress: r.isPass ? 100 : Math.min(r.score || 0, 100),
             icon: mapped.icon,
             color: mapped.color,
             bg: mapped.bg
           }
         })
+      } else {
+        recentLearn.value = []
       }
     }
   } catch (e) {
@@ -172,9 +187,21 @@ onMounted(() => {
   loadData()
 })
 
+onShow(() => {
+  loadData()
+})
+
+watch(gradeLevelId, () => {
+  learnStore.clearLearningContext()
+  subjects.value = []
+  recentLearn.value = []
+  loadData()
+})
+
 function goCourse(item) {
-  learnStore.setSubject({ id: item.id, name: item.subject })
-  uni.navigateTo({ url: `/pages/learn/courses?subjectId=${item.id}` })
+  learnStore.setLevel({ id: item.courseId, name: item.levelName })
+  const grade = gradeLevelId.value || ''
+  uni.navigateTo({ url: `/pages/learn/quiz?levelId=${item.courseId}&gradeLevelId=${grade}` })
 }
 </script>
 
@@ -196,11 +223,19 @@ function goCourse(item) {
 }
 
 .grade-banner {
-  background: $white;
-  border-radius: $radius-md;
-  padding: 12px 20px;
-  text-align: center;
+  background: linear-gradient(135deg, #FFFFFF, #F0F7FF);
+  border: 1px solid rgba(74, 144, 217, 0.12);
+  border-radius: $radius-lg;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: $shadow-sm;
 }
+.grade-emoji { font-size: 34px; }
+.grade-copy { display: flex; flex-direction: column; gap: 2px; }
+.grade-title { font-size: 15px; color: $text; font-weight: 800; }
+.grade-desc { font-size: 12px; color: $text-light; }
 
 .section-title-row {
   display: flex;
@@ -208,6 +243,8 @@ function goCourse(item) {
   justify-content: space-between;
   margin-bottom: 12px;
 }
+.section-title-copy { display: flex; flex-direction: column; gap: 2px; }
+.section-hint { font-size: 13px; color: $text-light; }
 
 .subject-grid {
   display: grid;
@@ -216,27 +253,28 @@ function goCourse(item) {
 }
 
 .subject-card {
-  padding: 20px 16px;
+  min-height: 154px;
+  padding: 22px 16px;
   text-align: center;
   cursor: pointer;
   transition: all $transition-fast;
   position: relative;
 
-  &:active { transform: scale(0.97); }
+  &:active { transform: scale(0.96); }
   &.locked { opacity: 0.5; background: #F5F5F5; box-shadow: none; }
 }
 
 .subject-icon-wrap {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
+  width: 64px;
+  height: 64px;
+  border-radius: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 10px;
 }
 
-.subject-emoji { font-size: 28px; }
+.subject-emoji { font-size: 32px; }
 .subject-name { display: block; margin-bottom: 8px; }
 
 .subject-progress-row {
@@ -264,15 +302,16 @@ function goCourse(item) {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 14px 20px;
+  min-height: 76px;
+  padding: 16px 20px;
   cursor: pointer;
 
   &:active { transform: scale(0.99); }
 }
 
 .recent-icon-wrap {
-  width: 44px;
-  height: 44px;
+  width: 50px;
+  height: 50px;
   border-radius: $radius;
   display: flex;
   align-items: center;
@@ -295,6 +334,19 @@ function goCourse(item) {
   gap: 8px;
   margin-right: 8px;
 }
+.continue-pill {
+  min-width: 56px;
+  height: 38px;
+  border-radius: 19px;
+  background: linear-gradient(135deg, $learn-blue, $learn-blue-light);
+  color: $white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 8px 16px rgba(74, 144, 217, 0.22);
+}
 
 /* 响应式 */
 @media (max-width: 800px) {
@@ -303,5 +355,13 @@ function goCourse(item) {
   .subject-icon-wrap { width: 44px; height: 44px; }
   .subject-card { padding: 14px 10px; }
   .recent-card { flex-wrap: wrap; }
+}
+
+@media (max-width: 640px) {
+  .learn-content { gap: 16px; }
+  .subject-grid { grid-template-columns: repeat(2, 1fr); }
+  .subject-card { min-height: 138px; }
+  .subject-icon-wrap { width: 56px; height: 56px; border-radius: 18px; }
+  .recent-progress { width: 100%; margin-left: 64px; }
 }
 </style>

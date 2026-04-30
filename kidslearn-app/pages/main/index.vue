@@ -51,6 +51,7 @@
       <view class="topbar">
         <view class="topbar-left">
           <text class="topbar-title">{{ currentTitle }}</text>
+          <text v-if="activeTab !== 'parent'" class="topbar-subtitle">选一个喜欢的任务开始吧</text>
         </view>
         <view class="topbar-center"></view>
         <view class="topbar-right">
@@ -89,7 +90,7 @@
 
 <script setup>
 import { ref, computed, provide, onMounted, reactive } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onLoad } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { useLearnStore } from '@/store/learn'
 import { getUserInfo, updateChildProfile } from '@/api/user'
@@ -116,8 +117,19 @@ function switchTab(key) {
     uni.navigateTo({ url: '/pages/mine/vip' })
     return
   }
-  if (!loadedTabs.has(key)) loadedTabs.add(key)
-  activeTab.value = key
+  // 如果点击的是当前 tab，检查是否在子页面
+  if (activeTab.value === key) {
+    // 如果当前在子页面（URL 不是 main/index），返回到主页
+    const pages = getCurrentPages()
+    const currentPage = pages[pages.length - 1]
+    const route = currentPage?.route || ''
+    if (!route.includes('main/index')) {
+      uni.reLaunch({ url: '/pages/main/index?tab=' + key })
+    }
+    return
+  }
+  // 切换到不同 tab，reLaunch 带上目标 tab
+  uni.reLaunch({ url: '/pages/main/index?tab=' + key })
 }
 
 // 通过 provide 向子组件暴露 switchTab 方法
@@ -209,7 +221,9 @@ async function handleGradeConfirm(grade) {
     await updateChildProfile({ gradeLevel: grade })
     const info = await getUserInfo()
     if (info) userStore.setUserInfo(info)
+    learnStore.clearLearningContext()
     uni.showToast({ title: '年级配置成功', icon: 'success' })
+    uni.reLaunch({ url: '/pages/main/index?tab=learn' })
   } catch (e) {
     uni.showToast({ title: '配置失败', icon: 'none' })
   }
@@ -222,6 +236,13 @@ onMounted(() => {
   }
   // 检测年级配置
   checkGradeSetup()
+})
+
+onLoad((query) => {
+  if (query.tab && ['home', 'learn', 'pet', 'ranking', 'achievement', 'parent'].includes(query.tab)) {
+    if (!loadedTabs.has(query.tab)) loadedTabs.add(query.tab)
+    activeTab.value = query.tab
+  }
 })
 
 onShow(() => {
@@ -239,7 +260,9 @@ onShow(() => {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: $bg;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(255, 217, 90, 0.20), transparent 24%),
+    linear-gradient(180deg, #F8FBFF 0%, #FFF8F2 100%);
 }
 
 /* ===== 侧边栏 ===== */
@@ -247,8 +270,9 @@ onShow(() => {
   width: $sidebar-width;
   min-width: $sidebar-width;
   height: 100vh;
-  background: $white;
-  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.92);
+  border-right: 1px solid rgba(73, 98, 128, 0.08);
+  box-shadow: 8px 0 28px rgba(73, 98, 128, 0.06);
   display: flex;
   flex-direction: column;
   transition: all $transition-normal;
@@ -258,6 +282,56 @@ onShow(() => {
   &.collapsed {
     width: $sidebar-collapsed;
     min-width: $sidebar-collapsed;
+
+    .sidebar-header {
+      justify-content: center;
+      padding: 12px 6px;
+    }
+
+    .hamburger {
+      width: 46px;
+      height: 46px;
+    }
+
+    .sidebar-nav {
+      align-items: center;
+      padding: 8px 6px;
+    }
+
+    .nav-item {
+      width: 48px;
+      min-height: 48px;
+      justify-content: center;
+      gap: 0;
+      padding: 0;
+      margin: 0 auto;
+      border-radius: 16px;
+      box-sizing: border-box;
+
+      .nav-icon {
+        width: auto;
+        font-size: 24px;
+        line-height: 1;
+      }
+    }
+
+    .sidebar-footer {
+      padding: 8px 6px;
+    }
+
+    .user-area {
+      width: 48px;
+      min-height: 48px;
+      justify-content: center;
+      padding: 0;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .user-avatar {
+      width: 42px;
+      height: 42px;
+    }
   }
 }
 
@@ -269,9 +343,9 @@ onShow(() => {
 }
 
 .hamburger {
-  width: 44px; height: 44px;
+  width: 48px; height: 48px;
   display: flex; align-items: center; justify-content: center;
-  border-radius: $radius; background: #F5F5F5;
+  border-radius: $radius; background: #F1F6FC;
   cursor: pointer; flex-shrink: 0;
   &:active { transform: scale(0.92); }
 }
@@ -281,8 +355,8 @@ onShow(() => {
 .brand { display: flex; align-items: center; gap: 8px; overflow: hidden; }
 .brand-emoji { font-size: 32px; flex-shrink: 0; }
 .brand-text { display: flex; flex-direction: column; }
-.brand-name { font-size: 18px; font-weight: bold; color: $text; }
-.brand-sub { font-size: 11px; color: $text-light; }
+.brand-name { white-space: nowrap; font-size: 19px; font-weight: bold; color: $text; }
+.brand-sub { font-size: 12px; color: $text-light; }
 
 /* 导航 */
 .sidebar-nav {
@@ -295,14 +369,19 @@ onShow(() => {
 
 .nav-item {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 16px; border-radius: $radius;
+  min-height: 52px;
+  padding: 12px 16px; border-radius: $radius-md;
   cursor: pointer; transition: all $transition-fast;
   white-space: nowrap;
   &:active { transform: scale(0.97); }
-  .nav-icon { font-size: 22px; flex-shrink: 0; width: 28px; text-align: center; }
-  .nav-label { font-size: 15px; color: $text; font-weight: 500; }
-  &.active { background: #FFF0F0; .nav-label { color: $primary; font-weight: 600; } }
-  &:not(.active):hover { background: #F8F8F8; }
+  .nav-icon { font-size: 24px; flex-shrink: 0; width: 30px; text-align: center; }
+  .nav-label { font-size: 16px; color: $text; font-weight: 700; }
+  &.active {
+    background: #FFF0E8;
+    box-shadow: 0 8px 18px rgba(255, 122, 89, 0.16);
+    .nav-label { color: $primary; font-weight: 800; }
+  }
+  &:not(.active):hover { background: #F1F6FC; }
 }
 
 /* 学习主题 */
@@ -322,6 +401,7 @@ onShow(() => {
 
 .user-area {
   display: flex; align-items: center; gap: 10px;
+  min-height: 56px;
   padding: 8px; border-radius: $radius; cursor: pointer;
   &:active { background: #F5F5F5; }
 }
@@ -345,19 +425,21 @@ onShow(() => {
 .topbar {
   height: $topbar-height; min-height: $topbar-height;
   padding: 0 28px; display: flex; align-items: center; justify-content: space-between;
-  background: $white; border-bottom: 1px solid rgba(0,0,0,0.04);
+  background: rgba(255, 255, 255, 0.82);
+  border-bottom: 1px solid rgba(73, 98, 128, 0.06);
 }
 
-.topbar-left { display: flex; align-items: center; gap: 12px; }
-.topbar-title { font-size: 18px; font-weight: 600; color: $text; }
+.topbar-left { display: flex; flex-direction: column; justify-content: center; gap: 2px; }
+.topbar-title { font-size: 20px; font-weight: 800; color: $text; }
+.topbar-subtitle { font-size: 12px; color: $text-light; }
 .topbar-center { flex: 1; display: flex; align-items: center; justify-content: center; }
 .topbar-right { display: flex; align-items: center; gap: 10px; }
 
-.greeting-text { font-size: 14px; color: $text; margin-right: 4px; }
+.greeting-text { font-size: 15px; color: $text-secondary; margin-right: 4px; font-weight: 600; }
 
 .action-btn {
-  width: 44px; height: 44px; border-radius: $radius;
-  background: #F5F5F5; display: flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px; border-radius: $radius;
+  background: #F1F6FC; display: flex; align-items: center; justify-content: center;
   font-size: 18px; cursor: pointer;
   &:active { transform: scale(0.92); }
 }
@@ -383,7 +465,7 @@ onShow(() => {
 }
 
 .content-wrapper {
-  padding: 24px 28px;
+  padding: 24px 28px 32px;
   min-height: 100%;
 }
 
@@ -403,15 +485,48 @@ onShow(() => {
 }
 
 @media (max-width: 640px) {
-  .sidebar { width: 48px; min-width: 48px; }
-  .sidebar-header { padding: 8px; }
-  .hamburger { width: 32px; height: 32px; }
-  .sidebar-nav { padding: 4px; }
-  .nav-item { padding: 10px 8px; .nav-icon { font-size: 20px; } }
-  .user-area { padding: 4px; }
-  .user-avatar { width: 36px; height: 36px; }
-  .content-wrapper { padding: 12px; }
-  .topbar { height: 48px; min-height: 48px; }
-  .topbar-title { font-size: 15px; }
+  .main-page { flex-direction: column-reverse; }
+  .sidebar {
+    width: 100%;
+    min-width: 100%;
+    height: 68px;
+    min-height: 68px;
+    border-right: 0;
+    border-top: 1px solid rgba(73, 98, 128, 0.08);
+    box-shadow: 0 -8px 28px rgba(73, 98, 128, 0.08);
+
+    &.collapsed {
+      width: 100%;
+      min-width: 100%;
+    }
+  }
+  .sidebar-header, .sidebar-footer { display: none; }
+  .sidebar-nav {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    gap: 4px;
+    padding: 8px;
+  }
+  .nav-item {
+    flex: 1;
+    min-height: 52px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 4px;
+    border-radius: 16px;
+    .nav-icon { font-size: 20px; width: auto; }
+    .nav-label {
+      display: block !important;
+      font-size: 11px;
+      line-height: 1.1;
+    }
+  }
+  .content-wrapper { padding: 14px 14px 18px; }
+  .topbar { height: 56px; min-height: 56px; padding: 0 14px; }
+  .topbar-title { font-size: 17px; }
+  .topbar-subtitle { display: none; }
+  .parent-mode-btn, .exit-parent-btn { display: none; }
 }
 </style>

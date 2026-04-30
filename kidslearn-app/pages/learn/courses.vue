@@ -39,7 +39,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onLoad } from '@dcloudio/uni-app'
 import AppLayout from '@/components/AppLayout.vue'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
@@ -48,14 +48,23 @@ import { getCourses } from '@/api/learn'
 const learnStore = useLearnStore()
 const userStore = useUserStore()
 const subjectName = ref(learnStore.currentSubject?.name || '学科')
+const pageSubjectId = ref(null)
 
 const courses = ref([])
 
+// 官方推荐方式获取页面参数
+onLoad((query) => {
+  pageSubjectId.value = query.subjectId || null
+})
+
 async function loadCourses() {
-  const pages = getCurrentPages()
-  const page = pages[pages.length - 1]
-  const subjectId = page.$page?.options?.subjectId || learnStore.currentSubject?.id
+  // 优先级：store > URL参数
+  const subjectId = learnStore.currentSubject?.id || pageSubjectId.value
   if (subjectId) {
+    // 更新学科名称
+    if (learnStore.currentSubject?.name) {
+      subjectName.value = learnStore.currentSubject.name
+    }
     try {
       const gradeLevelId = userStore.userInfo?.gradeLevelId || null
       const res = await getCourses(subjectId, gradeLevelId)
@@ -86,7 +95,8 @@ onShow(() => {
 
 function goLevels(course) {
   learnStore.setCourse(course)
-  uni.navigateTo({ url: `/pages/learn/levels?courseId=${course.id}` })
+  const gradeLevelId = userStore.userInfo?.gradeLevelId || ''
+  uni.navigateTo({ url: `/pages/learn/levels?courseId=${course.id}&gradeLevelId=${gradeLevelId}` })
 }
 </script>
 

@@ -16,6 +16,14 @@ export const useLearnStore = defineStore('learn', () => {
   function setResults(results) { quizResults.value = results }
   function setDailyTasks(tasks) { dailyTasks.value = tasks }
 
+  function clearLearningContext() {
+    currentSubject.value = null
+    currentCourse.value = null
+    currentLevel.value = null
+    quizQuestions.value = []
+    quizResults.value = null
+  }
+
   function clearQuiz() {
     quizQuestions.value = []
     quizResults.value = null
@@ -25,6 +33,6 @@ export const useLearnStore = defineStore('learn', () => {
     currentSubject, currentCourse, currentLevel,
     quizQuestions, quizResults, dailyTasks,
     setSubject, setCourse, setLevel, setQuestions, setResults, setDailyTasks,
-    clearQuiz
+    clearLearningContext, clearQuiz
   }
 })

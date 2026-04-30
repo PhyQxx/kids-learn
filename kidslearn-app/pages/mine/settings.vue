@@ -112,9 +112,11 @@ import { ref, computed } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import GradeSelectPopup from '@/components/GradeSelectPopup.vue'
 import { useUserStore } from '@/store/user'
+import { useLearnStore } from '@/store/learn'
 import { getUserInfo, updateChildProfile } from '@/api/user'
 
 const userStore = useUserStore()
+const learnStore = useLearnStore()
 
 const showGradePopup = ref(false)
 
@@ -147,7 +149,9 @@ async function handleGradeConfirm(grade) {
     await updateChildProfile({ gradeLevel: grade })
     const info = await getUserInfo()
     if (info) userStore.setUserInfo(info)
+    learnStore.clearLearningContext()
     uni.showToast({ title: '已更新年级', icon: 'success' })
+    uni.reLaunch({ url: '/pages/main/index?tab=learn' })
   } catch (e) {
     uni.showToast({ title: '更新失败', icon: 'none' })
   }

@@ -7,6 +7,7 @@ import com.kidslearn.api.dto.learn.LevelResultVO;
 import com.kidslearn.api.dto.learn.SubmitAnswerDTO;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.service.AchievementService;
 import com.kidslearn.api.service.LearnService;
 import com.kidslearn.common.exception.BusinessException;
 import com.kidslearn.common.result.PageResult;
@@ -38,6 +39,7 @@ public class LearnServiceImpl implements LearnService {
     private final UserStickerMapper userStickerMapper;
     private final GradeLevelMapper gradeLevelMapper;
     private final CourseGradeMapper courseGradeMapper;
+    private final AchievementService achievementService;
 
     @Override
     public DailyTaskVO getDailyTasks(Long userId) {
@@ -401,9 +403,13 @@ public class LearnServiceImpl implements LearnService {
             throw new BusinessException("关卡不存在");
         }
 
-        // calculate stars
-        int stars = calculateStars(totalScore, level.getStarThresholds());
-        boolean isPass = totalScore >= level.getPassScore();
+        // calculate correct rate percentage (totalScore is actual score earned, each question = 10 points)
+        int totalPossibleScore = level.getTotalQuestions() * 10;
+        int correctRate = totalPossibleScore > 0 ? (totalScore * 100 / totalPossibleScore) : 0;
+
+        // calculate stars based on correct rate percentage
+        int stars = calculateStars(correctRate, level.getStarThresholds());
+        boolean isPass = correctRate >= level.getPassScore();
 
         // save learning record
         LearningRecord record = new LearningRecord();
@@ -420,6 +426,7 @@ public class LearnServiceImpl implements LearnService {
         // build result
         LevelResultVO vo = new LevelResultVO();
         vo.setScore(totalScore);
+        vo.setCorrectRate(correctRate);
         vo.setStars(stars);
         vo.setWrongCount(wrongCount);
         vo.setIsPass(isPass);
@@ -486,6 +493,9 @@ public class LearnServiceImpl implements LearnService {
 
             // update daily stats
             updateDailyStats(userId, totalTime, 1, goldReward, expReward);
+
+            // refresh achievement unlock state after learning/sticker progress changes
+            achievementService.syncAchievementProgress(userId);
         } else {
             vo.setGold(0);
             vo.setExp(0);
@@ -530,26 +540,22 @@ public class LearnServiceImpl implements LearnService {
             return false;
         }
 
-        // 如果下一关已经解锁，直接返回
         if (nextLevel.getIsUnlock() == 1) {
             return false;
         }
 
-        // 检查 unlockCondition 中的 minStars 要求
         String unlockCondition = nextLevel.getUnlockCondition();
         if (unlockCondition != null && unlockCondition.contains("minStars")) {
             try {
                 int minStars = extractMinStars(unlockCondition);
                 if (earnedStars < minStars) {
-                    // 星星数不够，不解锁
                     return false;
                 }
             } catch (Exception e) {
-                // 解析失败，默认可以解锁
+                // Keep compatibility with legacy unlockCondition data.
             }
         }
 
-        // 解锁下一关
         nextLevel.setIsUnlock(1);
         courseLevelMapper.updateById(nextLevel);
         return true;
@@ -608,7 +614,12 @@ public class LearnServiceImpl implements LearnService {
                 map.put("levelName", level.getLevelName());
                 Course course = courseMapper.selectById(level.getCourseId());
                 if (course != null) {
+                    map.put("courseId", course.getId());
                     map.put("courseName", course.getCourseName());
+                    List<Long> gradeLevelIds = courseGradeMapper.selectList(
+                        new LambdaQueryWrapper<CourseGrade>().eq(CourseGrade::getCourseId, course.getId())
+                    ).stream().map(CourseGrade::getGradeLevelId).collect(Collectors.toList());
+                    map.put("gradeLevelIds", gradeLevelIds);
                     Subject subject = subjectMapper.selectById(course.getSubjectId());
                     if (subject != null) map.put("subjectName", subject.getSubjectName());
                 }

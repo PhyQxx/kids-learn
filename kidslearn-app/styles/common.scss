@@ -6,12 +6,15 @@
 /* 全局重置 */
 page {
   font-family: $font-family;
-  background-color: $bg;
+  background:
+    radial-gradient(circle at 16% 8%, rgba(255, 217, 90, 0.20), transparent 26%),
+    linear-gradient(180deg, #F8FBFF 0%, #FFF7F1 100%);
   color: $text;
   font-size: $font-base;
-  line-height: 1.5;
+  line-height: 1.6;
   overflow: hidden;
   height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* 防止横屏滚动 */
@@ -63,12 +66,13 @@ uni-page-body, html, body {
   background: $white;
   border-radius: $radius-md;
   box-shadow: $shadow;
+  border: 1px solid rgba(84, 108, 138, 0.08);
   padding: 20px;
   transition: transform $transition-fast $ease-spring, box-shadow $transition-fast;
 }
 
 .card-hover:active {
-  transform: scale(0.94);
+  transform: scale(0.96);
   opacity: 0.9;
 }
 
@@ -81,7 +85,7 @@ uni-page-body, html, body {
   font-size: $font-md;
   font-weight: 500;
   padding: 0 20px;
-  height: 40px;
+  min-height: 48px;
   cursor: pointer;
   transition: all $transition-fast;
   border: none;
@@ -95,7 +99,7 @@ uni-page-body, html, body {
 .btn-primary {
   background: linear-gradient(135deg, $primary, $primary-light);
   color: $white;
-  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  box-shadow: 0 8px 18px rgba(255, 122, 89, 0.28);
 }
 
 .btn-teal {
@@ -320,7 +324,7 @@ uni-page-body, html, body {
 /* ===== 输入框 ===== */
 .input {
   width: 100%;
-  height: 48px;
+  height: 52px;
   border: 2px solid $border;
   border-radius: $radius;
   padding: 0 16px;
@@ -333,4 +337,21 @@ uni-page-body, html, body {
     border-color: $primary;
     outline: none;
   }
+}
+
+/* Kids UX primitives */
+.kid-tap {
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.kid-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kid-helper {
+  font-size: $font-sm;
+  color: $text-secondary;
 }

@@ -3,10 +3,10 @@
 // CSS 自定义属性在 tokens.scss 中定义，用于运行时主题切换
 
 // ===== 主题色 =====
-$primary: #FF6B6B;
-$primary-light: #FF8E8E;
-$accent: #FFE66D;
-$teal: #4ECDC4;
+$primary: #FF7A59;
+$primary-light: #FFA06F;
+$accent: #FFD95A;
+$teal: #35C9B8;
 $teal-dark: #26A69A;
 
 // 学习流程蓝色主题
@@ -20,36 +20,36 @@ $dark2: #16213E;
 $gold: #FFD700;
 
 // 语义色
-$success: #2ECC71;
-$warning: #F39C12;
-$error: #E74C3C;
+$success: #35C773;
+$warning: #F4A62A;
+$error: #F05A5A;
 $info: #4A90D9;
 
 // 基础色
-$bg: #F7F7F7;
+$bg: #F8FBFF;
 $white: #FFFFFF;
-$text: #333333;
-$text-light: #999999;
-$text-secondary: #666666;
-$border: #F0F0F0;
+$text: #2D3440;
+$text-light: #7A8797;
+$text-secondary: #5D6A7A;
+$border: #E7EEF7;
 
 // ===== 圆角规范 =====
 $radius-sm: 8px;
-$radius: 12px;
-$radius-md: 16px;
-$radius-lg: 20px;
-$radius-xl: 24px;
+$radius: 14px;
+$radius-md: 18px;
+$radius-lg: 22px;
+$radius-xl: 28px;
 
 // ===== 阴影 =====
-$shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-$shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-$shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+$shadow: 0 10px 28px rgba(73, 98, 128, 0.10);
+$shadow-sm: 0 4px 14px rgba(73, 98, 128, 0.08);
+$shadow-lg: 0 16px 42px rgba(73, 98, 128, 0.14);
 
 // ===== 字体 =====
 $font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
-$font-xs: 11px;
-$font-sm: 12px;
-$font-base: 14px;
+$font-xs: 12px;
+$font-sm: 13px;
+$font-base: 15px;
 $font-md: 16px;
 $font-lg: 18px;
 $font-xl: 20px;

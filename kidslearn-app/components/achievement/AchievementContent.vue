@@ -118,7 +118,10 @@ async function loadData() {
     if (results[0].status === 'fulfilled' && results[0].value) {
       const list = results[0].value
       if (Array.isArray(list) && list.length > 0) {
-        achievements.value = list.map(a => ({
+        achievements.value = list.map(a => {
+          const targetValue = getAchievementTarget(a)
+          const currentValue = Number(a.currentValue || 0)
+          return {
           id: a.id,
           name: a.achieveName,
           desc: a.achieveDesc,
@@ -126,13 +129,14 @@ async function loadData() {
           achieveType: a.achieveType,
           isTiered: a.isTiered,
           tiers: a.tiers || [],
-          status: a.isCompleted ? 'done' : (a.currentValue > 0 ? 'progress' : 'locked'),
+          status: a.isCompleted ? 'done' : (currentValue > 0 ? 'progress' : 'locked'),
           rarity: ['bronze', 'silver', 'gold', 'legendary'][(a.achieveType || 1) - 1] || 'bronze',
           claimed: a.isReceived || false,
-          percent: a.currentValue ? Math.round(a.currentValue / 100 * 100) : 0,
-          current: a.currentValue || 0,
-          target: 100
-        }))
+          percent: targetValue > 0 ? Math.min(100, Math.round(currentValue / targetValue * 100)) : 0,
+          current: currentValue,
+          target: targetValue
+          }
+        })
         totalCount.value = list.length
         completedCount.value = list.filter(a => a.isCompleted).length
       }
@@ -159,6 +163,36 @@ onMounted(() => {
 watch(activeTab, () => {
   loadData()
 })
+
+function getAchievementTarget(a) {
+  const directTarget = Number(a.targetValue || 0)
+  if (directTarget > 0) return directTarget
+
+  const firstTier = Array.isArray(a.tiers) ? a.tiers[0] : null
+  if (firstTier && firstTier.conditionJson) {
+    try {
+      const condition = typeof firstTier.conditionJson === 'string'
+        ? JSON.parse(firstTier.conditionJson)
+        : firstTier.conditionJson
+      const tierTarget = Number(
+        condition.target ||
+        condition.targetValue ||
+        condition.count ||
+        condition.value ||
+        condition.levelCount ||
+        condition.starCount ||
+        condition.stickerCount ||
+        condition.subjectCount ||
+        0
+      )
+      if (tierTarget > 0) return tierTarget
+    } catch (e) {
+      console.log('AchievementContent: conditionJson parse failed', e)
+    }
+  }
+
+  return 1
+}
 
 function claimReward(ach) {
   receiveReward(ach.id).then(() => {

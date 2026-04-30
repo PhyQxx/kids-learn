@@ -7,6 +7,8 @@ public interface AchievementService {
 
     List<Map<String, Object>> getAchievements(Long userId, Integer type);
 
+    void syncAchievementProgress(Long userId);
+
     Map<String, Object> getMyProgress(Long userId);
 
     Map<String, Object> receiveReward(Long userId, Long achievementId);

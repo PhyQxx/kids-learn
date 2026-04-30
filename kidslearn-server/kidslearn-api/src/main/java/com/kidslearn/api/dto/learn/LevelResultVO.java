@@ -5,6 +5,7 @@ import lombok.Data;
 @Data
 public class LevelResultVO {
     private Integer score;
+    private Integer correctRate;
     private Integer stars;
     private Integer gold;
     private Integer exp;

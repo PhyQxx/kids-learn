@@ -6,6 +6,7 @@
         <text class="start-emoji animate-pulse">{{ levelEmoji }}</text>
         <text class="start-title text-title text-bold">{{ levelName }}</text>
         <text class="start-subtitle text-light">准备好了吗？</text>
+        <text v-if="!totalQuestions" class="start-tip">题目正在准备中，请稍等一下</text>
         <view class="info-row">
           <view class="info-item card">
             <text class="info-emoji">📝</text>
@@ -20,7 +21,7 @@
             <text class="info-text text-sm">{{ timeLimit }} 秒</text>
           </view>
         </view>
-        <tn-button type="primary" size="xl" shape="round" @click="startQuiz" style="background: linear-gradient(135deg, #4A90D9, #6BA3E0);">开始答题</tn-button>
+        <tn-button type="primary" size="xl" shape="round" :disabled="!totalQuestions" @click="startQuiz" style="background: linear-gradient(135deg, #4A90D9, #6BA3E0);">开始答题</tn-button>
       </view>
 
       <!-- 答题屏 -->
@@ -40,7 +41,11 @@
 
         <!-- 题目区域 -->
         <view class="question-area">
-          <text class="question-emoji" @click="questionToSpeech(currentQuestion.text)">{{ currentQuestion.emoji }}</text>
+          <view class="question-speech" @tap="questionToSpeech(currentQuestion.text)">
+            <text class="question-emoji">{{ currentQuestion.emoji }}</text>
+            <text class="speech-hint">点这里听题</text>
+          </view>
+          <text class="question-count">第 {{ currentIndex + 1 }} / {{ totalQuestions }} 题</text>
           <text class="question-text text-title text-bold" @click="questionToSpeech(currentQuestion.text)">{{ currentQuestion.text }}</text>
 
           <!-- 选项网格 -->
@@ -151,6 +156,7 @@ const totalTime = ref(60)
 let timer = null
 
 const levelId = ref(null)
+const pageGradeLevelId = ref(null)
 const levelName = ref(learnStore.currentLevel?.name || '第 1 关')
 const levelEmoji = ref('🎮')
 const timeLimit = ref(60)
@@ -202,9 +208,10 @@ onMounted(async () => {
   const pages = getCurrentPages()
   const page = pages[pages.length - 1]
   levelId.value = page.$page?.options?.levelId || learnStore.currentLevel?.id
+  pageGradeLevelId.value = page.$page?.options?.gradeLevelId || userStore.userInfo?.gradeLevelId || null
   if (levelId.value) {
     try {
-      const res = await getQuestions(levelId.value)
+      const res = await getQuestions(levelId.value, pageGradeLevelId.value)
       if (res && Array.isArray(res) && res.length > 0) {
         questions.value = res.map(q => ({
           id: q.id,
@@ -226,8 +233,7 @@ onMounted(async () => {
 
 const totalQuestions = computed(() => questions.value.length)
 const currentQuestion = computed(() => {
-  questionToSpeech(questions.value[currentIndex.value].text)
-  return questions.value[currentIndex.value] || {}
+  return questions.value[currentIndex.value] || { emoji: '❓', text: '', options: [] }
 })
 const correctCount = ref(0)
 const totalScore = ref(0)
@@ -301,6 +307,7 @@ function nextQuestion() {
 }
 
 function startQuiz() {
+  if (!totalQuestions.value) return
   screen.value = 'quiz'
   startTime.value = Date.now()
   questionStartTime.value = Date.now()
@@ -402,7 +409,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 28px;
 }
 
 /* ===== 开始屏 ===== */
@@ -413,6 +420,15 @@ onUnmounted(() => {
 .start-emoji { font-size: 96px; display: block; }
 .start-title { text-align: center; }
 .start-subtitle { text-align: center; }
+.start-tip {
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: #FFF8E6;
+  color: $warning;
+  font-size: 13px;
+  font-weight: 700;
+}
 
 .info-row {
   display: flex;
@@ -424,6 +440,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-height: 52px;
   padding: 10px 16px;
   border-radius: $radius;
 }
@@ -441,12 +458,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .close-btn {
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   border-radius: $radius;
   background: #F5F5F5;
   display: flex;
@@ -462,7 +479,9 @@ onUnmounted(() => {
 .timer {
   background: #F0F7FF;
   color: $learn-blue;
-  padding: 6px 14px;
+  min-width: 56px;
+  min-height: 40px;
+  padding: 8px 14px;
   border-radius: 100px;
   font-size: 16px;
   font-weight: 600;
@@ -479,17 +498,37 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  max-width: 600px;
+  gap: 14px;
+  width: 100%;
+  max-width: 680px;
 }
 
-.question-emoji { font-size: 80px; }
-.question-text { text-align: center; }
+.question-speech {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 18px;
+  border-radius: $radius-xl;
+  background: #F0F7FF;
+}
+.question-emoji { font-size: 74px; }
+.speech-hint { font-size: 13px; color: $learn-blue; font-weight: 800; }
+.question-count {
+  min-height: 28px;
+  padding: 4px 12px;
+  border-radius: 14px;
+  background: #EEF6FF;
+  color: $learn-blue;
+  font-size: 13px;
+  font-weight: 800;
+}
+.question-text { text-align: center; line-height: 1.35; }
 
 .options-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
   width: 100%;
 }
 
@@ -497,7 +536,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 20px;
+  min-height: 78px;
+  padding: 18px 20px;
   border: 2px solid #E8F0FE;
   border-radius: $radius-md;
   background: $white;
@@ -519,8 +559,8 @@ onUnmounted(() => {
 }
 
 .option-label {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   background: #F5F5F5;
   display: flex;
@@ -530,12 +570,14 @@ onUnmounted(() => {
   font-weight: 600;
   color: $text;
   text-align: center;
-  line-height: 28px;
+  line-height: 34px;
 }
 
 .option-text {
-  font-size: 16px;
+  font-size: 18px;
+  font-weight: 700;
   color: $text;
+  line-height: 1.35;
 }
 
 /* ===== 结果屏 ===== */
@@ -612,4 +654,18 @@ onUnmounted(() => {
 }
 
 .feedback-text { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); }
+
+@media (max-width: 640px) {
+  .screen { padding: 16px; }
+  .start-emoji { font-size: 76px; }
+  .info-row { gap: 8px; }
+  .info-item { padding: 8px 10px; }
+  .quiz-screen { padding-top: 10px; }
+  .question-emoji { font-size: 58px; }
+  .question-text { font-size: 22px; }
+  .options-grid { grid-template-columns: 1fr; gap: 10px; }
+  .option-btn { min-height: 64px; }
+  .result-stats { width: 100%; }
+  .result-actions { width: 100%; flex-direction: column; }
+}
 </style>

@@ -11,10 +11,10 @@ export const getCourses = (subjectId, gradeLevelId, page = 1, pageSize = 20) =>
   get('/learn/courses', { subjectId, gradeLevelId, page, pageSize })
 
 // 获取关卡列表
-export const getLevels = (courseId) => get('/learn/levels', { courseId })
+export const getLevels = (courseId, gradeLevelId) => get('/learn/levels', { courseId, gradeLevelId })
 
 // 获取题目列表
-export const getQuestions = (levelId) => get('/learn/questions', { levelId })
+export const getQuestions = (levelId, gradeLevelId) => get('/learn/questions', { levelId, gradeLevelId })
 
 // 提交答案
 export const submitAnswer = (data) => post('/learn/submit-answer', data)

@@ -20,10 +20,10 @@
       <view class="sidebar-nav">
         <view
           v-for="item in navItems"
-          :key="item.path"
+          :key="item.key"
           class="nav-item"
-          :class="{ active: currentPage === item.path }"
-          @tap="navigateTo(item.path)"
+          :class="{ active: currentNavKey === item.key }"
+          @tap="navigateTo(item)"
         >
           <text class="nav-icon">{{ item.icon }}</text>
           <text v-show="!collapsed" class="nav-label">{{ item.label }}</text>
@@ -33,7 +33,7 @@
       <!-- 用户区域 -->
       <view class="sidebar-footer">
         <view class="sidebar-divider"></view>
-        <view class="user-area" @tap="navigateTo('/pages/mine/index')">
+        <view class="user-area" @tap="navigateTo({ path: '/pages/mine/index' })">
           <view class="user-avatar">
             <text class="avatar-emoji">👦</text>
           </view>
@@ -55,6 +55,7 @@
           </view>
           <text v-if="title" class="topbar-title">{{ title }}</text>
           <slot name="topbar-left"></slot>
+          <slot name="topbar-left-extra"></slot>
         </view>
         <view class="topbar-center">
           <slot name="topbar-center"></slot>
@@ -91,28 +92,46 @@ const collapsed = computed(() => userStore.sidebarCollapsed)
 
 const themeClass = computed(() => `theme-${props.theme}`)
 
-// 当前页面路径
-const currentPage = computed(() => {
-  if (props.activeNav) return props.activeNav
+const navKeyByPath = {
+  '/pages/main/index': 'home',
+  '/pages/learn/index': 'learn',
+  '/pages/learn/courses': 'learn',
+  '/pages/learn/levels': 'learn',
+  '/pages/learn/quiz': 'learn',
+  '/pages/pet/index': 'pet',
+  '/pages/ranking/index': 'ranking',
+  '/pages/achievement/index': 'achievement',
+  '/pages/parent/index': 'parent',
+  '/pages/mine/vip': 'vip'
+}
+
+// 当前导航 key
+const currentNavKey = computed(() => {
+  if (props.activeNav) {
+    return props.activeNav.startsWith('/') ? navKeyByPath[props.activeNav] || props.activeNav : props.activeNav
+  }
   const pages = getCurrentPages()
-  if (pages.length > 0) return '/' + pages[pages.length - 1].route
-  return ''
+  if (pages.length > 0) {
+    const path = '/' + pages[pages.length - 1].route
+    return navKeyByPath[path] || path
+  }
+  return 'home'
 })
 
 // 导航项
 const navItems = computed(() => {
   if (userStore.isParentMode) {
     return [
-      { icon: '👨‍👩‍👧', label: '家长中心', path: '/pages/parent/index' },
-      { icon: '👑', label: 'VIP会员', path: '/pages/mine/vip' }
+      { key: 'parent', icon: '👨‍👩‍👧', label: '家长中心', path: '/pages/parent/index' },
+      { key: 'vip', icon: '👑', label: 'VIP会员', path: '/pages/mine/vip' }
     ]
   }
   return [
-    { icon: '🏠', label: '首页', path: '/pages/main/index' },
-    { icon: '📚', label: '学习中心', path: '/pages/main/index' },
-    { icon: '🐱', label: '我的宠物', path: '/pages/main/index' },
-    { icon: '🏆', label: '排行榜', path: '/pages/main/index' },
-    { icon: '🏅', label: '成就', path: '/pages/main/index' }
+    { key: 'home', icon: '🏠', label: '首页', tab: 'home' },
+    { key: 'learn', icon: '📚', label: '学习中心', tab: 'learn' },
+    { key: 'pet', icon: '🐱', label: '我的宠物', tab: 'pet' },
+    { key: 'ranking', icon: '🏆', label: '排行榜', tab: 'ranking' },
+    { key: 'achievement', icon: '🏅', label: '成就', tab: 'achievement' }
   ]
 })
 
@@ -120,10 +139,18 @@ function toggleSidebar() {
   userStore.toggleSidebar()
 }
 
-function navigateTo(path) {
-  uni.navigateTo({ url: path, fail: () => {
-    uni.switchTab({ url: path, fail: () => {
-      uni.reLaunch({ url: path })
+function navigateTo(item) {
+  const url = item.tab ? `/pages/main/index?tab=${item.tab}` : item.path
+  if (!url) return
+
+  if (item.tab) {
+    uni.reLaunch({ url })
+    return
+  }
+
+  uni.navigateTo({ url, fail: () => {
+    uni.switchTab({ url, fail: () => {
+      uni.reLaunch({ url })
     }})
   }})
 }
@@ -143,7 +170,9 @@ function goBack() {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background: $bg;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(255, 217, 90, 0.20), transparent 24%),
+    linear-gradient(180deg, #F8FBFF 0%, #FFF8F2 100%);
 }
 
 /* ===== 侧边栏 ===== */
@@ -151,8 +180,9 @@ function goBack() {
   width: $sidebar-width;
   min-width: $sidebar-width;
   height: 100vh;
-  background: $white;
-  border-right: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.92);
+  border-right: 1px solid rgba(73, 98, 128, 0.08);
+  box-shadow: 8px 0 28px rgba(73, 98, 128, 0.06);
   display: flex;
   flex-direction: column;
   transition: all $transition-normal;
@@ -162,6 +192,56 @@ function goBack() {
   &.collapsed {
     width: $sidebar-collapsed;
     min-width: $sidebar-collapsed;
+
+    .sidebar-header {
+      justify-content: center;
+      padding: 12px 6px;
+    }
+
+    .hamburger {
+      width: 46px;
+      height: 46px;
+    }
+
+    .sidebar-nav {
+      align-items: center;
+      padding: 8px 6px;
+    }
+
+    .nav-item {
+      width: 48px;
+      min-height: 48px;
+      justify-content: center;
+      gap: 0;
+      padding: 0;
+      margin: 0 auto;
+      border-radius: 16px;
+      box-sizing: border-box;
+
+      .nav-icon {
+        width: auto;
+        font-size: 24px;
+        line-height: 1;
+      }
+    }
+
+    .sidebar-footer {
+      padding: 8px 6px;
+    }
+
+    .user-area {
+      width: 48px;
+      min-height: 48px;
+      justify-content: center;
+      padding: 0;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }
+
+    .user-avatar {
+      width: 42px;
+      height: 42px;
+    }
   }
 }
 
@@ -173,13 +253,13 @@ function goBack() {
 }
 
 .hamburger {
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: $radius;
-  background: #F5F5F5;
+  background: #F1F6FC;
   cursor: pointer;
   flex-shrink: 0;
 
@@ -209,6 +289,7 @@ function goBack() {
 }
 
 .brand-name {
+  white-space: nowrap;
   font-size: 18px;
   font-weight: bold;
   color: $text;
@@ -232,8 +313,9 @@ function goBack() {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 52px;
   padding: 12px 16px;
-  border-radius: $radius;
+  border-radius: $radius-md;
   cursor: pointer;
   transition: all $transition-fast;
   white-space: nowrap;
@@ -241,25 +323,26 @@ function goBack() {
   &:active { transform: scale(0.97); }
 
   .nav-icon {
-    font-size: 22px;
+    font-size: 24px;
     flex-shrink: 0;
     width: 28px;
     text-align: center;
   }
 
   .nav-label {
-    font-size: 15px;
+    font-size: 16px;
     color: $text;
-    font-weight: 500;
+    font-weight: 700;
   }
 
   &.active {
-    background: #FFF0F0;
-    .nav-label { color: $primary; font-weight: 600; }
+    background: #FFF0E8;
+    box-shadow: 0 8px 18px rgba(255, 122, 89, 0.16);
+    .nav-label { color: $primary; font-weight: 800; }
   }
 
   &:not(.active):hover {
-    background: #F8F8F8;
+    background: #F1F6FC;
   }
 }
 
@@ -313,6 +396,7 @@ function goBack() {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 56px;
   padding: 8px;
   border-radius: $radius;
   cursor: pointer;
@@ -365,7 +449,7 @@ function goBack() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: $bg;
+  background: transparent;
 }
 
 .theme-dark .main-area {
@@ -379,8 +463,8 @@ function goBack() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: $white;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.82);
+  border-bottom: 1px solid rgba(73, 98, 128, 0.06);
 }
 
 .theme-parent .topbar {
@@ -401,19 +485,19 @@ function goBack() {
 }
 
 .topbar-title {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 800;
   color: $text;
 }
 
 .back-btn {
-  width: 36px;
-  height: 36px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: $radius;
-  background: #F5F5F5;
+  background: #F1F6FC;
   font-size: 18px;
   cursor: pointer;
 
@@ -439,7 +523,56 @@ function goBack() {
 }
 
 .content-wrapper {
-  padding: 24px 28px;
+  padding: 24px 28px 32px;
   min-height: 100%;
+}
+
+@media (max-width: 640px) {
+  .app-layout { flex-direction: column-reverse; }
+  .sidebar {
+    width: 100%;
+    min-width: 100%;
+    height: 68px;
+    min-height: 68px;
+    border-right: 0;
+    border-top: 1px solid rgba(73, 98, 128, 0.08);
+    box-shadow: 0 -8px 28px rgba(73, 98, 128, 0.08);
+
+    &.collapsed {
+      width: 100%;
+      min-width: 100%;
+    }
+  }
+  .sidebar-header, .sidebar-footer { display: none; }
+  .sidebar-nav {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-around;
+    gap: 4px;
+    padding: 8px;
+  }
+  .nav-item {
+    flex: 1;
+    min-height: 52px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 4px;
+    border-radius: 16px;
+    .nav-icon { font-size: 20px; width: auto; }
+    .nav-label {
+      display: block !important;
+      font-size: 11px;
+      line-height: 1.1;
+    }
+  }
+  .topbar {
+    height: 56px;
+    min-height: 56px;
+    padding: 0 14px;
+  }
+  .topbar-title { font-size: 17px; }
+  .back-btn { width: 42px; height: 42px; }
+  .content-wrapper { padding: 14px 14px 18px; }
 }
 </style>

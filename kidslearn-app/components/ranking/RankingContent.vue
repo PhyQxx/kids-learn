@@ -15,7 +15,7 @@
           <view class="podium-avatar silver-bg">
             <text class="podium-emoji">{{ podiumData[1]?.avatar || '🐰' }}</text>
           </view>
-          <text class="text-sm text-bold">{{ podiumData[1]?.name || '小红' }}</text>
+          <text class="text-sm text-bold">{{ podiumData[1]?.name || '-' }}</text>
           <text class="text-xs text-light">{{ podiumData[1]?.score || 0 }} 分</text>
           <view class="pedestal silver-ped">
             <text class="ped-rank">2</text>
@@ -27,7 +27,7 @@
           <view class="podium-avatar gold-bg">
             <text class="podium-emoji">{{ podiumData[0]?.avatar || '🦁' }}</text>
           </view>
-          <text class="text-sm text-bold">{{ podiumData[0]?.name || '小明' }}</text>
+          <text class="text-sm text-bold">{{ podiumData[0]?.name || '-' }}</text>
           <text class="text-xs text-light">{{ podiumData[0]?.score || 0 }} 分</text>
           <view class="pedestal gold-ped">
             <text class="ped-rank">1</text>
@@ -38,7 +38,7 @@
           <view class="podium-avatar bronze-bg">
             <text class="podium-emoji">{{ podiumData[2]?.avatar || '🦊' }}</text>
           </view>
-          <text class="text-sm text-bold">{{ podiumData[2]?.name || '小华' }}</text>
+          <text class="text-sm text-bold">{{ podiumData[2]?.name || '-' }}</text>
           <text class="text-xs text-light">{{ podiumData[2]?.score || 0 }} 分</text>
           <view class="pedestal bronze-ped">
             <text class="ped-rank">3</text>
@@ -74,7 +74,7 @@
 
     <!-- 排名列表 -->
     <view class="rank-list card">
-      <view v-for="(r, i) in rankList" :key="r.id" class="rank-item" :class="{ me: r.isMe }">
+      <view v-for="(r, i) in rankList" :key="r.id || i" class="rank-item" :class="{ me: r.isMe }">
         <text class="rank-pos" :class="{ 'top-three': i < 3 }">{{ i + 4 }}</text>
         <view class="rank-avatar-sm">
           <text>{{ r.avatar }}</text>
@@ -88,6 +88,9 @@
           <text v-for="s in r.stars" :key="s">⭐</text>
         </view>
       </view>
+      <view v-if="podiumData.length === 0 && rankList.length === 0" class="rank-empty">
+        <text class="text-sm text-light">暂无排行数据</text>
+      </view>
     </view>
     </template>
   </view>
@@ -100,45 +103,27 @@ import { getRanking, getMyRank } from '@/api/ranking'
 const loading = ref(true)
 const activeTab = ref(0)
 const tabItems = ref([
-  { label: '好友' },
-  { label: '班级' },
-  { label: '全国' }
+  { label: '周榜', type: 'weekly' },
+  { label: '总榜', type: 'total' }
 ])
 
-const podiumData = ref([
-  { rank: 1, name: '小明', avatar: '🦁', score: 4520 },
-  { rank: 2, name: '小红', avatar: '🐰', score: 4120 },
-  { rank: 3, name: '小华', avatar: '🦊', score: 3800 }
-])
+const podiumData = ref([])
 
-const myRankData = ref({ rank: 5, name: '我', avatar: '👦', level: 5, city: '北京', score: 2150, stars: 3 })
+const myRankData = ref({ rank: '-', name: '我', avatar: '👦', level: 0, city: '', score: 0, stars: 0 })
 
-const rankList = ref([
-  { id: 1, name: '小丽', avatar: '👧', level: 6, city: '上海', score: 3200, stars: 4, isMe: false },
-  { id: 2, name: '小明', avatar: '👦', level: 5, city: '北京', score: 2150, stars: 3, isMe: true },
-  { id: 3, name: '小龙', avatar: '🧒', level: 5, city: '深圳', score: 1980, stars: 3, isMe: false },
-  { id: 4, name: '小雨', avatar: '👧', level: 4, city: '广州', score: 1650, stars: 2, isMe: false }
-])
+const rankList = ref([])
 
 function applyMockData() {
-  podiumData.value = [
-    { rank: 1, name: '小明', avatar: '🦁', score: 4520 },
-    { rank: 2, name: '小红', avatar: '🐰', score: 4120 },
-    { rank: 3, name: '小华', avatar: '🦊', score: 3800 }
-  ]
-  myRankData.value = { rank: 5, name: '我', avatar: '👦', level: 5, city: '北京', score: 2150, stars: 3 }
-  rankList.value = [
-    { id: 1, name: '小丽', avatar: '👧', level: 6, city: '上海', score: 3200, stars: 4, isMe: false },
-    { id: 2, name: '小明', avatar: '👦', level: 5, city: '北京', score: 2150, stars: 3, isMe: true },
-    { id: 3, name: '小龙', avatar: '🧒', level: 5, city: '深圳', score: 1980, stars: 3, isMe: false },
-    { id: 4, name: '小雨', avatar: '👧', level: 4, city: '广州', score: 1650, stars: 2, isMe: false }
-  ]
+  podiumData.value = []
+  rankList.value = []
+  myRankData.value = { rank: '-', name: '我', avatar: '👦', level: 0, city: '', score: 0, stars: 0 }
 }
 
 async function loadData() {
   loading.value = true
   try {
-    const result = await getRanking('weekly')
+    const rankType = tabItems.value[activeTab.value]?.type || 'weekly'
+    const result = await getRanking(rankType)
 
     if (result && Array.isArray(result) && result.length > 0) {
       const top3 = result.slice(0, 3)
@@ -152,7 +137,7 @@ async function loadData() {
         id: r.id,
         name: r.nickname || r.name,
         avatar: r.avatar || '👦',
-        level: r.level || 1,
+        level: r.level || 0,
         city: r.city || '',
         score: r.score || 0,
         stars: Math.min(Math.floor((r.score || 0) / 500), 5),
@@ -167,7 +152,7 @@ async function loadData() {
           rank,
           name: '我',
           avatar: me.avatar || '👦',
-          level: me.level || 5,
+          level: me.level || 0,
           city: me.city || '',
           score: me.score || 0,
           stars: Math.min(Math.floor((me.score || 0) / 500), 5)
@@ -350,5 +335,10 @@ watch(activeTab, () => {
 
 .rank-score {
   margin-right: 8px;
+}
+
+.rank-empty {
+  padding: 18px 0;
+  text-align: center;
 }
 </style>

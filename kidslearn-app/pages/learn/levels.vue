@@ -36,7 +36,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { onShow } from '@dcloudio/uni-app'
+import { onShow, onLoad } from '@dcloudio/uni-app'
 import AppLayout from '@/components/AppLayout.vue'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
@@ -46,14 +46,26 @@ import { getUserInfo } from '@/api/user'
 const learnStore = useLearnStore()
 const userStore = useUserStore()
 const courseName = ref(learnStore.currentCourse?.name || '课程')
+const pageCourseId = ref(null)
+const pageGradeLevelId = ref(null)
 
 const units = ref([])
 
+onLoad((query) => {
+  pageCourseId.value = query.courseId || null
+  pageGradeLevelId.value = query.gradeLevelId || null
+})
+
 async function loadLevels() {
-  const courseId = learnStore.currentCourse?.id
+  // 优先使用 store，其次用 URL 参数
+  let courseId = learnStore.currentCourse?.id
+  if (!courseId) {
+    courseId = pageCourseId.value
+  }
   if (courseId) {
     try {
-      const res = await getLevels(courseId)
+      const gradeLevelId = pageGradeLevelId.value || userStore.userInfo?.gradeLevelId || null
+      const res = await getLevels(courseId, gradeLevelId)
       if (res && Array.isArray(res) && res.length > 0) {
         const levelList = res.map(l => ({
           id: l.id,
@@ -96,7 +108,8 @@ function statusText(level) {
 
 function startQuiz(level) {
   learnStore.setLevel(level)
-  uni.navigateTo({ url: `/pages/learn/quiz?levelId=${level.id}` })
+  const gradeLevelId = pageGradeLevelId.value || userStore.userInfo?.gradeLevelId || ''
+  uni.navigateTo({ url: `/pages/learn/quiz?levelId=${level.id}&gradeLevelId=${gradeLevelId}` })
 }
 
 onMounted(() => {

@@ -9,7 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,9 +29,14 @@ public class AchievementServiceImpl implements AchievementService {
     private final UserTitleMapper userTitleMapper;
     private final UserMapper userMapper;
     private final RewardLogMapper rewardLogMapper;
+    private final LearningRecordMapper learningRecordMapper;
+    private final CourseLevelMapper courseLevelMapper;
+    private final CourseMapper courseMapper;
 
     @Override
     public List<Map<String, Object>> getAchievements(Long userId, Integer type) {
+        syncAchievementProgress(userId);
+
         LambdaQueryWrapper<Achievement> wrapper = new LambdaQueryWrapper<Achievement>()
             .eq(Achievement::getStatus, 1)
             .eq(type != null, Achievement::getAchieveType, type)
@@ -52,6 +60,7 @@ public class AchievementServiceImpl implements AchievementService {
                     .eq(UserAchievement::getAchieveId, a.getId())
             );
             map.put("currentValue", ua != null ? ua.getCurrentValue() : 0);
+            map.put("targetValue", ua != null && ua.getTargetValue() != null ? ua.getTargetValue() : 1);
             map.put("isCompleted", ua != null && ua.getIsCompleted() == 1);
             map.put("isReceived", ua != null && ua.getIsReceived() == 1);
 
@@ -66,6 +75,7 @@ public class AchievementServiceImpl implements AchievementService {
                     Map<String, Object> tm = new HashMap<>();
                     tm.put("tierLevel", t.getTierLevel());
                     tm.put("tierName", t.getTierName());
+                    tm.put("conditionJson", t.getConditionJson());
                     return tm;
                 }).collect(Collectors.toList());
                 map.put("tiers", tierList);
@@ -76,6 +86,8 @@ public class AchievementServiceImpl implements AchievementService {
 
     @Override
     public Map<String, Object> getMyProgress(Long userId) {
+        syncAchievementProgress(userId);
+
         Map<String, Object> result = new HashMap<>();
         Long total = achievementMapper.selectCount(
             new LambdaQueryWrapper<Achievement>().eq(Achievement::getStatus, 1)
@@ -224,5 +236,143 @@ public class AchievementServiceImpl implements AchievementService {
         Map<String, Object> result = new HashMap<>();
         result.put("message", "称号佩戴成功！");
         return result;
+    }
+
+    @Override
+    public void syncAchievementProgress(Long userId) {
+        List<Achievement> achievements = achievementMapper.selectList(
+            new LambdaQueryWrapper<Achievement>().eq(Achievement::getStatus, 1)
+        );
+        if (achievements.isEmpty()) {
+            return;
+        }
+
+        List<LearningRecord> passedRecords = learningRecordMapper.selectList(
+            new LambdaQueryWrapper<LearningRecord>()
+                .eq(LearningRecord::getUserId, userId)
+                .eq(LearningRecord::getIsPass, 1)
+        );
+        Map<Long, Integer> bestStarsByLevel = new HashMap<>();
+        for (LearningRecord record : passedRecords) {
+            bestStarsByLevel.merge(record.getCourseLevelId(), record.getStars(), Math::max);
+        }
+
+        int completedLevels = bestStarsByLevel.size();
+        int threeStarLevels = (int) bestStarsByLevel.values().stream().filter(stars -> stars >= 3).count();
+        int learnedSubjects = countLearnedSubjects(bestStarsByLevel.keySet());
+        int collectedStickers = Math.toIntExact(userStickerMapper.selectCount(
+            new LambdaQueryWrapper<UserSticker>().eq(UserSticker::getUserId, userId)
+        ));
+
+        for (Achievement achievement : achievements) {
+            AchievementTier tier = achievementTierMapper.selectOne(
+                new LambdaQueryWrapper<AchievementTier>()
+                    .eq(AchievementTier::getAchieveId, achievement.getId())
+                    .orderByAsc(AchievementTier::getTierLevel)
+                    .last("LIMIT 1")
+            );
+            int target = resolveAchievementTarget(achievement, tier);
+            int current = resolveAchievementCurrent(achievement, completedLevels, threeStarLevels, learnedSubjects, collectedStickers);
+            upsertAchievementProgress(userId, achievement.getId(), current, target);
+        }
+    }
+
+    private int countLearnedSubjects(Set<Long> completedLevelIds) {
+        Set<Long> subjectIds = new HashSet<>();
+        for (Long levelId : completedLevelIds) {
+            CourseLevel level = courseLevelMapper.selectById(levelId);
+            if (level == null) {
+                continue;
+            }
+            Course course = courseMapper.selectById(level.getCourseId());
+            if (course != null) {
+                subjectIds.add(course.getSubjectId());
+            }
+        }
+        return subjectIds.size();
+    }
+
+    private int resolveAchievementTarget(Achievement achievement, AchievementTier tier) {
+        if (tier != null && tier.getConditionJson() != null) {
+            Integer target = firstNumber(tier.getConditionJson(),
+                "target", "targetValue", "count", "value", "levelCount", "starCount", "stickerCount", "subjectCount");
+            if (target != null && target > 0) {
+                return target;
+            }
+        }
+
+        String code = achievement.getAchieveCode() == null ? "" : achievement.getAchieveCode().toLowerCase(Locale.ROOT);
+        String name = achievement.getAchieveName() == null ? "" : achievement.getAchieveName();
+        if (code.contains("first") || name.contains("首次") || name.contains("初次")) return 1;
+        if (code.contains("star") || name.contains("满星") || name.contains("三星")) return 10;
+        if (code.contains("math") || name.contains("数学")) return 50;
+        if (code.contains("subject") || name.contains("全科")) return 6;
+        if (code.contains("sticker") || name.contains("贴纸") || name.contains("收集")) return 100;
+        return 1;
+    }
+
+    private int resolveAchievementCurrent(Achievement achievement, int completedLevels, int threeStarLevels, int learnedSubjects, int collectedStickers) {
+        String code = achievement.getAchieveCode() == null ? "" : achievement.getAchieveCode().toLowerCase(Locale.ROOT);
+        String name = achievement.getAchieveName() == null ? "" : achievement.getAchieveName();
+
+        if (code.contains("sticker") || name.contains("贴纸") || name.contains("收集")) {
+            return collectedStickers;
+        }
+        if (code.contains("subject") || name.contains("全科")) {
+            return learnedSubjects;
+        }
+        if (code.contains("star") || name.contains("满星") || name.contains("三星")) {
+            return threeStarLevels;
+        }
+        return completedLevels;
+    }
+
+    private Integer firstNumber(String json, String... keys) {
+        for (String key : keys) {
+            Matcher matcher = Pattern.compile("\"" + Pattern.quote(key) + "\"\\s*:\\s*(\\d+)").matcher(json);
+            if (matcher.find()) {
+                return Integer.parseInt(matcher.group(1));
+            }
+        }
+        return null;
+    }
+
+    private void upsertAchievementProgress(Long userId, Long achievementId, int current, int target) {
+        UserAchievement existing = userAchievementMapper.selectOne(
+            new LambdaQueryWrapper<UserAchievement>()
+                .eq(UserAchievement::getUserId, userId)
+                .eq(UserAchievement::getAchieveId, achievementId)
+        );
+
+        int safeTarget = Math.max(1, target);
+        int safeCurrent = Math.max(0, current);
+        int completed = safeCurrent >= safeTarget ? 1 : 0;
+
+        if (existing == null) {
+            UserAchievement ua = new UserAchievement();
+            ua.setUserId(userId);
+            ua.setAchieveId(achievementId);
+            ua.setCurrentValue(safeCurrent);
+            ua.setTargetValue(safeTarget);
+            ua.setIsCompleted(completed);
+            ua.setIsReceived(0);
+            if (completed == 1) {
+                ua.setCompletedTime(LocalDateTime.now());
+            }
+            userAchievementMapper.insert(ua);
+            return;
+        }
+
+        boolean newlyCompleted = existing.getIsCompleted() == null || existing.getIsCompleted() == 0;
+        existing.setCurrentValue(safeCurrent);
+        existing.setTargetValue(safeTarget);
+        existing.setIsCompleted(completed);
+        if (completed == 1 && newlyCompleted) {
+            existing.setCompletedTime(LocalDateTime.now());
+        }
+        if (existing.getIsReceived() == null) {
+            existing.setIsReceived(0);
+        }
+        userAchievementMapper.updateById(existing);
     }
 }
