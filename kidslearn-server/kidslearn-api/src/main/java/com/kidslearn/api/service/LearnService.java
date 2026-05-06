@@ -27,4 +27,20 @@ public interface LearnService {
     List<Map<String, Object>> getLearningRecords(Long userId, String date);
 
     List<Map<String, Object>> getWrongTopics(Long userId);
+
+    Map<String, Object> checkin(Long userId);
+
+    Map<String, Object> getCheckinStatus(Long userId);
+
+    Map<String, Object> getHint(Long userId, Long questionId);
+
+    List<Map<String, Object>> getWeakPoints(Long userId);
+
+    List<Map<String, Object>> getAdaptiveQuestions(Long userId, Long subjectId);
+
+    Map<String, Object> retryWrong(Long userId, Long questionId, String answer);
+
+    Map<String, Object> explainWrong(Long userId, Long questionId);
+
+    List<Map<String, Object>> getAssessmentQuestions(Long userId);
 }

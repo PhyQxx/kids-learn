@@ -9,6 +9,7 @@ import com.kidslearn.api.entity.GradeLevel;
 import com.kidslearn.api.entity.Question;
 import com.kidslearn.api.entity.QuestionOption;
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.service.impl.QuestionAudioService;
 import com.kidslearn.common.result.PageResult;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,6 +34,7 @@ public class AdminContentController {
     private final QuestionMapper questionMapper;
     private final QuestionOptionMapper questionOptionMapper;
     private final GradeLevelMapper gradeLevelMapper;
+    private final QuestionAudioService questionAudioService;
 
     // ==================== 学科管理 ====================
 
@@ -202,6 +204,16 @@ public class AdminContentController {
             }
         }
         return R.ok();
+    }
+
+    @Operation(summary = "生成/更新题目音频")
+    @PostMapping("/question/{id}/audio")
+    public R<Map<String, String>> questionAudio(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
+        String speechText = null;
+        if (body != null && body.get("speechText") != null) {
+            speechText = body.get("speechText").toString();
+        }
+        return R.ok(questionAudioService.generateQuestionAudio(id, speechText));
     }
 
     @Operation(summary = "删除题目")

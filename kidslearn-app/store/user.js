@@ -13,6 +13,7 @@ export const useUserStore = defineStore('user', () => {
   const level = computed(() => userInfo.value?.level || 1)
   const gold = computed(() => userInfo.value?.gold || 0)
   const themeClass = computed(() => `theme-${ageGroup.value}`)
+  const onboardingStep = computed(() => userInfo.value?.onboardingStep ?? 0)
 
   function setToken(val) {
     token.value = val
@@ -40,6 +41,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function logout() {
+    uni.closeSocket({ complete: () => {} })
     token.value = ''
     userInfo.value = null
     isParentMode.value = false
@@ -52,7 +54,7 @@ export const useUserStore = defineStore('user', () => {
 
   return {
     token, userInfo, isParentMode, sidebarCollapsed, ageGroup,
-    isLoggedIn, nickname, level, gold, themeClass,
+    isLoggedIn, nickname, level, gold, themeClass, onboardingStep,
     setToken, setUserInfo, setParentMode, toggleSidebar, setAgeGroup, logout
   }
 })

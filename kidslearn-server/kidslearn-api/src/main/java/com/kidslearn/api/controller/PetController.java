@@ -68,4 +68,55 @@ public class PetController {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(petService.getInventory(userId));
     }
+
+    @Operation(summary = "宠物洗澡")
+    @PostMapping("/bath")
+    public R<Map<String, Object>> bathPet(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(petService.bathPet(userId));
+    }
+
+    @Operation(summary = "获取装饰品列表")
+    @GetMapping("/decorations")
+    public R<List<Map<String, Object>>> getDecorations(
+            @RequestParam(required = false) String slot) {
+        return R.ok(petService.getDecorations(slot));
+    }
+
+    @Operation(summary = "购买装饰品")
+    @PostMapping("/decorations/buy")
+    public R<Map<String, Object>> buyDecoration(
+            HttpServletRequest request,
+            @RequestParam Long decorationId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(petService.buyDecoration(userId, decorationId));
+    }
+
+    @Operation(summary = "获取已拥有装饰品")
+    @GetMapping("/decorations/inventory")
+    public R<List<Map<String, Object>>> getDecorationInventory(
+            HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(petService.getDecorationInventory(userId));
+    }
+
+    @Operation(summary = "初始化宠物")
+    @PostMapping("/init")
+    public R<Map<String, Object>> initPet(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(petService.initPet(userId));
+    }
+
+    @Operation(summary = "获取可选宠物列表")
+    @GetMapping("/available")
+    public R<List<Map<String, Object>>> getAvailablePets() {
+        return R.ok(petService.getAvailablePets());
+    }
+
+    @Operation(summary = "选择宠物（新手引导）")
+    @PostMapping("/select")
+    public R<Map<String, Object>> selectPet(HttpServletRequest request, @RequestParam Long petId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(petService.selectPet(userId, petId));
+    }
 }

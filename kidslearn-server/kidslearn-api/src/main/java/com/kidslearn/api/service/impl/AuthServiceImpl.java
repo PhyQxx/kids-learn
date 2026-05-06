@@ -221,7 +221,11 @@ public class AuthServiceImpl implements AuthService {
             userPet.setCurrentExp(0);
             userPet.setHunger(80);
             userPet.setMood(3);
+            userPet.setEnergy(100);
             userPet.setCurrentImageUrl(defaultPet.getBaseImageUrl());
+            userPet.setLastFeedTime(LocalDateTime.now());
+            userPet.setLastPlayTime(LocalDateTime.now());
+            userPet.setLastBathTime(LocalDateTime.now());
             userPetMapper.insert(userPet);
         }
     }

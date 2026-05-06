@@ -117,6 +117,30 @@
   to { transform: scale(1); opacity: 1; }
 }
 
+/* 宝箱开启动画 */
+@keyframes chest-open {
+  0% { transform: scale(0.3) rotate(0deg); opacity: 0; }
+  40% { transform: scale(1.15) rotate(-5deg); opacity: 1; }
+  55% { transform: scale(1.3) rotate(3deg); }
+  70% { transform: scale(0.95) rotate(-2deg); }
+  85% { transform: scale(1.05) rotate(1deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* 金币散射飞出 */
+@keyframes coin-scatter {
+  0% { transform: translate(0, 0) scale(0); opacity: 1; }
+  20% { transform: translate(var(--coin-tx, 0), var(--coin-ty, -30px)) scale(1.2); opacity: 1; }
+  60% { transform: translate(calc(var(--coin-tx, 0) * 1.5), calc(var(--coin-ty, -30px) + 10px)) scale(1); opacity: 1; }
+  100% { transform: translate(calc(var(--coin-tx, 0) * 2), calc(var(--coin-ty, -30px) + 40px)) scale(0.6); opacity: 0; }
+}
+
+/* 宝箱闪光 */
+@keyframes chest-glow {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.3)); }
+  50% { filter: drop-shadow(0 0 24px rgba(255, 215, 0, 0.9)); }
+}
+
 /* ===== 动画类 ===== */
 
 /* 基础动画类 */
@@ -185,3 +209,8 @@
     animation: star-spin 0.6s ease-out forwards;
   }
 }
+
+/* 宝箱动画类 */
+.animate-chest-open { animation: chest-open 0.8s var(--ease-bounce) both; }
+.animate-chest-glow { animation: chest-glow 1.5s ease-in-out infinite; }
+.animate-coin-scatter { animation: coin-scatter 1s ease-out forwards; }

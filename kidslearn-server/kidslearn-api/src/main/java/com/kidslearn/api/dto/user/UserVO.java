@@ -15,4 +15,5 @@ public class UserVO {
     private Long gradeLevelId;
     private String gradeLevelName;
     private String phone;
+    private Integer onboardingStep;
 }

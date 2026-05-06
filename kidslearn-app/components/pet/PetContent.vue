@@ -11,10 +11,15 @@
       <!-- 左侧：宠物展示 -->
       <view class="pet-panel">
         <view class="pet-display">
-          <text class="pet-emoji animate-float">🐱</text>
+          <text class="pet-emoji animate-float">{{ petStore.currentImageUrl }}</text>
           <view class="pet-name-row">
             <text class="text-lg text-bold">{{ petStore.name }}</text>
             <tn-badge type="primary" :text="'Lv.' + petStore.level" />
+          </view>
+          <text v-if="petStore.evolutionName" class="text-xs text-light">{{ petStore.evolutionName }}</text>
+          <view class="wallet-row">
+            <text class="wallet-pill">🪙 {{ userStore.gold || 0 }}</text>
+            <text class="wallet-pill">💎 {{ userStore.userInfo?.diamond || 0 }}</text>
           </view>
         </view>
 
@@ -22,41 +27,41 @@
         <view class="evolution-section">
           <view class="evo-header">
             <text class="text-sm text-bold">进化进度</text>
-            <text class="text-xs text-light">{{ petExp.current }}/{{ petExp.max }} XP</text>
+            <text class="text-xs text-light">{{ petStore.expInLevel }}/{{ petStore.nextLevelExp }} XP</text>
           </view>
-          <tn-line-progress :percent="petExp.current / petExp.max * 100" active-color="#FF6B6B" inactive-color="rgba(255,255,255,0.3)" :height="12" :show-percent="false" />
+          <tn-line-progress :percent="petStore.nextLevelExp > 0 ? petStore.expInLevel / petStore.nextLevelExp * 100 : 0" active-color="#FF6B6B" inactive-color="rgba(255,255,255,0.3)" :height="12" :show-percent="false" />
         </view>
 
         <!-- 状态条 -->
         <view class="stats-bars">
           <view class="stat-row">
-            <text class="stat-label text-sm">🍖 饱食度</text>
+            <text class="stat-label text-sm">饱食度</text>
             <tn-line-progress :percent="petStore.hunger" active-color="#FFB74D" :height="12" :show-percent="false" style="flex: 1;" />
             <text class="text-xs text-light">{{ petStore.hunger }}%</text>
           </view>
           <view class="stat-row">
-            <text class="stat-label text-sm">😊 心情</text>
-            <tn-line-progress :percent="petMood" active-color="#4ECDC4" :height="12" :show-percent="false" style="flex: 1;" />
+            <text class="stat-label text-sm">心情</text>
+            <tn-line-progress :percent="petStore.moodPercent" active-color="#4ECDC4" :height="12" :show-percent="false" style="flex: 1;" />
             <text class="text-xs text-light">{{ petStore.moodText }}</text>
           </view>
           <view class="stat-row">
-            <text class="stat-label text-sm">⚡ 活力</text>
-            <tn-line-progress :percent="petEnergy" active-color="#2ECC71" :height="12" :show-percent="false" style="flex: 1;" />
-            <text class="text-xs text-light">{{ petEnergy }}%</text>
+            <text class="stat-label text-sm">活力</text>
+            <tn-line-progress :percent="petStore.energy" active-color="#2ECC71" :height="12" :show-percent="false" style="flex: 1;" />
+            <text class="text-xs text-light">{{ petStore.energy }}%</text>
           </view>
         </view>
 
         <!-- 操作按钮 -->
         <view class="action-grid">
-          <view class="action-btn-item card card-hover" @tap="feedPet">
+          <view class="action-btn-item card card-hover" @tap="handleFeed">
             <text class="action-emoji">🍖</text>
             <text class="text-sm">喂食</text>
           </view>
-          <view class="action-btn-item card card-hover" @tap="bathPet">
+          <view class="action-btn-item card card-hover" @tap="handleBath">
             <text class="action-emoji">🛁</text>
             <text class="text-sm">洗澡</text>
           </view>
-          <view class="action-btn-item card card-hover" @tap="playPet">
+          <view class="action-btn-item card card-hover" @tap="handlePlay">
             <text class="action-emoji">🎾</text>
             <text class="text-sm">玩耍</text>
           </view>
@@ -75,12 +80,15 @@
             <text class="text-md text-bold">🎒 背包 / 食物</text>
             <text class="text-xs text-primary" @tap="goShop">去商店 →</text>
           </view>
-          <view class="item-grid">
-            <view v-for="item in foodItems" :key="item.id" class="item-card" :class="{ empty: item.count === 0 }">
+          <view v-if="foodItems.length > 0" class="item-grid">
+            <view v-for="item in foodItems" :key="item.id" class="item-card" :class="{ empty: item.count <= 0 }" @tap="selectFood(item)">
               <text class="item-emoji">{{ item.icon }}</text>
               <text class="text-xs">{{ item.name }}</text>
               <text class="text-xs text-light">x{{ item.count }}</text>
             </view>
+          </view>
+          <view v-else class="empty-hint">
+            <text class="text-xs text-light">背包空空，去商店买点吧</text>
           </view>
         </view>
 
@@ -89,13 +97,15 @@
           <view class="inv-header">
             <text class="text-md text-bold">🎭 装扮</text>
           </view>
-          <view class="item-grid">
-            <view v-for="item in costumeItems" :key="item.id" class="item-card" :class="{ locked: !item.owned }">
+          <view v-if="costumeItems.length > 0" class="item-grid">
+            <view v-for="item in costumeItems" :key="item.id" class="item-card">
               <text class="item-emoji">{{ item.icon }}</text>
               <text class="text-xs">{{ item.name }}</text>
-              <text v-if="item.owned" class="text-xs text-success">已拥有</text>
-              <text v-else class="text-xs text-light">🔒</text>
+              <text class="text-xs text-success">已拥有</text>
             </view>
+          </view>
+          <view v-else class="empty-hint">
+            <text class="text-xs text-light">暂无装扮，去商店看看吧</text>
           </view>
         </view>
       </view>
@@ -104,8 +114,8 @@
     <!-- 喂食弹窗 -->
     <tn-popup v-model="showFeedModal" direction="center" :custom-style="{ width: '400px' }">
       <view class="feed-modal">
-        <text class="text-lg text-bold" style="margin-bottom: 16px;">🍖 选择食物</text>
-        <view class="feed-grid">
+        <text class="text-lg text-bold" style="margin-bottom: 16px;">选择食物</text>
+        <view v-if="availableFood.length > 0" class="feed-grid">
           <view
             v-for="item in availableFood"
             :key="item.id"
@@ -117,6 +127,9 @@
             <text class="text-sm">{{ item.name }}</text>
             <text class="text-xs text-light">x{{ item.count }}</text>
           </view>
+        </view>
+        <view v-else class="empty-hint">
+          <text class="text-sm text-light">没有可用的食物</text>
         </view>
         <view style="display: flex; gap: 12px; margin-top: 16px;">
           <tn-button type="primary" shape="round" @click="confirmFeed" :disabled="!selectedFood" block>确认喂食</tn-button>
@@ -131,95 +144,55 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { usePetStore } from '@/store/pet'
-import { getPetStatus, getInventory, feedPet as feedPetApi, playPet as playPetApi } from '@/api/pet'
+import { useUserStore } from '@/store/user'
+import { getPetStatus, getInventory, getDecorationInventory, feedPet as feedPetApi, playPet as playPetApi, bathPet as bathPetApi } from '@/api/pet'
+import { normalizeInventoryItems, normalizeDecorations } from '@/utils/petFeature.mjs'
 
 const petStore = usePetStore()
+const userStore = useUserStore()
 
 const loading = ref(true)
 const showFeedModal = ref(false)
 const selectedFood = ref(null)
-const petExp = ref({ current: 300, max: 500 })
-const petMood = ref(85)
-const petEnergy = ref(90)
 
-const foodItems = ref([
-  { id: 1, name: '苹果', icon: '🍎', count: 3 },
-  { id: 2, name: '蛋糕', icon: '🎂', count: 1 },
-  { id: 3, name: '鱼', icon: '🐟', count: 5 },
-  { id: 4, name: '星星糖', icon: '🍬', count: 2 },
-  { id: 5, name: '披萨', icon: '🍕', count: 0 },
-  { id: 6, name: '钻石果', icon: '💎', count: 0 }
-])
-
-const costumeItems = ref([
-  { id: 1, name: '帽子', icon: '🎩', owned: true },
-  { id: 2, name: '蝴蝶结', icon: '🎀', owned: true },
-  { id: 3, name: '眼镜', icon: '🕶️', owned: false },
-  { id: 4, name: '盾牌', icon: '🛡️', owned: false }
-])
+const foodItems = ref([])
+const costumeItems = ref([])
 
 const availableFood = computed(() => foodItems.value.filter(f => f.count > 0))
-
-function applyMockData() {
-  petExp.value = { current: 300, max: 500 }
-  petMood.value = 85
-  petEnergy.value = 90
-  foodItems.value = [
-    { id: 1, name: '苹果', icon: '🍎', count: 3 },
-    { id: 2, name: '蛋糕', icon: '🎂', count: 1 },
-    { id: 3, name: '鱼', icon: '🐟', count: 5 },
-    { id: 4, name: '星星糖', icon: '🍬', count: 2 },
-    { id: 5, name: '披萨', icon: '🍕', count: 0 },
-    { id: 6, name: '钻石果', icon: '💎', count: 0 }
-  ]
-  costumeItems.value = [
-    { id: 1, name: '帽子', icon: '🎩', owned: true },
-    { id: 2, name: '蝴蝶结', icon: '🎀', owned: true },
-    { id: 3, name: '眼镜', icon: '🕶️', owned: false },
-    { id: 4, name: '盾牌', icon: '🛡️', owned: false }
-  ]
-}
 
 async function loadData() {
   loading.value = true
   try {
-    const results = await Promise.allSettled([
+    const [petRes, inventoryRes, decoInvRes] = await Promise.all([
       getPetStatus(),
-      getInventory()
+      getInventory(),
+      getDecorationInventory()
     ])
 
-    // 宠物状态
-    if (results[0].status === 'fulfilled' && results[0].value) {
-      const pet = results[0].value
-      petStore.setPetInfo(pet)
-      petExp.value = { current: pet.currentExp || 300, max: pet.nextLevelExp || 500 }
-      petMood.value = pet.moodValue || pet.mood || 85
-      petEnergy.value = pet.energy || 90
+    if (petRes) {
+      petStore.setPetInfo(petRes)
+      syncUserBalance(petRes)
     }
 
-    // 背包物品
-    if (results[1].status === 'fulfilled' && results[1].value) {
-      const inv = results[1].value
-      if (inv.foods && Array.isArray(inv.foods) && inv.foods.length > 0) {
-        foodItems.value = inv.foods.map(f => ({
-          id: f.id,
-          name: f.itemName || f.name,
-          icon: f.iconUrl || f.icon || '🍽️',
-          count: f.count || 0
-        }))
-      }
-      if (inv.costumes && Array.isArray(inv.costumes) && inv.costumes.length > 0) {
-        costumeItems.value = inv.costumes.map(c => ({
-          id: c.id,
-          name: c.itemName || c.name,
-          icon: c.iconUrl || c.icon || '🎭',
-          owned: c.owned !== false
-        }))
-      }
+    if (inventoryRes && Array.isArray(inventoryRes)) {
+      foodItems.value = normalizeInventoryItems(inventoryRes)
+    }
+
+    if (decoInvRes && Array.isArray(decoInvRes)) {
+      costumeItems.value = normalizeDecorations(
+        decoInvRes.map(c => ({
+          id: c.decorationId,
+          decoName: c.decoName,
+          slot: c.slot,
+          imageUrl: c.imageUrl,
+          rarity: c.rarity
+        })),
+        decoInvRes,
+        petRes?.wearDecorationIds || []
+      )
     }
   } catch (e) {
-    console.log('PetContent: 使用模拟数据', e)
-    applyMockData()
+    uni.showToast({ title: '加载失败', icon: 'none' })
   } finally {
     loading.value = false
   }
@@ -229,34 +202,64 @@ onMounted(() => {
   loadData()
 })
 
-function feedPet() { showFeedModal.value = true }
-function bathPet() { uni.showToast({ title: '洗澡啦~ 🛁', icon: 'none' }) }
-function playPet() {
-  playPetApi().then(() => {
-    uni.showToast({ title: '玩耍中~ 🎾', icon: 'none' })
-    loadData()
-  }).catch(() => {
-    uni.showToast({ title: '玩耍中~ 🎾', icon: 'none' })
-  })
+function handleFeed() {
+  selectedFood.value = null
+  showFeedModal.value = true
 }
+
+function selectFood(item) {
+  if (item.count <= 0) return
+  selectedFood.value = item.id
+  showFeedModal.value = true
+}
+
+async function handleBath() {
+  try {
+    const res = await bathPetApi()
+    uni.showToast({ title: res.message || '洗澡啦~ 🛁', icon: 'none' })
+    loadData()
+  } catch (e) {
+    uni.showToast({ title: e.message || '操作失败', icon: 'none' })
+  }
+}
+
+async function handlePlay() {
+  try {
+    const res = await playPetApi()
+    uni.showToast({ title: res.message || '玩耍中~ 🎾', icon: 'none' })
+    loadData()
+  } catch (e) {
+    uni.showToast({ title: e.message || '操作失败', icon: 'none' })
+  }
+}
+
 function goDress() { uni.navigateTo({ url: '/pages/pet/dress' }) }
 function goShop() { uni.navigateTo({ url: '/pages/pet/shop' }) }
 
-function confirmFeed() {
+async function confirmFeed() {
   if (!selectedFood.value) return
   const food = foodItems.value.find(f => f.id === selectedFood.value)
   if (food && food.count > 0) {
-    feedPetApi(food.id).then(() => {
-      food.count--
-      uni.showToast({ title: `${petStore.name}吃了${food.name}！`, icon: 'none' })
-      loadData()
-    }).catch(() => {
-      food.count--
-      uni.showToast({ title: `${petStore.name}吃了${food.name}！`, icon: 'none' })
-    })
     showFeedModal.value = false
+    try {
+      const res = await feedPetApi(food.id)
+      uni.showToast({ title: res.message || '喂食成功！', icon: 'none' })
+    } catch (e) {
+      uni.showToast({ title: e.message || '喂食失败', icon: 'none' })
+    }
     selectedFood.value = null
+    loadData()
   }
+}
+
+function syncUserBalance(petRes) {
+  if (!userStore.userInfo) return
+  if (petRes.gold == null && petRes.diamond == null) return
+  userStore.setUserInfo({
+    ...userStore.userInfo,
+    gold: petRes.gold ?? userStore.userInfo.gold,
+    diamond: petRes.diamond ?? userStore.userInfo.diamond
+  })
 }
 </script>
 
@@ -280,7 +283,6 @@ function confirmFeed() {
   height: 100%;
 }
 
-/* 左侧宠物面板 */
 .pet-panel {
   background: linear-gradient(135deg, #FFB6C1, #FFD4E5);
   border-radius: $radius-md;
@@ -302,6 +304,21 @@ function confirmFeed() {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+.wallet-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wallet-pill {
+  background: rgba(255, 255, 255, 0.58);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .evolution-section {
@@ -328,7 +345,7 @@ function confirmFeed() {
   gap: 8px;
 }
 
-.stat-label { width: 64px; }
+.stat-label { width: 52px; }
 
 .action-grid {
   display: grid;
@@ -351,7 +368,6 @@ function confirmFeed() {
 
 .action-emoji { font-size: 28px; }
 
-/* 右侧物品面板 */
 .inventory-panel {
   display: flex;
   flex-direction: column;
@@ -386,12 +402,15 @@ function confirmFeed() {
   border-radius: $radius;
 
   &.empty { opacity: 0.4; }
-  &.locked { opacity: 0.5; }
 }
 
 .item-emoji { font-size: 28px; }
 
-/* 喂食弹窗 */
+.empty-hint {
+  text-align: center;
+  padding: 20px 0;
+}
+
 .feed-modal {
   padding: 24px;
 }
@@ -416,7 +435,6 @@ function confirmFeed() {
 
 .feed-emoji { font-size: 32px; }
 
-/* 响应式 */
 @media (max-width: 800px) {
   .pet-layout { grid-template-columns: 260px 1fr; gap: 10px; }
   .pet-emoji { font-size: 60px; }

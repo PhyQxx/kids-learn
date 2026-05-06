@@ -7,10 +7,14 @@ import com.kidslearn.api.dto.learn.LevelResultVO;
 import com.kidslearn.api.dto.learn.SubmitAnswerDTO;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.realtime.RealtimeEventPublisher;
 import com.kidslearn.api.service.AchievementService;
+import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.LearnService;
+import com.kidslearn.api.service.PetService;
 import com.kidslearn.common.exception.BusinessException;
 import com.kidslearn.common.result.PageResult;
+import com.kidslearn.common.util.RichContentUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +43,11 @@ public class LearnServiceImpl implements LearnService {
     private final UserStickerMapper userStickerMapper;
     private final GradeLevelMapper gradeLevelMapper;
     private final CourseGradeMapper courseGradeMapper;
+    private final DailyCheckinMapper dailyCheckinMapper;
     private final AchievementService achievementService;
+    private final RealtimeEventPublisher realtimeEventPublisher;
+    private final PetService petService;
+    private final AiService aiService;
 
     @Override
     public DailyTaskVO getDailyTasks(Long userId) {
@@ -334,28 +342,30 @@ public class LearnServiceImpl implements LearnService {
                 .eq(Question::getCourseLevelId, levelId)
                 .orderByAsc(Question::getSortOrder)
         );
+        Random random = new Random();
 
-        return questions.stream().map(q -> {
+        return QuestionRandomizer.shuffledCopy(questions, random).stream().map(q -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", q.getId());
             map.put("questionType", q.getQuestionType());
             map.put("questionContent", q.getQuestionContent());
+            map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
+            map.put("questionSpeechText", RichContentUtil.toSpeechText(q.getQuestionContent()));
+            map.put("questionAudioUrl", RichContentUtil.toSpeechAudioUrl(q.getQuestionContent()));
             map.put("difficulty", q.getDifficulty());
             map.put("score", q.getScore());
             map.put("timeLimit", q.getTimeLimit());
+            map.put("analysis", q.getAnalysis());
+            map.put("analysisText", RichContentUtil.toPlainText(q.getAnalysis()));
+            map.put("analysisSpeechText", RichContentUtil.toSpeechText(q.getAnalysis()));
+            map.put("analysisAudioUrl", RichContentUtil.toSpeechAudioUrl(q.getAnalysis()));
 
             List<QuestionOption> options = questionOptionMapper.selectList(
                 new LambdaQueryWrapper<QuestionOption>()
                     .eq(QuestionOption::getQuestionId, q.getId())
                     .orderByAsc(QuestionOption::getSortOrder)
             );
-            List<Map<String, String>> optionList = options.stream().map(o -> {
-                Map<String, String> opt = new HashMap<>();
-                opt.put("optionLabel", o.getOptionLabel());
-                opt.put("optionContent", o.getOptionContent());
-                return opt;
-            }).collect(Collectors.toList());
-            map.put("options", optionList);
+            map.put("options", QuestionRandomizer.toRandomizedOptions(options, random));
             return map;
         }).collect(Collectors.toList());
     }
@@ -381,10 +391,25 @@ public class LearnServiceImpl implements LearnService {
         result.put("correct", isCorrect);
         result.put("correctAnswer", correctAnswer);
         result.put("explanation", question.getAnalysis());
+        result.put("explanationText", RichContentUtil.toPlainText(question.getAnalysis()));
 
         if (isCorrect) {
             result.put("gold", 5);
             result.put("exp", 5);
+            result.put("petExp", 2);
+            petService.addPetExp(userId, 2);
+
+            // 如果该题之前做错过，标记为已掌握
+            WrongTopic existingWrong = wrongTopicMapper.selectOne(
+                new LambdaQueryWrapper<WrongTopic>()
+                    .eq(WrongTopic::getUserId, userId)
+                    .eq(WrongTopic::getQuestionId, dto.getQuestionId())
+                    .eq(WrongTopic::getIsMastered, 0)
+            );
+            if (existingWrong != null) {
+                existingWrong.setIsMastered(1);
+                wrongTopicMapper.updateById(existingWrong);
+            }
         } else {
             // save to wrong topic
             saveWrongTopic(userId, dto.getQuestionId(), dto.getAnswer(), correctAnswer);
@@ -443,6 +468,7 @@ public class LearnServiceImpl implements LearnService {
             user.setTotalExp(user.getTotalExp() + expReward);
             user.setLevel(calculateLevel(user.getTotalExp()));
             userMapper.updateById(user);
+            realtimeEventPublisher.publishBalance(userId, user.getGold(), user.getDiamond());
 
             // reward log
             RewardLog goldLog = new RewardLog();
@@ -496,6 +522,10 @@ public class LearnServiceImpl implements LearnService {
 
             // refresh achievement unlock state after learning/sticker progress changes
             achievementService.syncAchievementProgress(userId);
+
+            // pet bonus exp for completing level
+            int petBonusExp = stars * 5;
+            petService.addPetExp(userId, petBonusExp);
         } else {
             vo.setGold(0);
             vo.setExp(0);
@@ -647,6 +677,8 @@ public class LearnServiceImpl implements LearnService {
             Question q = questionMapper.selectById(wt.getQuestionId());
             if (q != null) {
                 map.put("questionContent", q.getQuestionContent());
+                map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
+                map.put("analysisText", RichContentUtil.toPlainText(q.getAnalysis()));
                 map.put("levelId", q.getCourseLevelId());
                 CourseLevel level = courseLevelMapper.selectById(q.getCourseLevelId());
                 if (level != null) {
@@ -686,5 +718,511 @@ public class LearnServiceImpl implements LearnService {
             stats.setLoginCount(1);
             dailyStatsMapper.insert(stats);
         }
+    }
+
+    // ===== 每日签到 =====
+    private static final int[] CHECKIN_GOLD  = {5, 10, 15, 20, 30, 40, 50};
+    private static final int[] CHECKIN_EXP   = {5, 5, 10, 10, 15, 20, 50};
+
+    @Override
+    @Transactional
+    public Map<String, Object> checkin(Long userId) {
+        LocalDate today = LocalDate.now();
+        DailyCheckin existing = dailyCheckinMapper.selectOne(
+            new LambdaQueryWrapper<DailyCheckin>()
+                .eq(DailyCheckin::getUserId, userId)
+                .eq(DailyCheckin::getCheckinDate, today));
+        if (existing != null) {
+            throw new BusinessException("今日已签到");
+        }
+        // Check yesterday to compute streak
+        DailyCheckin yesterday = dailyCheckinMapper.selectOne(
+            new LambdaQueryWrapper<DailyCheckin>()
+                .eq(DailyCheckin::getUserId, userId)
+                .eq(DailyCheckin::getCheckinDate, today.minusDays(1)));
+        int rewardDay = (yesterday != null) ? (yesterday.getRewardDay() % 7) + 1 : 1;
+        int gold = CHECKIN_GOLD[rewardDay - 1];
+        int exp = CHECKIN_EXP[rewardDay - 1];
+
+        DailyCheckin record = new DailyCheckin();
+        record.setUserId(userId);
+        record.setCheckinDate(today);
+        record.setRewardDay(rewardDay);
+        record.setGoldReward(gold);
+        record.setExpReward(exp);
+        dailyCheckinMapper.insert(record);
+
+        // Add rewards to user
+        User user = userMapper.selectById(userId);
+        if (user != null) {
+            user.setGold(user.getGold() + gold);
+            user.setTotalExp(user.getTotalExp() + exp);
+            userMapper.updateById(user);
+        }
+        Map<String, Object> result = new HashMap<>();
+        result.put("rewardDay", rewardDay);
+        result.put("goldReward", gold);
+        result.put("expReward", exp);
+        result.put("checkedIn", true);
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> getCheckinStatus(Long userId) {
+        LocalDate today = LocalDate.now();
+        DailyCheckin todayRecord = dailyCheckinMapper.selectOne(
+            new LambdaQueryWrapper<DailyCheckin>()
+                .eq(DailyCheckin::getUserId, userId)
+                .eq(DailyCheckin::getCheckinDate, today));
+        // Get recent 7 days for the streak display
+        List<DailyCheckin> recentList = dailyCheckinMapper.selectList(
+            new LambdaQueryWrapper<DailyCheckin>()
+                .eq(DailyCheckin::getUserId, userId)
+                .ge(DailyCheckin::getCheckinDate, today.minusDays(6))
+                .orderByAsc(DailyCheckin::getCheckinDate));
+        // Calculate current streak
+        int streak = 0;
+        LocalDate d = today;
+        if (todayRecord != null) {
+            streak = 1;
+            d = today.minusDays(1);
+        }
+        while (true) {
+            LocalDate checkDate = d;
+            boolean found = recentList.stream().anyMatch(r -> r.getCheckinDate().equals(checkDate));
+            if (found) { streak++; d = d.minusDays(1); } else break;
+        }
+        // Determine current reward day (what day the user would get if they check in now)
+        int nextRewardDay;
+        if (todayRecord != null) {
+            nextRewardDay = todayRecord.getRewardDay(); // already checked in
+        } else if (streak > 0) {
+            nextRewardDay = (streak % 7) + 1;
+        } else {
+            nextRewardDay = 1;
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("checkedIn", todayRecord != null);
+        result.put("streak", streak);
+        result.put("nextRewardDay", nextRewardDay);
+        result.put("nextGoldReward", CHECKIN_GOLD[nextRewardDay - 1]);
+        result.put("nextExpReward", CHECKIN_EXP[nextRewardDay - 1]);
+        result.put("today", today.toString());
+        // Build 7-day history: which days in the current cycle were checked in
+        List<Map<String, Object>> weekDays = new ArrayList<>();
+        int cycleStart = todayRecord != null ? todayRecord.getRewardDay() : nextRewardDay;
+        for (int i = 1; i <= 7; i++) {
+            LocalDate date = today.minusDays(cycleStart - i);
+            boolean done = recentList.stream().anyMatch(r -> r.getCheckinDate().equals(date));
+            Map<String, Object> day = new HashMap<>();
+            day.put("day", i);
+            day.put("gold", CHECKIN_GOLD[i - 1]);
+            day.put("exp", CHECKIN_EXP[i - 1]);
+            day.put("done", done);
+            day.put("isToday", date.equals(today));
+            weekDays.add(day);
+        }
+        result.put("weekDays", weekDays);
+        return result;
+    }
+
+    // ===== 宠物提示技能 =====
+    @Override
+    public Map<String, Object> getHint(Long userId, Long questionId) {
+        List<QuestionOption> options = questionOptionMapper.selectList(
+            new LambdaQueryWrapper<QuestionOption>()
+                .eq(QuestionOption::getQuestionId, questionId)
+                .orderByAsc(QuestionOption::getSortOrder)
+        );
+        if (options.size() < 3) {
+            throw new BusinessException("题目选项不足，无法使用提示");
+        }
+
+        // Find the correct option and one random wrong option to keep
+        QuestionOption correctOpt = options.stream()
+            .filter(o -> o.getIsCorrect() == 1).findFirst().orElse(null);
+        if (correctOpt == null) {
+            throw new BusinessException("题目没有正确答案");
+        }
+
+        List<QuestionOption> wrongOpts = options.stream()
+            .filter(o -> o.getIsCorrect() != 1).collect(Collectors.toList());
+        Random random = new Random();
+        QuestionOption keepWrong = wrongOpts.get(random.nextInt(wrongOpts.size()));
+
+        // Build "keep" labels — frontend will gray out the rest
+        List<String> keepLabels = List.of(correctOpt.getOptionLabel(), keepWrong.getOptionLabel());
+        Map<String, Object> result = new HashMap<>();
+        result.put("keepOptions", keepLabels);
+        result.put("message", "宠物帮你排除了2个错误选项！");
+        return result;
+    }
+
+    // ===== 薄弱点分析 =====
+    @Override
+    public List<Map<String, Object>> getWeakPoints(Long userId) {
+        List<WrongTopic> wrongTopics = wrongTopicMapper.selectList(
+            new LambdaQueryWrapper<WrongTopic>()
+                .eq(WrongTopic::getUserId, userId)
+                .eq(WrongTopic::getIsMastered, 0)
+        );
+
+        Map<Long, Long> questionToSubject = new HashMap<>();
+        Map<Long, Long> questionToLevel = new HashMap<>();
+        for (WrongTopic wt : wrongTopics) {
+            if (!questionToSubject.containsKey(wt.getQuestionId())) {
+                Question q = questionMapper.selectById(wt.getQuestionId());
+                if (q != null) {
+                    questionToLevel.put(wt.getQuestionId(), q.getCourseLevelId());
+                    CourseLevel level = courseLevelMapper.selectById(q.getCourseLevelId());
+                    if (level != null) {
+                        Course course = courseMapper.selectById(level.getCourseId());
+                        if (course != null) {
+                            questionToSubject.put(wt.getQuestionId(), course.getSubjectId());
+                        }
+                    }
+                }
+            }
+        }
+
+        Map<Long, Long> wrongCountBySubject = new HashMap<>();
+        for (WrongTopic wt : wrongTopics) {
+            Long subjectId = questionToSubject.get(wt.getQuestionId());
+            if (subjectId != null) {
+                wrongCountBySubject.merge(subjectId, 1L, Long::sum);
+            }
+        }
+
+        List<LearningRecord> recentRecords = learningRecordMapper.selectList(
+            new LambdaQueryWrapper<LearningRecord>()
+                .eq(LearningRecord::getUserId, userId)
+                .orderByDesc(LearningRecord::getCreateTime)
+                .last("LIMIT 20")
+        );
+
+        Map<Long, List<LearningRecord>> recordsBySubject = new HashMap<>();
+        for (LearningRecord r : recentRecords) {
+            CourseLevel level = courseLevelMapper.selectById(r.getCourseLevelId());
+            if (level != null) {
+                Course course = courseMapper.selectById(level.getCourseId());
+                if (course != null) {
+                    recordsBySubject.computeIfAbsent(course.getSubjectId(), k -> new ArrayList<>()).add(r);
+                }
+            }
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        List<Subject> allSubjects = subjectMapper.selectList(
+            new LambdaQueryWrapper<Subject>().eq(Subject::getStatus, 1)
+        );
+
+        for (Subject subject : allSubjects) {
+            long wrongCount = wrongCountBySubject.getOrDefault(subject.getId(), 0L);
+            List<LearningRecord> subjectRecords = recordsBySubject.getOrDefault(subject.getId(), List.of());
+
+            if (wrongCount == 0 && subjectRecords.isEmpty()) continue;
+
+            int totalQuestions = 0;
+            int totalCorrect = 0;
+            for (LearningRecord r : subjectRecords) {
+                CourseLevel level = courseLevelMapper.selectById(r.getCourseLevelId());
+                if (level != null) {
+                    totalQuestions += level.getTotalQuestions();
+                    totalCorrect += level.getTotalQuestions() - r.getWrongCount();
+                }
+            }
+            int accuracy = totalQuestions > 0 ? (totalCorrect * 100 / totalQuestions) : 100;
+
+            if (wrongCount == 0 && accuracy >= 80) continue;
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("subjectId", subject.getId());
+            map.put("subjectName", subject.getSubjectName());
+            map.put("subjectIcon", subject.getIconUrl());
+            map.put("wrongCount", wrongCount);
+            map.put("accuracy", accuracy);
+
+            Map<Long, Integer> wrongCountByLevel = new HashMap<>();
+            for (WrongTopic wt : wrongTopics) {
+                Long levelId = questionToLevel.get(wt.getQuestionId());
+                Long sId = questionToSubject.get(wt.getQuestionId());
+                if (levelId != null && sId != null && sId.equals(subject.getId())) {
+                    wrongCountByLevel.merge(levelId, 1, Integer::sum);
+                }
+            }
+
+            if (!wrongCountByLevel.isEmpty()) {
+                Long recommendedLevelId = wrongCountByLevel.entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .map(Map.Entry::getKey).orElse(null);
+                if (recommendedLevelId != null) {
+                    CourseLevel recLevel = courseLevelMapper.selectById(recommendedLevelId);
+                    if (recLevel != null) {
+                        Course recCourse = courseMapper.selectById(recLevel.getCourseId());
+                        map.put("recommendedCourseId", recLevel.getCourseId());
+                        map.put("recommendedCourseName", recCourse != null ? recCourse.getCourseName() : "");
+                        map.put("recommendedLevelId", recommendedLevelId);
+                        map.put("recommendedLevelName", recLevel.getLevelName());
+                    }
+                }
+            }
+
+            result.add(map);
+        }
+
+        result.sort((a, b) -> {
+            int scoreA = ((Number) a.getOrDefault("wrongCount", 0)).intValue() * 10
+                - ((Number) a.getOrDefault("accuracy", 100)).intValue() / 10;
+            int scoreB = ((Number) b.getOrDefault("wrongCount", 0)).intValue() * 10
+                - ((Number) b.getOrDefault("accuracy", 100)).intValue() / 10;
+            return scoreB - scoreA;
+        });
+
+        return result.stream().limit(3).collect(Collectors.toList());
+    }
+
+    // ===== 自适应题目 =====
+    @Override
+    public List<Map<String, Object>> getAdaptiveQuestions(Long userId, Long subjectId) {
+        List<Question> selectedQuestions = new ArrayList<>();
+        Random random = new Random();
+
+        List<WrongTopic> wrongTopics = wrongTopicMapper.selectList(
+            new LambdaQueryWrapper<WrongTopic>()
+                .eq(WrongTopic::getUserId, userId)
+                .eq(WrongTopic::getIsMastered, 0)
+        );
+
+        List<Long> wrongQuestionIds = new ArrayList<>();
+        for (WrongTopic wt : wrongTopics) {
+            if (subjectId != null) {
+                Question q = questionMapper.selectById(wt.getQuestionId());
+                if (q != null) {
+                    CourseLevel level = courseLevelMapper.selectById(q.getCourseLevelId());
+                    if (level != null) {
+                        Course course = courseMapper.selectById(level.getCourseId());
+                        if (course == null || !course.getSubjectId().equals(subjectId)) continue;
+                    }
+                }
+            }
+            wrongQuestionIds.add(wt.getQuestionId());
+        }
+
+        Collections.shuffle(wrongQuestionIds, random);
+        int wrongCount = Math.min(3, wrongQuestionIds.size());
+        for (int i = 0; i < wrongCount; i++) {
+            Question q = questionMapper.selectById(wrongQuestionIds.get(i));
+            if (q != null) selectedQuestions.add(q);
+        }
+
+        int recommendedDifficulty = 2;
+        if (!wrongTopics.isEmpty()) {
+            double avgWrongTimes = wrongTopics.stream()
+                .mapToInt(WrongTopic::getTimes).average().orElse(1);
+            if (avgWrongTimes >= 3) recommendedDifficulty = 1;
+            else if (avgWrongTimes <= 1) recommendedDifficulty = 3;
+        }
+
+        int needMore = 5 - selectedQuestions.size();
+        if (needMore > 0) {
+            Set<Long> existingIds = selectedQuestions.stream().map(Question::getId).collect(Collectors.toSet());
+            wrongQuestionIds.forEach(existingIds::add);
+
+            LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>()
+                .notIn(!existingIds.isEmpty(), Question::getId, existingIds)
+                .eq(recommendedDifficulty > 0, Question::getDifficulty, recommendedDifficulty);
+
+            if (subjectId != null || !selectedQuestions.isEmpty()) {
+                Set<Long> courseIds = new HashSet<>();
+                if (subjectId != null) {
+                    courseIds.addAll(courseMapper.selectList(
+                        new LambdaQueryWrapper<Course>().eq(Course::getSubjectId, subjectId)
+                    ).stream().map(Course::getId).collect(Collectors.toSet()));
+                } else {
+                    for (Question sq : selectedQuestions) {
+                        CourseLevel level = courseLevelMapper.selectById(sq.getCourseLevelId());
+                        if (level != null) courseIds.add(level.getCourseId());
+                    }
+                }
+                if (!courseIds.isEmpty()) {
+                    Set<Long> levelIds = courseLevelMapper.selectList(
+                        new LambdaQueryWrapper<CourseLevel>().in(CourseLevel::getCourseId, courseIds)
+                    ).stream().map(CourseLevel::getId).collect(Collectors.toSet());
+                    wrapper.in(Question::getCourseLevelId, levelIds);
+                }
+            }
+
+            wrapper.last("LIMIT " + needMore * 3);
+            List<Question> candidates = questionMapper.selectList(wrapper);
+            Collections.shuffle(candidates, random);
+            for (int i = 0; i < Math.min(needMore, candidates.size()); i++) {
+                selectedQuestions.add(candidates.get(i));
+            }
+        }
+
+        return QuestionRandomizer.shuffledCopy(selectedQuestions, random).stream().map(q -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", q.getId());
+            map.put("questionType", q.getQuestionType());
+            map.put("questionContent", q.getQuestionContent());
+            map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
+            map.put("questionSpeechText", RichContentUtil.toSpeechText(q.getQuestionContent()));
+            map.put("questionAudioUrl", RichContentUtil.toSpeechAudioUrl(q.getQuestionContent()));
+            map.put("difficulty", q.getDifficulty());
+            map.put("score", q.getScore());
+            map.put("timeLimit", q.getTimeLimit());
+            map.put("analysis", q.getAnalysis());
+
+            List<QuestionOption> options = questionOptionMapper.selectList(
+                new LambdaQueryWrapper<QuestionOption>()
+                    .eq(QuestionOption::getQuestionId, q.getId())
+                    .orderByAsc(QuestionOption::getSortOrder)
+            );
+            map.put("options", QuestionRandomizer.toRandomizedOptions(options, random));
+            return map;
+        }).collect(Collectors.toList());
+    }
+
+    // ===== 错题AI讲解 =====
+    @Override
+    public Map<String, Object> explainWrong(Long userId, Long questionId) {
+        Question question = questionMapper.selectById(questionId);
+        if (question == null) {
+            throw new BusinessException("题目不存在");
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("questionId", questionId);
+        result.put("analysisText", RichContentUtil.toPlainText(question.getAnalysis()));
+
+        // 获取选项文本
+        List<QuestionOption> options = questionOptionMapper.selectList(
+            new LambdaQueryWrapper<QuestionOption>()
+                .eq(QuestionOption::getQuestionId, questionId)
+                .orderByAsc(QuestionOption::getSortOrder)
+        );
+        List<String> optionTexts = options.stream()
+            .map(o -> RichContentUtil.toPlainText(o.getOptionContent()))
+            .collect(Collectors.toList());
+        result.put("options", optionTexts);
+
+        // 获取用户错题记录
+        WrongTopic wt = wrongTopicMapper.selectOne(
+            new LambdaQueryWrapper<WrongTopic>()
+                .eq(WrongTopic::getUserId, userId)
+                .eq(WrongTopic::getQuestionId, questionId)
+                .last("LIMIT 1")
+        );
+        String wrongAnswer = wt != null ? wt.getWrongAnswer() : "";
+        String correctAnswer = wt != null ? wt.getCorrectAnswer() : "";
+
+        // AI讲解
+        String aiAvailable = "false";
+        String aiExplanation = null;
+        if (aiService.isAvailable()) {
+            String questionText = RichContentUtil.toPlainText(question.getQuestionContent());
+            aiExplanation = aiService.explainWrongTopic(questionText, wrongAnswer, correctAnswer, optionTexts);
+            if (aiExplanation != null) {
+                aiAvailable = "true";
+            }
+        }
+        result.put("aiAvailable", aiAvailable);
+        result.put("aiExplanation", aiExplanation);
+        result.put("wrongAnswer", wrongAnswer);
+        result.put("correctAnswer", correctAnswer);
+
+        return result;
+    }
+
+    // ===== 错题重做 =====
+    @Override
+    @Transactional
+    public Map<String, Object> retryWrong(Long userId, Long questionId, String answer) {
+        Question question = questionMapper.selectById(questionId);
+        if (question == null) {
+            throw new BusinessException("题目不存在");
+        }
+
+        QuestionOption correctOption = questionOptionMapper.selectOne(
+            new LambdaQueryWrapper<QuestionOption>()
+                .eq(QuestionOption::getQuestionId, questionId)
+                .eq(QuestionOption::getIsCorrect, 1)
+                .last("LIMIT 1")
+        );
+
+        String correctAnswer = correctOption != null ? correctOption.getOptionLabel() : "";
+        boolean isCorrect = correctAnswer.equalsIgnoreCase(answer);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("correct", isCorrect);
+        result.put("correctAnswer", correctAnswer);
+        result.put("explanation", question.getAnalysis());
+        result.put("explanationText", RichContentUtil.toPlainText(question.getAnalysis()));
+
+        if (isCorrect) {
+            WrongTopic wt = wrongTopicMapper.selectOne(
+                new LambdaQueryWrapper<WrongTopic>()
+                    .eq(WrongTopic::getUserId, userId)
+                    .eq(WrongTopic::getQuestionId, questionId)
+            );
+            if (wt != null) {
+                wt.setIsMastered(1);
+                wrongTopicMapper.updateById(wt);
+            }
+            result.put("mastered", true);
+            result.put("gold", 3);
+            result.put("exp", 3);
+            petService.addPetExp(userId, 1);
+        } else {
+            saveWrongTopic(userId, questionId, answer, correctAnswer);
+            result.put("mastered", false);
+            result.put("gold", 0);
+            result.put("exp", 0);
+        }
+
+        return result;
+    }
+
+    // ===== 新手测评 =====
+    @Override
+    public List<Map<String, Object>> getAssessmentQuestions(Long userId) {
+        // 从各难度中随机抽取共10题：4简单 + 3中等 + 3困难
+        List<Question> selected = new ArrayList<>();
+        Random random = new Random();
+
+        int[] difficulties = {1, 2, 3};
+        int[] counts = {4, 3, 3};
+        for (int i = 0; i < difficulties.length; i++) {
+            List<Question> pool = questionMapper.selectList(
+                new LambdaQueryWrapper<Question>()
+                    .eq(Question::getDifficulty, difficulties[i])
+                    .eq(Question::getQuestionType, 1)
+            );
+            Collections.shuffle(pool, random);
+            selected.addAll(pool.subList(0, Math.min(counts[i], pool.size())));
+        }
+        Collections.shuffle(selected, random);
+
+        return selected.stream().map(q -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", q.getId());
+            map.put("questionType", q.getQuestionType());
+            map.put("questionContent", q.getQuestionContent());
+            map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
+            map.put("questionSpeechText", RichContentUtil.toSpeechText(q.getQuestionContent()));
+            map.put("questionAudioUrl", RichContentUtil.toSpeechAudioUrl(q.getQuestionContent()));
+            map.put("difficulty", q.getDifficulty());
+            map.put("score", q.getScore());
+            map.put("timeLimit", q.getTimeLimit());
+
+            List<QuestionOption> options = questionOptionMapper.selectList(
+                new LambdaQueryWrapper<QuestionOption>()
+                    .eq(QuestionOption::getQuestionId, q.getId())
+                    .orderByAsc(QuestionOption::getSortOrder)
+            );
+            map.put("options", QuestionRandomizer.toRandomizedOptions(options, random));
+            return map;
+        }).collect(Collectors.toList());
     }
 }

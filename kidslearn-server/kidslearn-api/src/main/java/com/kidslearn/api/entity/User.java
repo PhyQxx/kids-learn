@@ -21,4 +21,5 @@ public class User extends BaseEntity {
     private Integer gold;
     private Integer diamond;
     private LocalDateTime lastLoginTime;
+    private Integer onboardingStep;
 }

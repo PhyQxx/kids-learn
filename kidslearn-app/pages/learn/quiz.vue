@@ -34,6 +34,9 @@
           <view class="quiz-progress">
             <tn-line-progress :percent="(currentIndex + 1) / totalQuestions * 100" active-color="#4A90D9" :height="10" :show-percent="false" />
           </view>
+          <view class="hint-btn" :class="{ used: hintUsed }" @tap="useHint">
+            <text>{{ hintUsed ? '🐾 已用' : '🐾 提示' }}</text>
+          </view>
           <view class="timer" :class="{ warning: countdown <= 10 }">
             <text>{{ countdown }}s</text>
           </view>
@@ -41,12 +44,17 @@
 
         <!-- 题目区域 -->
         <view class="question-area">
-          <view class="question-speech" @tap="questionToSpeech(currentQuestion.text)">
+          <view class="question-speech" :class="{ speaking: isSpeaking }" @tap="questionToSpeech()">
             <text class="question-emoji">{{ currentQuestion.emoji }}</text>
-            <text class="speech-hint">点这里听题</text>
+            <view v-if="isSpeaking" class="sound-wave">
+              <view class="sound-bar" v-for="i in 4" :key="i"></view>
+            </view>
+            <text class="speech-hint">{{ isSpeaking ? '正在播放...' : '点这里听题' }}</text>
           </view>
           <text class="question-count">第 {{ currentIndex + 1 }} / {{ totalQuestions }} 题</text>
-          <text class="question-text text-title text-bold" @click="questionToSpeech(currentQuestion.text)">{{ currentQuestion.text }}</text>
+          <view class="question-text text-title text-bold" @tap="questionToSpeech()">
+            <rich-text :nodes="currentQuestion.nodes" />
+          </view>
 
           <!-- 选项网格 -->
           <view class="options-grid">
@@ -58,7 +66,7 @@
               @tap="selectOption(opt)"
             >
               <text class="option-label">{{ opt.label }}</text>
-              <text class="option-text">{{ opt.text }}</text>
+              <rich-text class="option-text" :nodes="opt.nodes" />
             </view>
           </view>
         </view>
@@ -66,7 +74,19 @@
 
       <!-- 结果屏 -->
       <view v-if="screen === 'result'" class="screen result-screen">
-        <text class="result-emoji animate-pop-in">{{ resultEmoji }}</text>
+        <!-- 3星宝箱动画 -->
+        <view v-if="showTreasureChest" class="treasure-chest animate-chest-open">
+          <text class="chest-emoji">🎁</text>
+          <view class="chest-coins" v-if="showRewardAnimation">
+            <text
+              v-for="p in coinParticles"
+              :key="'chest-' + p.id"
+              class="chest-coin animate-coin-scatter"
+              :style="p.style"
+            >🪙</text>
+          </view>
+        </view>
+        <text v-else class="result-emoji animate-pop-in">{{ resultEmoji }}</text>
 
         <!-- 星级 -->
         <view class="result-stars">
@@ -82,20 +102,23 @@
         <text class="result-subtitle text-light">{{ resultSubtitle }}</text>
 
         <!-- 奖励卡片 -->
-        <view class="reward-row">
+        <view class="reward-row" :class="{ 'animate-slide-up': showRewardAnimation }">
           <view class="reward-card card">
             <text class="reward-emoji">🪙</text>
-            <text class="reward-value text-md text-bold">+{{ rewards.gold }}</text>
+            <AnimatedNumber v-if="showRewardAnimation" :value="rewards.gold" :duration="800" prefix="+" class="reward-value text-md text-bold" />
+            <text v-else class="reward-value text-md text-bold">+{{ rewards.gold }}</text>
             <text class="reward-label text-xs text-light">金币</text>
           </view>
           <view class="reward-card card">
             <text class="reward-emoji">⚡</text>
-            <text class="reward-value text-md text-bold">+{{ rewards.exp }}</text>
+            <AnimatedNumber v-if="showRewardAnimation" :value="rewards.exp" :duration="800" prefix="+" class="reward-value text-md text-bold" />
+            <text v-else class="reward-value text-md text-bold">+{{ rewards.exp }}</text>
             <text class="reward-label text-xs text-light">经验</text>
           </view>
           <view class="reward-card card">
             <text class="reward-emoji">🎨</text>
-            <text class="reward-value text-md text-bold">x{{ rewards.stickers }}</text>
+            <AnimatedNumber v-if="showRewardAnimation" :value="rewards.stickers" :duration="600" prefix="x" class="reward-value text-md text-bold" />
+            <text v-else class="reward-value text-md text-bold">x{{ rewards.stickers }}</text>
             <text class="reward-label text-xs text-light">贴纸</text>
           </view>
         </view>
@@ -124,7 +147,23 @@
 
       <!-- 答对反馈 -->
       <view v-if="showCorrect" class="feedback-overlay correct-overlay">
-        <text class="feedback-text text-title text-bold text-white animate-pop-in">✅ 正确！</text>
+        <view class="feedback-content animate-pop-in">
+          <text class="feedback-text text-title text-bold text-white">✅ 正确！</text>
+          <text v-if="petExpGained" class="pet-exp-badge animate-pop-in">🐾 +{{ petExpGained }}</text>
+        </view>
+        <!-- 金币飞入粒子 -->
+        <view class="coin-particles" v-if="coinParticles.length">
+          <text
+            v-for="p in coinParticles"
+            :key="p.id"
+            class="coin-particle animate-coin-scatter"
+            :style="p.style"
+          >🪙</text>
+        </view>
+        <!-- 得分飞入 -->
+        <view class="score-fly-up positive">
+          <text>+{{ currentQuestion.score || 10 }}分</text>
+        </view>
       </view>
 
       <!-- 答错反馈 -->
@@ -138,13 +177,67 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
+import RewardOverlay from '@/components/common/RewardOverlay.vue'
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
-import { getQuestions, submitAnswer, completeLevel } from '@/api/learn'
+import { usePetStore } from '@/store/pet'
+import { getQuestions, submitAnswer, completeLevel, getHint } from '@/api/learn'
 import { getUserInfo } from '@/api/user'
+import { richContentToNodes, richContentToText } from '@/utils/richContent.mjs'
+import { resolveQuestionSpeech } from '@/utils/questionSpeech.mjs'
 
 const learnStore = useLearnStore()
 const userStore = useUserStore()
+const petStore = usePetStore()
+
+const FEEDBACK_AUDIO_BASE = 'https://ftp.pnkx.top:8/ftp/kids-learn/question/audio/seed/feedback'
+const CORRECT_FEEDBACKS = ['correct-1', 'correct-2', 'correct-3', 'correct-4', 'correct-5']
+const WRONG_FEEDBACKS = ['wrong-1', 'wrong-2', 'wrong-3']
+let lastCorrectIdx = -1
+let lastWrongIdx = -1
+let feedbackAudio = null
+
+function preloadFeedbackAudio() {
+  const preload = (name) => {
+    const a = uni.createInnerAudioContext()
+    a.src = `${FEEDBACK_AUDIO_BASE}/${name}.wav`
+    a.onCanplay(() => { a.destroy() })
+    a.onError(() => { a.destroy() })
+  }
+  CORRECT_FEEDBACKS.forEach(preload)
+  WRONG_FEEDBACKS.forEach(preload)
+}
+
+function stopFeedbackAudio() {
+  if (feedbackAudio) {
+    feedbackAudio.stop()
+    feedbackAudio.destroy()
+    feedbackAudio = null
+  }
+}
+
+function playFeedbackAudio(type) {
+  const list = type === 'correct' ? CORRECT_FEEDBACKS : WRONG_FEEDBACKS
+  let prevIdx = type === 'correct' ? lastCorrectIdx : lastWrongIdx
+  let idx = Math.floor(Math.random() * list.length)
+  if (idx === prevIdx && list.length > 1) idx = (idx + 1) % list.length
+  if (type === 'correct') lastCorrectIdx = idx; else lastWrongIdx = idx
+
+  stopFeedbackAudio()
+  feedbackAudio = uni.createInnerAudioContext()
+  feedbackAudio.src = `${FEEDBACK_AUDIO_BASE}/${list[idx]}.wav`
+  feedbackAudio.onEnded(() => { feedbackAudio.destroy(); feedbackAudio = null })
+  feedbackAudio.onError(() => { feedbackAudio.destroy(); feedbackAudio = null })
+  try {
+    const result = feedbackAudio.play()
+    if (result && typeof result.catch === 'function') {
+      result.catch(() => { feedbackAudio.destroy(); feedbackAudio = null })
+    }
+  } catch (e) {
+    feedbackAudio = null
+  }
+}
 
 const screen = ref('start')
 const currentIndex = ref(0)
@@ -163,48 +256,93 @@ const timeLimit = ref(60)
 
 // 题目列表，由后端加载
 const questions = ref([])
-// 科大讯飞语音播报插件（仅在 App 端初始化）
-let xfyunVoicePlugin = null
-// #ifdef APP-PLUS
-xfyunVoicePlugin = uni.requireNativePlugin('Tellsea-XfyunVoicePlugin');
-console.log('科大讯飞语音播报插件：' + JSON.stringify(xfyunVoicePlugin));
-// #endif
+let questionAudio = null
+const isSpeaking = ref(false)
 
-// 初始化插件
-const init = () => {
-  // #ifdef APP-PLUS
-  if (!xfyunVoicePlugin) return
-  // APPID：你在讯飞语音控制台创建应用的APPID，下面是测试APPID，需要更换成你自己的
-  xfyunVoicePlugin.init('ae085245', (e) => {
-    let res = JSON.parse(e);
-    console.log(res);
-    if (res.code == 200) {
-      uni.showToast({ title: res.msg, icon: 'none' });
-    } else {
-      uni.showToast({ title: res.msg, icon: 'none' });
+function stopQuestionSpeech() {
+  isSpeaking.value = false
+  if (questionAudio) {
+    questionAudio.stop()
+    questionAudio.destroy()
+    questionAudio = null
+  }
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel()
+  }
+}
+
+function fallbackToSpeech(text) {
+  if (!speakQuestionText(text)) {
+    uni.showToast({ title: '语音暂不可用', icon: 'none' })
+  }
+}
+
+function playQuestionAudio(audioUrl, fallbackText) {
+  if (!audioUrl || typeof uni.createInnerAudioContext !== 'function') {
+    return false
+  }
+  stopQuestionSpeech()
+  isSpeaking.value = true
+  questionAudio = uni.createInnerAudioContext()
+  questionAudio.src = audioUrl
+  questionAudio.onEnded(() => {
+    stopQuestionSpeech()
+  })
+  questionAudio.onError(() => {
+    stopQuestionSpeech()
+    fallbackToSpeech(fallbackText)
+  })
+  try {
+    const result = questionAudio.play()
+    if (result && typeof result.catch === 'function') {
+      result.catch(() => {
+        stopQuestionSpeech()
+        fallbackToSpeech(fallbackText)
+      })
     }
-  });
+  } catch (e) {
+    return false
+  }
+  return true
+}
+
+function speakQuestionText(text) {
+  // #ifdef H5
+  if (typeof window !== 'undefined' && window.speechSynthesis && window.SpeechSynthesisUtterance && text) {
+    window.speechSynthesis.cancel()
+    isSpeaking.value = true
+    const utterance = new window.SpeechSynthesisUtterance(text)
+    utterance.lang = 'zh-CN'
+    utterance.rate = 0.9
+    utterance.onend = () => { isSpeaking.value = false }
+    utterance.onerror = () => { isSpeaking.value = false }
+    window.speechSynthesis.speak(utterance)
+    return true
+  }
   // #endif
+  return false
 }
 
 // 语音播报
-const questionToSpeech = (text) => {
-  // #ifdef APP-PLUS
-  if (!xfyunVoicePlugin) return
-  xfyunVoicePlugin.textToSpeech(text + '测试播放', (e) => {
-    let res = JSON.parse(e);
-    console.log(res);
-    if (res.code == 200) {
-      uni.showToast({ title: res.msg, icon: 'none' });
-    } else {
-      uni.showToast({ title: res.msg, icon: 'none' });
-    }
-  });
-  // #endif
+function preloadQuestionAudio(question) {
+  if (!question || !question.questionAudioUrl) return
+  const audio = uni.createInnerAudioContext()
+  audio.src = question.questionAudioUrl
+  audio.onCanplay(() => { audio.destroy() })
+  audio.onError(() => { audio.destroy() })
+}
+
+const questionToSpeech = (question = currentQuestion.value) => {
+  const speech = resolveQuestionSpeech(question)
+  if (playQuestionAudio(speech.audioUrl, speech.text)) {
+    return
+  }
+  if (!speakQuestionText(speech.text)) {
+    uni.showToast({ title: '语音文件准备中', icon: 'none' })
+  }
 }
 
 onMounted(async () => {
-  init();
   const pages = getCurrentPages()
   const page = pages[pages.length - 1]
   levelId.value = page.$page?.options?.levelId || learnStore.currentLevel?.id
@@ -216,14 +354,27 @@ onMounted(async () => {
         questions.value = res.map(q => ({
           id: q.id,
           emoji: '❓',
-          text: q.questionContent,
+          questionContent: q.questionContent,
+          text: q.questionText || richContentToText(q.questionContent),
+          plainText: q.questionText || richContentToText(q.questionContent),
+          questionSpeechText: q.questionSpeechText || '',
+          questionAudioUrl: q.questionAudioUrl || '',
+          nodes: richContentToNodes(q.questionContent),
           score: q.score || 10,
           options: (q.options || []).map((opt, i) => ({
             label: opt.optionLabel || String.fromCharCode(65 + i),
-            text: opt.optionContent,
+            answerValue: opt.answerValue || opt.optionLabel || String.fromCharCode(65 + i),
+            text: opt.optionText || richContentToText(opt.optionContent),
+            speechText: opt.optionSpeechText || '',
+            audioUrl: opt.optionAudioUrl || '',
+            nodes: richContentToNodes(opt.optionContent),
             correct: false
           }))
         }))
+        // Preload first question audio
+        if (questions.value[0]) {
+          preloadQuestionAudio(questions.value[0])
+        }
       }
     } catch (e) {
       console.log('quiz: 使用模拟题目')
@@ -233,7 +384,7 @@ onMounted(async () => {
 
 const totalQuestions = computed(() => questions.value.length)
 const currentQuestion = computed(() => {
-  return questions.value[currentIndex.value] || { emoji: '❓', text: '', options: [] }
+  return questions.value[currentIndex.value] || { emoji: '❓', text: '', plainText: '', nodes: [], options: [] }
 })
 const correctCount = ref(0)
 const totalScore = ref(0)
@@ -244,6 +395,18 @@ const usedTime = ref(0)
 
 const rewards = ref({ gold: 15, exp: 10, stickers: 1 })
 
+// 奖励动画状态
+const showRewardAnimation = ref(false)
+const showTreasureChest = ref(false)
+const coinParticles = ref([])
+
+// 宠物提示技能
+const hintUsed = ref(false)
+const hintLoading = ref(false)
+const eliminatedOptions = ref(new Set()) // option labels to gray out
+const showPetExp = ref(false)
+const petExpGained = ref(0)
+
 const accuracy = computed(() =>
   totalQuestions.value ? Math.round(correctCount.value / totalQuestions.value * 100) : 0
 )
@@ -253,14 +416,65 @@ const resultTitle = computed(() => earnedStars.value >= 3 ? '太棒了！' : ear
 const resultSubtitle = computed(() => earnedStars.value >= 3 ? '你获得了满星评价！' : '再努力一下就能获得更多星星！')
 
 function getOptionClass(opt) {
+  if (eliminatedOptions.value.has(opt.label)) return 'eliminated'
   if (!selectedAnswer.value) return ''
   if (opt.correct) return 'correct'
   if (opt.label === selectedAnswer.value && !opt.correct) return 'wrong'
   return ''
 }
 
+async function useHint() {
+  if (hintUsed.value || hintLoading.value || selectedAnswer.value) return
+  const q = currentQuestion.value
+  if (!q.id) return
+  hintLoading.value = true
+  try {
+    const res = await getHint(q.id)
+    if (res?.keepOptions) {
+      // Eliminate options NOT in keepOptions
+      const keep = new Set(res.keepOptions)
+      q.options.forEach(opt => {
+        if (!keep.has(opt.label)) {
+          eliminatedOptions.value.add(opt.label)
+        }
+      })
+      hintUsed.value = true
+    }
+  } catch (e) {
+    uni.showToast({ title: e.message || '提示失败', icon: 'none' })
+  } finally {
+    hintLoading.value = false
+  }
+}
+
+function showPetExpGain(exp) {
+  petExpGained.value = exp
+  showPetExp.value = true
+  setTimeout(() => { showPetExp.value = false }, 1500)
+}
+
+// 生成答对时的金币飞入粒子
+function generateCoinParticles(count = 6) {
+  const particles = []
+  for (let i = 0; i < count; i++) {
+    const angle = (360 / count) * i
+    const tx = Math.cos(angle * Math.PI / 180) * (40 + Math.random() * 30)
+    const ty = Math.sin(angle * Math.PI / 180) * (40 + Math.random() * 30) - 20
+    particles.push({
+      id: i,
+      style: {
+        '--coin-tx': `${tx}px`,
+        '--coin-ty': `${ty}px`,
+        animationDelay: `${Math.random() * 0.3}s`
+      }
+    })
+  }
+  coinParticles.value = particles
+}
+
 function selectOption(opt) {
   if (selectedAnswer.value) return
+  stopQuestionSpeech()
   selectedAnswer.value = opt.label
   const q = currentQuestion.value
   const answerTime = Math.round((Date.now() - (questionStartTime.value || startTime.value)) / 1000)
@@ -270,7 +484,7 @@ function selectOption(opt) {
     submitAnswer({
       levelId: levelId.value,
       questionId: q.id,
-      answer: opt.label,
+      answer: opt.answerValue || opt.label,
       answerTime
     }).then(res => {
       const isCorrect = res?.correct || false
@@ -278,17 +492,22 @@ function selectOption(opt) {
         correctCount.value++
         totalScore.value += (q.score || 10)
         showCorrect.value = true
+        playFeedbackAudio('correct')
+        generateCoinParticles(6)
+        if (res?.petExp) showPetExpGain(res.petExp)
       } else {
         showWrong.value = true
+        playFeedbackAudio('wrong')
       }
       setTimeout(() => {
         showCorrect.value = false
         showWrong.value = false
         nextQuestion()
-      }, isCorrect ? 800 : 1000)
+      }, isCorrect ? 2500 : 3000)
     }).catch(() => {
       showWrong.value = true
-      setTimeout(() => { showWrong.value = false; nextQuestion() }, 1000)
+      playFeedbackAudio('wrong')
+      setTimeout(() => { showWrong.value = false; nextQuestion() }, 3000)
     })
   } else {
     // 无 levelId 时随机判定（fallback mock 题目）
@@ -299,8 +518,12 @@ function selectOption(opt) {
 
 function nextQuestion() {
   selectedAnswer.value = ''
+  eliminatedOptions.value = new Set()
   if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value++
+    questionStartTime.value = Date.now()
+    preloadQuestionAudio(questions.value[currentIndex.value])
+    setTimeout(() => questionToSpeech(), 250)
   } else {
     finishQuiz()
   }
@@ -311,6 +534,8 @@ function startQuiz() {
   screen.value = 'quiz'
   startTime.value = Date.now()
   questionStartTime.value = Date.now()
+  preloadFeedbackAudio()
+  setTimeout(() => questionToSpeech(), 250)
   countdown.value = totalTime.value
   timer = setInterval(() => {
     countdown.value--
@@ -322,6 +547,7 @@ function startQuiz() {
 
 async function finishQuiz() {
   clearInterval(timer)
+  stopQuestionSpeech()
   usedTime.value = Math.round((Date.now() - startTime.value) / 1000)
 
   // Calculate stars
@@ -372,10 +598,21 @@ async function finishQuiz() {
   }
 
   screen.value = 'result'
+
+  // 触发奖励动画
+  showTreasureChest.value = earnedStars.value >= 3
+  setTimeout(() => {
+    showRewardAnimation.value = true
+    if (earnedStars.value >= 3) {
+      generateCoinParticles(12)
+    }
+  }, 600)
 }
 
 function exitQuiz() {
   clearInterval(timer)
+  stopQuestionSpeech()
+  stopFeedbackAudio()
   uni.navigateBack()
 }
 
@@ -389,6 +626,8 @@ function goBack() {
 
 onUnmounted(() => {
   clearInterval(timer)
+  stopQuestionSpeech()
+  stopFeedbackAudio()
 })
 </script>
 
@@ -476,6 +715,31 @@ onUnmounted(() => {
 
 .quiz-progress { flex: 1; }
 
+.hint-btn {
+  min-width: 60px;
+  min-height: 40px;
+  padding: 6px 12px;
+  border-radius: 100px;
+  background: #FFF0E8;
+  color: #FF8C42;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+
+  &:active { transform: scale(0.95); }
+
+  &.used {
+    background: #F0F0F0;
+    color: #BBB;
+    pointer-events: none;
+  }
+}
+
 .timer {
   background: #F0F7FF;
   color: $learn-blue;
@@ -511,8 +775,37 @@ onUnmounted(() => {
   padding: 10px 18px;
   border-radius: $radius-xl;
   background: #F0F7FF;
+  transition: background 0.3s ease;
+
+  &.speaking {
+    background: #DBEAFE;
+  }
 }
 .question-emoji { font-size: 74px; }
+
+.sound-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 28px;
+}
+.sound-bar {
+  width: 4px;
+  border-radius: 2px;
+  background: $learn-blue;
+  animation: soundPulse 0.6s ease-in-out infinite alternate;
+
+  &:nth-child(1) { height: 8px; animation-delay: 0s; }
+  &:nth-child(2) { height: 16px; animation-delay: 0.15s; }
+  &:nth-child(3) { height: 22px; animation-delay: 0.3s; }
+  &:nth-child(4) { height: 12px; animation-delay: 0.45s; }
+}
+
+@keyframes soundPulse {
+  0% { transform: scaleY(0.4); opacity: 0.5; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
 .speech-hint { font-size: 13px; color: $learn-blue; font-weight: 800; }
 .question-count {
   min-height: 28px;
@@ -556,6 +849,13 @@ onUnmounted(() => {
     border-color: $error;
     animation: shake 0.3s ease;
   }
+
+  &.eliminated {
+    opacity: 0.3;
+    pointer-events: none;
+    background: #F5F5F5;
+    border-color: #E0E0E0;
+  }
 }
 
 .option-label {
@@ -574,6 +874,8 @@ onUnmounted(() => {
 }
 
 .option-text {
+  flex: 1;
+  display: block;
   font-size: 18px;
   font-weight: 700;
   color: $text;
@@ -655,12 +957,92 @@ onUnmounted(() => {
 
 .feedback-text { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); }
 
+.feedback-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.pet-exp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.3);
+  color: #FFD700;
+  font-size: 18px;
+  font-weight: 800;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+/* ===== 金币飞入粒子 ===== */
+.coin-particles {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.coin-particle {
+  position: absolute;
+  font-size: 20px;
+}
+
+/* ===== 得分飞入 ===== */
+.score-fly-up {
+  position: absolute;
+  bottom: 30%;
+  font-size: 28px;
+  font-weight: 800;
+  animation: score-fly-up 1.2s ease-out forwards;
+
+  &.positive {
+    color: $gold;
+    text-shadow: 0 2px 10px rgba(255, 215, 0, 0.5);
+  }
+}
+
+@keyframes score-fly-up {
+  0% { transform: translateY(0) scale(0.5); opacity: 0; }
+  30% { transform: translateY(-30px) scale(1.2); opacity: 1; }
+  100% { transform: translateY(-100px) scale(1); opacity: 0; }
+}
+
+/* ===== 宝箱动画 ===== */
+.treasure-chest {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chest-emoji {
+  font-size: 90px;
+  display: block;
+}
+
+.chest-coins {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.chest-coin {
+  position: absolute;
+  font-size: 22px;
+}
+
 @media (max-width: 640px) {
   .screen { padding: 16px; }
   .start-emoji { font-size: 76px; }
   .info-row { gap: 8px; }
   .info-item { padding: 8px 10px; }
   .quiz-screen { padding-top: 10px; }
+  .hint-btn { min-width: 48px; font-size: 12px; padding: 4px 8px; }
   .question-emoji { font-size: 58px; }
   .question-text { font-size: 22px; }
   .options-grid { grid-template-columns: 1fr; gap: 10px; }

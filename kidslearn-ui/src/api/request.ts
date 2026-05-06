@@ -42,6 +42,14 @@ export function getQuestionList(params: any) { return get('/admin/question/list'
 export function saveQuestion(data: any) { return post('/admin/question/save', data) }
 export function deleteQuestion(id: number) { return del(`/admin/question/${id}`) }
 export function getQuestionOptions(id: number) { return get(`/admin/question/${id}/options`) }
+export function generateQuestionAudio(id: number, data: { speechText?: string }) {
+  return post(`/admin/question/${id}/audio`, data)
+}
+export function uploadQuestionImage(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return post('/admin/file/upload-image', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
 
 // ==================== 宠物管理 ====================
 export function getPetList(params: any) { return get('/admin/pet/list', params) }

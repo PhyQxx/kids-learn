@@ -1,80 +1,86 @@
-<template>
+﻿<template>
   <view class="achievement-content">
-    <!-- Loading -->
     <view v-if="loading" class="loading-state">
       <tn-loading size="60" />
       <text class="text-sm text-light" style="margin-top: 12px;">加载中...</text>
     </view>
 
     <template v-else>
-    <!-- 成就概览 -->
-    <view class="summary-card">
-      <view class="summary-info">
-        <text class="summary-emoji">🏅</text>
-        <view>
-          <text class="text-lg text-bold text-white">成就中心</text>
-          <text class="text-sm text-white" style="opacity: 0.8;">已解锁 {{ completedCount }}/{{ totalCount }} 个成就</text>
+      <view class="summary-card">
+        <view class="summary-info">
+          <text class="summary-emoji">🏅</text>
+          <view>
+            <text class="text-lg text-bold text-white">成就中心</text>
+            <text class="text-sm text-white" style="opacity: 0.8;">已解锁 {{ completedCount }}/{{ totalCount }} 个成就</text>
+          </view>
+        </view>
+        <view class="summary-right">
+          <text class="text-sm text-white" style="opacity: 0.8;">当前称号</text>
+          <view class="title-badge">
+            <text class="text-sm text-bold text-white">{{ currentTitle }}</text>
+          </view>
         </view>
       </view>
-      <view class="summary-right">
-        <text class="text-sm text-white" style="opacity: 0.8;">当前称号</text>
-        <view class="title-badge">
-          <text class="text-sm text-bold text-white">{{ currentTitle }}</text>
-        </view>
-      </view>
-    </view>
 
-    <!-- 分类筛选 -->
-    <tn-tabs v-model="activeTab" active-color="#FF6B6B">
-      <tn-tabs-item v-for="tab in tabItems" :key="tab.label" :title="tab.label" />
-    </tn-tabs>
-
-    <!-- 成就网格 -->
-    <view class="achieve-grid stagger-spring">
-      <view
-        v-for="ach in achievements"
-        :key="ach.id"
-        class="achieve-card card"
-        :class="ach.status"
-      >
-        <view class="achieve-icon-wrap" :class="ach.rarity">
-          <text class="achieve-emoji">{{ ach.icon }}</text>
-        </view>
-        <view class="achieve-info">
-          <text class="text-sm text-bold">{{ ach.name }}</text>
-          <text class="text-xs text-light">{{ ach.desc }}</text>
-          <!-- 进度 -->
-          <view v-if="ach.status === 'progress'" class="achieve-progress">
-            <tn-line-progress :percent="ach.percent" :height="10" :show-percent="false" style="flex: 1;" />
-            <text class="text-xs text-light">{{ ach.current }}/{{ ach.target }}</text>
-          </view>
-          <!-- 已完成 -->
-          <view v-if="ach.status === 'done'" class="done-badge">
-            <text class="text-xs text-success">✅ 已达成</text>
-          </view>
-          <!-- 锁定 -->
-          <view v-if="ach.status === 'locked'" class="locked-badge">
-            <text class="text-xs text-light">🔒 未解锁</text>
-          </view>
-        </view>
+      <view class="action-row">
         <tn-button
-          v-if="ach.status === 'done' && !ach.claimed"
           type="primary"
           size="sm"
           shape="round"
-          @click="claimReward(ach)"
-        >领取</tn-button>
+          :disabled="claimingAll || claimableCount === 0"
+          :loading="claimingAll"
+          @click="claimAllRewards"
+        >{{ claimAllLabel }}</tn-button>
       </view>
-    </view>
+
+      <tn-tabs v-model="activeTab" active-color="#FF6B6B">
+        <tn-tabs-item v-for="tab in tabItems" :key="tab.label" :title="tab.label" />
+      </tn-tabs>
+
+      <view class="achieve-grid stagger-spring">
+        <view
+          v-for="ach in achievements"
+          :key="ach.id"
+          class="achieve-card card"
+          :class="ach.status"
+        >
+          <view class="achieve-icon-wrap" :class="ach.rarity">
+            <text class="achieve-emoji">{{ ach.icon }}</text>
+          </view>
+          <view class="achieve-info">
+            <text class="text-sm text-bold">{{ ach.name }}</text>
+            <text class="text-xs text-light">{{ ach.desc }}</text>
+            <view v-if="ach.status === 'progress'" class="achieve-progress">
+              <tn-line-progress :percent="ach.percent" :height="10" :show-percent="false" style="flex: 1;" />
+              <text class="text-xs text-light">{{ ach.current }}/{{ ach.target }}</text>
+            </view>
+            <view v-if="ach.status === 'done'" class="done-badge">
+              <text class="text-xs text-success">✓ 已达成</text>
+            </view>
+            <view v-if="ach.status === 'locked'" class="locked-badge">
+              <text class="text-xs text-light">🔒 未解锁</text>
+            </view>
+          </view>
+          <tn-button
+            v-if="ach.status === 'done' && !ach.claimed"
+            type="primary"
+            size="sm"
+            shape="round"
+            @click="claimReward(ach)"
+          >领取</tn-button>
+        </view>
+      </view>
     </template>
   </view>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { getAchievements, getMyProgress, receiveReward } from '@/api/achievement'
+import { claimAchievementReward, claimAllAchievementRewards } from '@/utils/achievementClaim.mjs'
 
 const loading = ref(true)
+const claimingAll = ref(false)
 const activeTab = ref(0)
 const tabItems = ref([
   { label: '全部' },
@@ -98,6 +104,14 @@ const achievements = ref([
   { id: 8, name: '全国冠军', desc: '全国排行榜第一', icon: '🏆', status: 'locked', rarity: 'legendary' }
 ])
 
+const claimableCount = computed(() =>
+  achievements.value.filter(ach => ach.status === 'done' && !ach.claimed).length
+)
+const claimAllLabel = computed(() => {
+  if (claimingAll.value) return '领取中...'
+  return claimableCount.value > 0 ? `一键领取（${claimableCount.value}）` : '一键领取'
+})
+
 function applyMockData() {
   completedCount.value = 12
   totalCount.value = 36
@@ -106,7 +120,6 @@ function applyMockData() {
 
 async function loadData() {
   loading.value = true
-  // achieveType 字典: 1=学习, 2=收集, 3=社交
   const typeMap = [null, 1, 2, 3]
   try {
     const results = await Promise.allSettled([
@@ -114,7 +127,6 @@ async function loadData() {
       getMyProgress()
     ])
 
-    // 成就列表
     if (results[0].status === 'fulfilled' && results[0].value) {
       const list = results[0].value
       if (Array.isArray(list) && list.length > 0) {
@@ -122,19 +134,19 @@ async function loadData() {
           const targetValue = getAchievementTarget(a)
           const currentValue = Number(a.currentValue || 0)
           return {
-          id: a.id,
-          name: a.achieveName,
-          desc: a.achieveDesc,
-          icon: a.achieveIcon || '🏅',
-          achieveType: a.achieveType,
-          isTiered: a.isTiered,
-          tiers: a.tiers || [],
-          status: a.isCompleted ? 'done' : (currentValue > 0 ? 'progress' : 'locked'),
-          rarity: ['bronze', 'silver', 'gold', 'legendary'][(a.achieveType || 1) - 1] || 'bronze',
-          claimed: a.isReceived || false,
-          percent: targetValue > 0 ? Math.min(100, Math.round(currentValue / targetValue * 100)) : 0,
-          current: currentValue,
-          target: targetValue
+            id: a.id,
+            name: a.achieveName,
+            desc: a.achieveDesc,
+            icon: a.achieveIcon || '🏅',
+            achieveType: a.achieveType,
+            isTiered: a.isTiered,
+            tiers: a.tiers || [],
+            status: a.isCompleted ? 'done' : (currentValue > 0 ? 'progress' : 'locked'),
+            rarity: ['bronze', 'silver', 'gold', 'legendary'][(a.achieveType || 1) - 1] || 'bronze',
+            claimed: a.isReceived || false,
+            percent: targetValue > 0 ? Math.min(100, Math.round(currentValue / targetValue * 100)) : 0,
+            current: currentValue,
+            target: targetValue
           }
         })
         totalCount.value = list.length
@@ -142,7 +154,6 @@ async function loadData() {
       }
     }
 
-    // 进度概览
     if (results[1].status === 'fulfilled' && results[1].value) {
       const prog = results[1].value
       completedCount.value = prog.completedAchievements || completedCount.value
@@ -183,6 +194,7 @@ function getAchievementTarget(a) {
         condition.starCount ||
         condition.stickerCount ||
         condition.subjectCount ||
+        condition.days ||
         0
       )
       if (tierTarget > 0) return tierTarget
@@ -195,13 +207,17 @@ function getAchievementTarget(a) {
 }
 
 function claimReward(ach) {
-  receiveReward(ach.id).then(() => {
-    ach.claimed = true
-    uni.showToast({ title: '奖励已领取！', icon: 'success' })
-  }).catch(() => {
-    ach.claimed = true
-    uni.showToast({ title: '奖励已领取！', icon: 'success' })
-  })
+  claimAchievementReward(receiveReward, ach).catch(() => {})
+}
+
+async function claimAllRewards() {
+  if (claimingAll.value) return
+  claimingAll.value = true
+  try {
+    await claimAllAchievementRewards(receiveReward, achievements.value)
+  } finally {
+    claimingAll.value = false
+  }
 }
 </script>
 
@@ -222,7 +238,6 @@ function claimReward(ach) {
   padding: 80px 0;
 }
 
-/* 概览 */
 .summary-card {
   background: linear-gradient(135deg, #7B68EE, #9B8BFF);
   border-radius: $radius-md;
@@ -254,7 +269,11 @@ function claimReward(ach) {
   border-radius: 100px;
 }
 
-/* 成就网格 */
+.action-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .achieve-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

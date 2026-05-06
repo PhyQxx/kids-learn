@@ -32,6 +32,7 @@
 <script>
 import { login } from '@/api/auth'
 import { useUserStore } from '@/store/user'
+import { useRealtimeStore } from '@/store/realtime'
 
 export default {
   data() {
@@ -54,8 +55,14 @@ export default {
         if (res.userInfo) {
           userStore.setUserInfo(res.userInfo)
         }
+        useRealtimeStore().connect()
         uni.hideLoading()
-        uni.reLaunch({ url: '/pages/main/index' })
+        const step = res.userInfo?.onboardingStep ?? 0
+        if (step > 0 && step < 3) {
+          uni.reLaunch({ url: '/pages/onboarding/index' })
+        } else {
+          uni.reLaunch({ url: '/pages/main/index' })
+        }
       } catch (e) {
         uni.hideLoading()
         this.loginError = e?.msg || '登录失败，请检查账号密码'

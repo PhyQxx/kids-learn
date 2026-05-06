@@ -111,6 +111,9 @@ const collapsed = computed(() => userStore.sidebarCollapsed)
 const loadedTabs = reactive(new Set(['home']))
 const showGradePopup = ref(false)
 
+// 向子组件暴露年级弹窗状态，避免签到弹窗同时弹出
+provide('gradePopupVisible', showGradePopup)
+
 // 标记首次加载
 function switchTab(key) {
   if (key === 'vip') {

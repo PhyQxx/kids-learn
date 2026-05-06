@@ -100,4 +100,67 @@ public class LearnController {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(learnService.getWrongTopics(userId));
     }
+
+    @Operation(summary = "每日签到")
+    @PostMapping("/checkin")
+    public R<Map<String, Object>> checkin(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.checkin(userId));
+    }
+
+    @Operation(summary = "获取签到状态")
+    @GetMapping("/checkin/status")
+    public R<Map<String, Object>> getCheckinStatus(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getCheckinStatus(userId));
+    }
+
+    @Operation(summary = "宠物提示技能")
+    @PostMapping("/hint")
+    public R<Map<String, Object>> getHint(HttpServletRequest request, @RequestParam Long questionId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getHint(userId, questionId));
+    }
+
+    @Operation(summary = "获取薄弱点推荐")
+    @GetMapping("/weak-points")
+    public R<List<Map<String, Object>>> getWeakPoints(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getWeakPoints(userId));
+    }
+
+    @Operation(summary = "获取自适应题目")
+    @GetMapping("/adaptive-questions")
+    public R<List<Map<String, Object>>> getAdaptiveQuestions(
+            HttpServletRequest request,
+            @RequestParam(required = false) Long subjectId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getAdaptiveQuestions(userId, subjectId));
+    }
+
+    @Operation(summary = "错题重做")
+    @PostMapping("/retry-wrong")
+    public R<Map<String, Object>> retryWrong(
+            HttpServletRequest request,
+            @RequestParam Long questionId,
+            @RequestParam String answer) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.retryWrong(userId, questionId, answer));
+    }
+
+    @Operation(summary = "错题AI讲解")
+    @GetMapping("/explain-wrong")
+    public R<Map<String, Object>> explainWrong(
+            HttpServletRequest request,
+            @RequestParam Long questionId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.explainWrong(userId, questionId));
+    }
+
+    @Operation(summary = "获取新手测评题目")
+    @GetMapping("/assessment")
+    public R<List<Map<String, Object>>> getAssessmentQuestions(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getAssessmentQuestions(userId));
+    }
 }

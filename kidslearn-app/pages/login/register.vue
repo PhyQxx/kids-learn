@@ -87,9 +87,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { register as registerApi } from '@/api/auth'
 import { useUserStore } from '@/store/user'
+import { useRealtimeStore } from '@/store/realtime'
 
 const nickname = ref('')
 const phone = ref('')
@@ -115,29 +116,12 @@ function onGradeChange(e) {
   selectedGradeLabel.value = gradeOptions[idx].label
 }
 
-onMounted(() => {})
-
-async function doRegister() {
-  if (!username.value) { errorMsg.value = '请输入账号'; return }
-  if (!nickname.value) { errorMsg.value = '请输入昵称'; return }
-  if (!phone.value) { errorMsg.value = '请输入手机号'; return }
-  if (!code.value) { errorMsg.value = '请输入验证码'; return }
-  if (!password.value || password.value.length < 6) { errorMsg.value = '密码至少6位'; return }
-
-  errorMsg.value = ''
-  uni.showLoading({ title: '注册中...' })
-  try {
-    const res = await registerApi({
-      username: username.value,
-      password: password.value,
-      nickname: nickname.value,
-      loginType: 1,
-      phone: phone.value,
-      gradeLevel: selectedGrade.value
-    })
-
 function sendCode() {
-  if (codeSent.value || !phone.value) return
+  if (codeSent.value) return
+  if (!phone.value) {
+    errorMsg.value = '请输入手机号'
+    return
+  }
   codeSent.value = true
   const timer = setInterval(() => {
     countdown.value--
@@ -165,17 +149,18 @@ async function doRegister() {
       nickname: nickname.value,
       loginType: 1,
       phone: phone.value,
-      learnAgeGroup: selectedAge.value
+      gradeLevel: selectedGrade.value
     })
     const userStore = useUserStore()
     userStore.setToken(res.accessToken)
     if (res.userInfo) {
       userStore.setUserInfo(res.userInfo)
     }
+    useRealtimeStore().connect()
     uni.hideLoading()
     uni.showToast({ title: '注册成功！', icon: 'success' })
     setTimeout(() => {
-      uni.reLaunch({ url: '/pages/main/index' })
+      uni.reLaunch({ url: '/pages/onboarding/index' })
     }, 1500)
   } catch (e) {
     uni.hideLoading()

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -32,6 +33,7 @@ public class AchievementServiceImpl implements AchievementService {
     private final LearningRecordMapper learningRecordMapper;
     private final CourseLevelMapper courseLevelMapper;
     private final CourseMapper courseMapper;
+    private final SubjectMapper subjectMapper;
 
     @Override
     public List<Map<String, Object>> getAchievements(Long userId, Integer type) {
@@ -76,6 +78,7 @@ public class AchievementServiceImpl implements AchievementService {
                     tm.put("tierLevel", t.getTierLevel());
                     tm.put("tierName", t.getTierName());
                     tm.put("conditionJson", t.getConditionJson());
+                    tm.put("rewardJson", t.getRewardJson());
                     return tm;
                 }).collect(Collectors.toList());
                 map.put("tiers", tierList);
@@ -130,35 +133,28 @@ public class AchievementServiceImpl implements AchievementService {
         AchievementTier tier = achievementTierMapper.selectOne(
             new LambdaQueryWrapper<AchievementTier>()
                 .eq(AchievementTier::getAchieveId, achievementId)
-                .eq(AchievementTier::getTierLevel, 1) // simplified: just first tier
+                .eq(AchievementTier::getTierLevel, resolveAchievedTierLevel(achievementId, ua.getCurrentValue()))
                 .last("LIMIT 1")
         );
 
-        int goldReward = 50; // default
-        if (tier != null && tier.getRewardJson() != null) {
-            // parse reward json for gold amount (simplified)
-            if (tier.getRewardJson().contains("\"value\":100")) goldReward = 100;
-            else if (tier.getRewardJson().contains("\"value\":50")) goldReward = 50;
+        List<AchievementRuleEngine.RewardItem> rewards = AchievementRuleEngine.resolveRewardItems(
+            tier != null ? tier.getRewardJson() : null
+        );
+        if (rewards.isEmpty()) {
+            rewards = List.of(new AchievementRuleEngine.RewardItem("GOLD", null, 50));
         }
 
         User user = userMapper.selectById(userId);
-        user.setGold(user.getGold() + goldReward);
-        userMapper.updateById(user);
+        if (user == null) {
+            throw new BusinessException("用户不存在");
+        }
+        Map<String, Object> rewardSummary = applyAchievementRewards(user, achievementId, rewards);
 
         ua.setIsReceived(1);
         userAchievementMapper.updateById(ua);
 
-        RewardLog log = new RewardLog();
-        log.setUserId(userId);
-        log.setRewardType(1);
-        log.setQuantity(goldReward);
-        log.setSourceType("ACHIEVEMENT");
-        log.setSourceId(achievementId);
-        log.setDescription("成就奖励");
-        rewardLogMapper.insert(log);
-
         Map<String, Object> result = new HashMap<>();
-        result.put("gold", goldReward);
+        result.putAll(rewardSummary);
         result.put("message", "奖励领取成功！");
         return result;
     }
@@ -215,6 +211,15 @@ public class AchievementServiceImpl implements AchievementService {
     @Override
     @Transactional
     public Map<String, Object> activateTitle(Long userId, Long titleId) {
+        UserTitle target = userTitleMapper.selectOne(
+            new LambdaQueryWrapper<UserTitle>()
+                .eq(UserTitle::getUserId, userId)
+                .eq(UserTitle::getTitleId, titleId)
+        );
+        if (target == null) {
+            throw new BusinessException("称号未解锁");
+        }
+
         // deactivate all
         List<UserTitle> all = userTitleMapper.selectList(
             new LambdaQueryWrapper<UserTitle>().eq(UserTitle::getUserId, userId)
@@ -224,15 +229,8 @@ public class AchievementServiceImpl implements AchievementService {
             userTitleMapper.updateById(ut);
         }
         // activate target
-        UserTitle target = userTitleMapper.selectOne(
-            new LambdaQueryWrapper<UserTitle>()
-                .eq(UserTitle::getUserId, userId)
-                .eq(UserTitle::getTitleId, titleId)
-        );
-        if (target != null) {
-            target.setIsActive(1);
-            userTitleMapper.updateById(target);
-        }
+        target.setIsActive(1);
+        userTitleMapper.updateById(target);
         Map<String, Object> result = new HashMap<>();
         result.put("message", "称号佩戴成功！");
         return result;
@@ -259,10 +257,24 @@ public class AchievementServiceImpl implements AchievementService {
 
         int completedLevels = bestStarsByLevel.size();
         int threeStarLevels = (int) bestStarsByLevel.values().stream().filter(stars -> stars >= 3).count();
+        ScoreProgress scoreProgress = countScoreProgress(passedRecords);
         int learnedSubjects = countLearnedSubjects(bestStarsByLevel.keySet());
+        int streakDays = countCurrentStreakDays(passedRecords);
         int collectedStickers = Math.toIntExact(userStickerMapper.selectCount(
             new LambdaQueryWrapper<UserSticker>().eq(UserSticker::getUserId, userId)
         ));
+        int bestRank = resolveTotalExpRank(userId);
+        AchievementRuleEngine.ProgressSnapshot snapshot = new AchievementRuleEngine.ProgressSnapshot(
+            completedLevels,
+            threeStarLevels,
+            scoreProgress.perfectLevels(),
+            scoreProgress.mathCompletedLevels(),
+            scoreProgress.mathPerfectLevels(),
+            learnedSubjects,
+            collectedStickers,
+            streakDays,
+            bestRank
+        );
 
         for (Achievement achievement : achievements) {
             AchievementTier tier = achievementTierMapper.selectOne(
@@ -271,8 +283,13 @@ public class AchievementServiceImpl implements AchievementService {
                     .orderByAsc(AchievementTier::getTierLevel)
                     .last("LIMIT 1")
             );
-            int target = resolveAchievementTarget(achievement, tier);
-            int current = resolveAchievementCurrent(achievement, completedLevels, threeStarLevels, learnedSubjects, collectedStickers);
+            String conditionJson = tier != null ? tier.getConditionJson() : null;
+            int target = AchievementRuleEngine.resolveTarget(
+                conditionJson, achievement.getAchieveCode(), achievement.getAchieveName()
+            );
+            int current = AchievementRuleEngine.resolveCurrent(
+                conditionJson, achievement.getAchieveCode(), achievement.getAchieveName(), snapshot
+            );
             upsertAchievementProgress(userId, achievement.getId(), current, target);
         }
     }
@@ -290,6 +307,91 @@ public class AchievementServiceImpl implements AchievementService {
             }
         }
         return subjectIds.size();
+    }
+
+    private ScoreProgress countScoreProgress(List<LearningRecord> records) {
+        Set<Long> perfectLevelIds = new HashSet<>();
+        Set<Long> mathLevelIds = new HashSet<>();
+        Set<Long> mathPerfectLevelIds = new HashSet<>();
+
+        for (LearningRecord record : records) {
+            Long levelId = record.getCourseLevelId();
+            CourseLevel level = courseLevelMapper.selectById(levelId);
+            if (level == null) {
+                continue;
+            }
+
+            boolean mathLevel = isMathLevel(level);
+            if (mathLevel) {
+                mathLevelIds.add(levelId);
+            }
+
+            if (isPerfectRecord(record, level)) {
+                perfectLevelIds.add(levelId);
+                if (mathLevel) {
+                    mathPerfectLevelIds.add(levelId);
+                }
+            }
+        }
+
+        return new ScoreProgress(perfectLevelIds.size(), mathLevelIds.size(), mathPerfectLevelIds.size());
+    }
+
+    private boolean isPerfectRecord(LearningRecord record, CourseLevel level) {
+        Integer totalQuestions = level.getTotalQuestions();
+        Integer score = record.getScore();
+        if (totalQuestions != null && totalQuestions > 0 && score != null) {
+            return score >= totalQuestions * 10;
+        }
+        return Objects.equals(record.getWrongCount(), 0) && record.getStars() != null && record.getStars() >= 3;
+    }
+
+    private boolean isMathLevel(CourseLevel level) {
+        Course course = courseMapper.selectById(level.getCourseId());
+        if (course == null) {
+            return false;
+        }
+        Subject subject = subjectMapper.selectById(course.getSubjectId());
+        return subject != null && "MATH".equalsIgnoreCase(subject.getSubjectCode());
+    }
+
+    private record ScoreProgress(int perfectLevels, int mathCompletedLevels, int mathPerfectLevels) {
+    }
+
+    private int countCurrentStreakDays(List<LearningRecord> records) {
+        Set<LocalDate> learnedDates = records.stream()
+            .map(LearningRecord::getPlayTime)
+            .filter(Objects::nonNull)
+            .map(LocalDateTime::toLocalDate)
+            .collect(Collectors.toSet());
+        if (learnedDates.isEmpty()) {
+            return 0;
+        }
+
+        LocalDate cursor = LocalDate.now();
+        if (!learnedDates.contains(cursor)) {
+            cursor = cursor.minusDays(1);
+        }
+
+        int streak = 0;
+        while (learnedDates.contains(cursor)) {
+            streak++;
+            cursor = cursor.minusDays(1);
+        }
+        return streak;
+    }
+
+    private int resolveTotalExpRank(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null || user.getTotalExp() == null) {
+            return 0;
+        }
+        Long betterUsers = userMapper.selectCount(
+            new LambdaQueryWrapper<User>()
+                .eq(User::getStatus, 1)
+                .gt(User::getTotalExp, user.getTotalExp())
+        );
+        return Math.toIntExact(betterUsers) + 1;
     }
 
     private int resolveAchievementTarget(Achievement achievement, AchievementTier tier) {
@@ -335,6 +437,130 @@ public class AchievementServiceImpl implements AchievementService {
             }
         }
         return null;
+    }
+
+    private int resolveAchievedTierLevel(Long achievementId, Integer currentValue) {
+        List<AchievementTier> tiers = achievementTierMapper.selectList(
+            new LambdaQueryWrapper<AchievementTier>()
+                .eq(AchievementTier::getAchieveId, achievementId)
+                .orderByAsc(AchievementTier::getTierLevel)
+        );
+        int safeCurrent = currentValue == null ? 0 : currentValue;
+        int achievedLevel = 1;
+        for (AchievementTier tier : tiers) {
+            int target = AchievementRuleEngine.resolveTarget(tier.getConditionJson(), null, null);
+            if (safeCurrent >= Math.max(1, target)) {
+                achievedLevel = tier.getTierLevel();
+            }
+        }
+        return achievedLevel;
+    }
+
+    private Map<String, Object> applyAchievementRewards(
+        User user,
+        Long achievementId,
+        List<AchievementRuleEngine.RewardItem> rewards
+    ) {
+        Map<String, Object> summary = new HashMap<>();
+        int gold = 0;
+        int exp = 0;
+        int diamond = 0;
+        List<Long> stickers = new ArrayList<>();
+        List<Long> titles = new ArrayList<>();
+
+        for (AchievementRuleEngine.RewardItem reward : rewards) {
+            switch (reward.type()) {
+                case "GOLD" -> gold += reward.quantity();
+                case "EXP" -> exp += reward.quantity();
+                case "DIAMOND" -> diamond += reward.quantity();
+                case "STICKER" -> {
+                    if (reward.itemId() != null) {
+                        addStickerReward(user.getId(), reward.itemId(), reward.quantity());
+                        stickers.add(reward.itemId());
+                        insertRewardLog(user.getId(), 4, reward.itemId(), reward.quantity(), achievementId);
+                    }
+                }
+                case "TITLE" -> {
+                    if (reward.itemId() != null) {
+                        addTitleReward(user.getId(), reward.itemId());
+                        titles.add(reward.itemId());
+                        insertRewardLog(user.getId(), 5, reward.itemId(), 1, achievementId);
+                    }
+                }
+                default -> {
+                }
+            }
+        }
+
+        if (gold > 0 || exp > 0 || diamond > 0) {
+            user.setGold((user.getGold() == null ? 0 : user.getGold()) + gold);
+            user.setTotalExp((user.getTotalExp() == null ? 0 : user.getTotalExp()) + exp);
+            user.setDiamond((user.getDiamond() == null ? 0 : user.getDiamond()) + diamond);
+            userMapper.updateById(user);
+        }
+        if (gold > 0) {
+            insertRewardLog(user.getId(), 1, null, gold, achievementId);
+        }
+        if (exp > 0) {
+            insertRewardLog(user.getId(), 2, null, exp, achievementId);
+        }
+        if (diamond > 0) {
+            insertRewardLog(user.getId(), 3, null, diamond, achievementId);
+        }
+
+        summary.put("gold", gold);
+        summary.put("exp", exp);
+        summary.put("diamond", diamond);
+        summary.put("stickers", stickers);
+        summary.put("titles", titles);
+        return summary;
+    }
+
+    private void addStickerReward(Long userId, Long stickerId, int quantity) {
+        UserSticker existing = userStickerMapper.selectOne(
+            new LambdaQueryWrapper<UserSticker>()
+                .eq(UserSticker::getUserId, userId)
+                .eq(UserSticker::getStickerId, stickerId)
+        );
+        if (existing == null) {
+            UserSticker userSticker = new UserSticker();
+            userSticker.setUserId(userId);
+            userSticker.setStickerId(stickerId);
+            userSticker.setQuantity(quantity);
+            userStickerMapper.insert(userSticker);
+            return;
+        }
+        existing.setQuantity((existing.getQuantity() == null ? 0 : existing.getQuantity()) + quantity);
+        userStickerMapper.updateById(existing);
+    }
+
+    private void addTitleReward(Long userId, Long titleId) {
+        UserTitle existing = userTitleMapper.selectOne(
+            new LambdaQueryWrapper<UserTitle>()
+                .eq(UserTitle::getUserId, userId)
+                .eq(UserTitle::getTitleId, titleId)
+        );
+        if (existing != null) {
+            return;
+        }
+        UserTitle userTitle = new UserTitle();
+        userTitle.setUserId(userId);
+        userTitle.setTitleId(titleId);
+        userTitle.setIsActive(0);
+        userTitle.setObtainTime(LocalDateTime.now());
+        userTitleMapper.insert(userTitle);
+    }
+
+    private void insertRewardLog(Long userId, int rewardType, Long rewardItemId, int quantity, Long achievementId) {
+        RewardLog log = new RewardLog();
+        log.setUserId(userId);
+        log.setRewardType(rewardType);
+        log.setRewardItemId(rewardItemId);
+        log.setQuantity(quantity);
+        log.setSourceType("ACHIEVEMENT");
+        log.setSourceId(achievementId);
+        log.setDescription("鎴愬氨濂栧姳");
+        rewardLogMapper.insert(log);
     }
 
     private void upsertAchievementProgress(Long userId, Long achievementId, int current, int target) {

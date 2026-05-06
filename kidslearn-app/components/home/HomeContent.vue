@@ -22,6 +22,16 @@
         </view>
       </view>
 
+      <!-- 签到入口 -->
+      <view class="checkin-banner card card-hover" @tap="openCheckin">
+        <text class="checkin-emoji">📅</text>
+        <view class="checkin-info">
+          <text class="text-md text-bold">每日签到</text>
+          <text class="text-xs text-light">{{ checkinStreak > 0 ? `已连续签到 ${checkinStreak} 天` : '点击签到领奖励' }}</text>
+        </view>
+        <text class="checkin-action text-primary text-sm">{{ checkinDone ? '已签到 ✅' : '签到 →' }}</text>
+      </view>
+
       <!-- 排名横幅 -->
       <view class="rank-banner" @tap="goRanking">
         <view class="rank-info">
@@ -62,6 +72,34 @@
         </view>
       </view>
 
+      <!-- 薄弱点推荐 -->
+      <view v-if="weakPoints.length > 0" class="section-title-row">
+        <view class="section-title-copy">
+          <text class="text-lg text-bold">🎯 薄弱点练习</text>
+          <text class="section-hint">针对错题推荐</text>
+        </view>
+        <text class="text-primary text-sm section-link" @tap="goWrongTopics">错题本</text>
+      </view>
+      <view v-if="weakPoints.length > 0" class="weak-grid stagger-list">
+        <view
+          v-for="wp in weakPoints"
+          :key="wp.subjectId"
+          class="weak-card card card-hover"
+          @tap="goAdaptivePractice(wp)"
+        >
+          <view class="weak-header">
+            <text class="weak-icon">{{ wp.subjectIcon }}</text>
+            <view class="weak-info">
+              <text class="text-md text-bold">{{ wp.subjectName }}</text>
+              <text class="text-xs text-light">错题 {{ wp.wrongCount }} 道 · 正确率 {{ wp.accuracy }}%</text>
+            </view>
+          </view>
+          <view class="weak-action">
+            <text class="text-primary text-sm">去练习 →</text>
+          </view>
+        </view>
+      </view>
+
       <!-- 快捷入口 -->
       <view class="quick-grid">
         <view class="quick-card card card-hover" @tap="goPet">
@@ -99,6 +137,9 @@
         </view>
       </view>
     </template>
+
+    <!-- 签到弹窗 -->
+    <CheckinPopup v-if="showCheckin" :auto-close-if-done="checkinAutoOpen" @close="onCheckinClose" />
   </view>
 </template>
 
@@ -108,11 +149,12 @@ import { onShow } from '@dcloudio/uni-app'
 import { usePetStore } from '@/store/pet'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
-import { getDailyTasks, getSubjects } from '@/api/learn'
+import { getDailyTasks, getSubjects, getCheckinStatus, getWeakPoints } from '@/api/learn'
 import { getPetStatus } from '@/api/pet'
 import { getRanking } from '@/api/ranking'
 import { getMyProgress } from '@/api/achievement'
 import { createHomeDataRequests } from '@/utils/homeData.mjs'
+import CheckinPopup from '@/components/common/CheckinPopup.vue'
 
 defineEmits(['go-subject', 'go-learn'])
 
@@ -126,6 +168,11 @@ const completedTasks = ref(0)
 const totalTasks = ref(5)
 const myRank = ref(null)
 const achievementCount = ref(0)
+const showCheckin = ref(false)
+const checkinAutoOpen = ref(false)
+const checkinDone = ref(false)
+const checkinStreak = ref(0)
+const weakPoints = ref([])
 const gradeLevelId = computed(() => userStore.userInfo?.gradeLevelId || null)
 
 const taskProgress = computed(() =>
@@ -227,16 +274,29 @@ async function loadData() {
     applyMockData()
   } finally {
     loading.value = false
+    // 加载薄弱点推荐（不阻塞主流程）
+    getWeakPoints().then(res => {
+      if (Array.isArray(res) && res.length > 0) {
+        weakPoints.value = res
+      }
+    }).catch(() => {})
   }
 }
 
 onMounted(() => {
   loadData()
+  fetchCheckinStatus()
+  // Show checkin popup on first load (will auto-close if already done)
+  setTimeout(() => {
+    checkinAutoOpen.value = true
+    showCheckin.value = true
+  }, 800)
 })
 
 // 返回时刷新数据
 onShow(() => {
   loadData()
+  fetchCheckinStatus()
 })
 
 watch(gradeLevelId, () => {
@@ -245,9 +305,35 @@ watch(gradeLevelId, () => {
   loadData()
 })
 
+async function fetchCheckinStatus() {
+  try {
+    const res = await getCheckinStatus()
+    if (res) {
+      checkinDone.value = res.checkedIn || false
+      checkinStreak.value = res.streak || 0
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+function openCheckin() {
+  checkinAutoOpen.value = false
+  showCheckin.value = true
+}
+
+function onCheckinClose() {
+  showCheckin.value = false
+  fetchCheckinStatus()
+}
+
 function goRanking() { switchTab('ranking') }
 function goPet() { switchTab('pet') }
 function goAchievement() { switchTab('achievement') }
+function goWrongTopics() { uni.navigateTo({ url: '/pages/mine/wrong' }) }
+function goAdaptivePractice(wp) {
+  uni.navigateTo({ url: `/pages/learn/adaptive?subjectId=${wp.subjectId}` })
+}
 </script>
 
 <style lang="scss" scoped>
@@ -277,6 +363,17 @@ function goAchievement() { switchTab('achievement') }
 .banner-title { font-size: 22px; font-weight: 800; color: $white; line-height: 1.25; }
 .banner-desc { font-size: 14px; color: rgba(255,255,255,0.86); margin-top: 4px; }
 .progress-fill-accent { height: 100%; border-radius: 5px; background: $accent; }
+
+.checkin-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-radius: $radius-lg;
+}
+.checkin-emoji { font-size: 32px; }
+.checkin-info { flex: 1; display: flex; flex-direction: column; }
+.checkin-action { flex-shrink: 0; }
 
 .rank-banner {
   background: linear-gradient(135deg, #FFECA6, #FFD95A); border-radius: $radius-lg;
@@ -328,6 +425,13 @@ function goAchievement() { switchTab('achievement') }
 .subject-progress-wrap { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .subject-progress-bar { flex: 1; height: 6px; background: rgba(0,0,0,0.1); border-radius: 3px; overflow: hidden; }
 .subject-progress-fill { height: 100%; background: $primary; border-radius: 3px; transition: width 0.3s; }
+
+.weak-grid { display: flex; flex-direction: column; gap: 10px; }
+.weak-card { padding: 14px 18px; }
+.weak-header { display: flex; align-items: center; gap: 12px; }
+.weak-icon { font-size: 32px; }
+.weak-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.weak-action { flex-shrink: 0; }
 
 .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .quick-card {

@@ -102,4 +102,16 @@ public class UserController {
         childProfileMapper.updateById(profile);
         return R.ok();
     }
+
+    @Operation(summary = "更新新手引导步骤")
+    @PostMapping("/onboarding-step")
+    public R<Void> updateOnboardingStep(HttpServletRequest request, @RequestParam Integer step) {
+        Long userId = (Long) request.getAttribute("userId");
+        User user = userMapper.selectById(userId);
+        if (user != null) {
+            user.setOnboardingStep(step);
+            userMapper.updateById(user);
+        }
+        return R.ok();
+    }
 }
