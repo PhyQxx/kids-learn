@@ -73,6 +73,8 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+@import '@/styles/variables.scss';
+
 .learn-page {
   min-height: 100vh;
   padding: 32rpx;

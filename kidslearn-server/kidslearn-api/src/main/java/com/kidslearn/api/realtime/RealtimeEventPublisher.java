@@ -25,4 +25,8 @@ public class RealtimeEventPublisher {
         payload.put("diamond", diamond);
         publishToUser(userId, RealtimeMessageType.USER_BALANCE_UPDATE, payload);
     }
+
+    public void publishChildActivity(Long parentUserId, Map<String, Object> childActivity) {
+        publishToUser(parentUserId, RealtimeMessageType.CHILD_ACTIVITY_UPDATE, childActivity);
+    }
 }

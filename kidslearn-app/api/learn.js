@@ -13,6 +13,10 @@ export const getCourses = (subjectId, gradeLevelId, page = 1, pageSize = 20) =>
 // 获取关卡列表
 export const getLevels = (courseId, gradeLevelId) => get('/learn/levels', { courseId, gradeLevelId })
 
+export const getCourseVideos = (courseId) => get('/learn/videos', { courseId })
+
+export const submitVideoProgress = (data) => post('/learn/video-progress', data)
+
 // 获取题目列表
 export const getQuestions = (levelId, gradeLevelId) => get('/learn/questions', { levelId, gradeLevelId })
 

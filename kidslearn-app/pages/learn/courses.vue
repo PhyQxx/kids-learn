@@ -17,20 +17,27 @@
         <text class="course-emoji">{{ course.icon }}</text>
         <view class="course-info">
           <text class="course-name text-md text-bold">{{ course.name }}</text>
-          <text class="course-meta text-xs text-light">{{ course.levels }}关 · {{ course.difficulty }}</text>
+          <text class="course-meta text-xs text-light">
+            {{ course.levels }}关 · {{ course.difficulty }} · {{ course.videoCount }}节视频
+          </text>
           <view class="progress-bar progress-bar-blue" style="width: 160px; margin-top: 6px;">
             <view class="progress-fill" :style="{ width: course.progress + '%' }"></view>
           </view>
         </view>
         <view class="course-right">
           <view class="stars">
-            <text v-for="s in 3" :key="s" :class="s <= course.stars ? 'star-filled' : 'star-empty'">⭐</text>
+            <text v-for="s in 3" :key="s" :class="s <= course.starLevel ? 'star-filled' : 'star-empty'">★</text>
           </view>
-          <view v-if="course.locked">
-            <tn-button size="sm" disabled>🔒</tn-button>
+          <tn-button v-if="course.locked" size="sm" disabled>锁定</tn-button>
+          <view v-else class="course-actions">
+            <tn-button
+              v-if="course.videoCount > 0"
+              size="sm"
+              shape="round"
+              @tap.stop="goVideos(course)"
+            >视频</tn-button>
+            <tn-button size="sm" shape="round" type="primary">{{ course.progress > 0 ? '继续' : '开始' }}</tn-button>
           </view>
-          <tn-button v-else-if="course.isVip" size="sm" shape="round" type="warning">👑 VIP</tn-button>
-          <tn-button v-else size="sm" shape="round" type="primary">{{ course.progress > 0 ? '继续' : '开始' }}</tn-button>
         </view>
       </view>
     </view>
@@ -52,35 +59,40 @@ const pageSubjectId = ref(null)
 
 const courses = ref([])
 
-// 官方推荐方式获取页面参数
 onLoad((query) => {
   pageSubjectId.value = query.subjectId || null
 })
 
 async function loadCourses() {
-  // 优先级：store > URL参数
   const subjectId = learnStore.currentSubject?.id || pageSubjectId.value
-  if (subjectId) {
-    // 更新学科名称
-    if (learnStore.currentSubject?.name) {
-      subjectName.value = learnStore.currentSubject.name
+  if (!subjectId) return
+  if (learnStore.currentSubject?.name) {
+    subjectName.value = learnStore.currentSubject.name
+  }
+  try {
+    const gradeLevelId = userStore.userInfo?.gradeLevelId || null
+    const res = await getCourses(subjectId, gradeLevelId)
+    if (res && res.list) {
+      courses.value = res.list.map(c => {
+        const totalLevels = c.totalLevels || 0
+        const completedLevels = c.completedLevels || 0
+        const progress = totalLevels ? Math.round(completedLevels / totalLevels * 100) : 0
+        return {
+          id: c.id,
+          name: c.courseName,
+          icon: '📘',
+          levels: totalLevels,
+          difficulty: ['简单', '普通', '困难'][(c.difficulty || 2) - 1] || '普通',
+          progress,
+          starLevel: Math.min(3, Math.floor((c.totalStars || 0) / Math.max(1, totalLevels))),
+          videoCount: c.videoCount || 0,
+          isVip: c.isElite === 1,
+          locked: false,
+        }
+      })
     }
-    try {
-      const gradeLevelId = userStore.userInfo?.gradeLevelId || null
-      const res = await getCourses(subjectId, gradeLevelId)
-      if (res && res.list) {
-        courses.value = res.list.map(c => ({
-          id: c.id, name: c.courseName, icon: '📚',
-          levels: c.totalLevels || 0,
-          difficulty: ['简单','普通','困难'][(c.difficulty || 2) - 1] || '普通',
-          progress: c.totalLevels ? Math.round((c.completedLevels || 0) / c.totalLevels * 100) : 0,
-          stars: c.totalStars || 0,
-          isVip: c.isElite === 1, locked: false
-        }))
-      }
-    } catch (e) {
-      console.log('courses: API 失败，列表为空')
-    }
+  } catch (e) {
+    console.log('courses: API failed')
   }
 }
 
@@ -88,7 +100,6 @@ onMounted(() => {
   loadCourses()
 })
 
-// 返回时刷新课程进度
 onShow(() => {
   loadCourses()
 })
@@ -97,6 +108,11 @@ function goLevels(course) {
   learnStore.setCourse(course)
   const gradeLevelId = userStore.userInfo?.gradeLevelId || ''
   uni.navigateTo({ url: `/pages/learn/levels?courseId=${course.id}&gradeLevelId=${gradeLevelId}` })
+}
+
+function goVideos(course) {
+  learnStore.setCourse(course)
+  uni.navigateTo({ url: `/pages/learn/videos?courseId=${course.id}` })
 }
 </script>
 
@@ -124,17 +140,22 @@ function goLevels(course) {
   transition: all $transition-fast;
 
   &:active { transform: scale(0.98); }
+
   &.vip {
     border-color: $gold;
     background: linear-gradient(135deg, #FFFEF5, #FFF8E8);
   }
+
   &.locked {
     opacity: 0.6;
     pointer-events: none;
   }
 }
 
-.course-emoji { font-size: 48px; flex-shrink: 0; }
+.course-emoji {
+  font-size: 48px;
+  flex-shrink: 0;
+}
 
 .course-info {
   flex: 1;
@@ -142,11 +163,19 @@ function goLevels(course) {
   flex-direction: column;
 }
 
-.course-meta { margin-top: 2px; }
+.course-meta {
+  margin-top: 2px;
+}
 
 .course-right {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.course-actions {
+  display: flex;
   align-items: center;
   gap: 8px;
 }
@@ -156,6 +185,7 @@ function goLevels(course) {
   gap: 2px;
   font-size: 14px;
 }
+
 .star-filled { color: $gold; }
 .star-empty { color: #E0E0E0; }
 </style>

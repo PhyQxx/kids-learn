@@ -3,6 +3,7 @@ package com.kidslearn.api.controller;
 import com.kidslearn.api.dto.learn.DailyTaskVO;
 import com.kidslearn.api.dto.learn.LevelResultVO;
 import com.kidslearn.api.dto.learn.SubmitAnswerDTO;
+import com.kidslearn.api.dto.learn.SubmitVideoProgressDTO;
 import com.kidslearn.api.service.LearnService;
 import com.kidslearn.common.result.PageResult;
 import com.kidslearn.common.result.R;
@@ -58,6 +59,24 @@ public class LearnController {
             @RequestParam Long courseId) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(learnService.getLevels(userId, courseId));
+    }
+
+    @Operation(summary = "鑾峰彇瑙嗛璇剧▼鍒楄〃")
+    @GetMapping("/videos")
+    public R<List<Map<String, Object>>> getCourseVideos(
+            HttpServletRequest request,
+            @RequestParam Long courseId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getCourseVideos(userId, courseId));
+    }
+
+    @Operation(summary = "涓婃姤瑙嗛瀛︿範杩涘害")
+    @PostMapping("/video-progress")
+    public R<Map<String, Object>> submitVideoProgress(
+            HttpServletRequest request,
+            @RequestBody SubmitVideoProgressDTO dto) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.submitVideoProgress(userId, dto));
     }
 
     @Operation(summary = "获取题目列表")

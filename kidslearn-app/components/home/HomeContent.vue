@@ -154,11 +154,13 @@ import { getPetStatus } from '@/api/pet'
 import { getRanking } from '@/api/ranking'
 import { getMyProgress } from '@/api/achievement'
 import { createHomeDataRequests } from '@/utils/homeData.mjs'
+import { getAutoCheckinDecision } from '@/utils/promptFlow.mjs'
 import CheckinPopup from '@/components/common/CheckinPopup.vue'
 
 defineEmits(['go-subject', 'go-learn'])
 
 const switchTab = inject('switchTab', () => {})
+const gradePopupVisible = inject('gradePopupVisible', ref(false))
 const petStore = usePetStore()
 const learnStore = useLearnStore()
 const userStore = useUserStore()
@@ -170,10 +172,13 @@ const myRank = ref(null)
 const achievementCount = ref(0)
 const showCheckin = ref(false)
 const checkinAutoOpen = ref(false)
+const checkinAutoOpened = ref(false)
+const pendingAutoCheckin = ref(false)
 const checkinDone = ref(false)
 const checkinStreak = ref(0)
 const weakPoints = ref([])
 const gradeLevelId = computed(() => userStore.userInfo?.gradeLevelId || null)
+const gradeSetupRequired = computed(() => !userStore.userInfo?.gradeLevelId)
 
 const taskProgress = computed(() =>
   totalTasks.value ? Math.round(completedTasks.value / totalTasks.value * 100) : 0
@@ -286,10 +291,8 @@ async function loadData() {
 onMounted(() => {
   loadData()
   fetchCheckinStatus()
-  // Show checkin popup on first load (will auto-close if already done)
   setTimeout(() => {
-    checkinAutoOpen.value = true
-    showCheckin.value = true
+    tryAutoOpenCheckin()
   }, 800)
 })
 
@@ -303,6 +306,12 @@ watch(gradeLevelId, () => {
   learnStore.clearLearningContext()
   subjects.value = []
   loadData()
+})
+
+watch([gradePopupVisible, gradeSetupRequired], () => {
+  if (pendingAutoCheckin.value) {
+    tryAutoOpenCheckin()
+  }
 })
 
 async function fetchCheckinStatus() {
@@ -320,6 +329,21 @@ async function fetchCheckinStatus() {
 function openCheckin() {
   checkinAutoOpen.value = false
   showCheckin.value = true
+}
+
+function tryAutoOpenCheckin() {
+  const decision = getAutoCheckinDecision({
+    gradePopupVisible: !!gradePopupVisible.value,
+    gradeSetupRequired: gradeSetupRequired.value,
+    alreadyAutoOpened: checkinAutoOpened.value
+  })
+
+  pendingAutoCheckin.value = decision.shouldRememberPending
+  if (!decision.shouldOpen) return
+
+  checkinAutoOpen.value = true
+  showCheckin.value = true
+  checkinAutoOpened.value = true
 }
 
 function onCheckinClose() {

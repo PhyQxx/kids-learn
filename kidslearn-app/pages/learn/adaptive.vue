@@ -94,6 +94,11 @@ import AppLayout from '@/components/AppLayout.vue'
 import { getAdaptiveQuestions, retryWrong } from '@/api/learn'
 import { richContentToNodes, richContentToText } from '@/utils/richContent.mjs'
 import { resolveQuestionSpeech } from '@/utils/questionSpeech.mjs'
+import {
+  loadQuestionsWithOfflineCache,
+  prefetchAudioFile,
+  readCachedAudioUrl
+} from '@/utils/offlineQuizCache.mjs'
 
 const screen = ref('start')
 const currentIndex = ref(0)
@@ -115,6 +120,9 @@ function stopQuestionSpeech() {
     questionAudio.destroy()
     questionAudio = null
   }
+  if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.cancel()
+  }
 }
 
 const totalQuestions = computed(() => questions.value.length)
@@ -127,12 +135,21 @@ const accuracy = computed(() =>
 
 async function loadQuestions() {
   try {
-    const res = await getAdaptiveQuestions(subjectIdParam.value)
-    if (res && Array.isArray(res) && res.length > 0) {
-      questions.value = res.map(q => ({
+    const res = await loadQuestionsWithOfflineCache({
+      levelId: `adaptive:${subjectIdParam.value || 'all'}`,
+      gradeLevelId: 'wrong-topics',
+      fetchQuestions: () => getAdaptiveQuestions(subjectIdParam.value),
+      storage: uni
+    })
+    if (res.fromCache) {
+      uni.showToast({ title: '已加载离线题目', icon: 'none' })
+    }
+    if (res.questions && Array.isArray(res.questions) && res.questions.length > 0) {
+      questions.value = res.questions.map(q => ({
         id: q.id,
         text: q.questionText || richContentToText(q.questionContent),
         questionContent: q.questionContent,
+        questionSpeechText: q.questionSpeechText || '',
         nodes: richContentToNodes(q.questionContent),
         questionAudioUrl: q.questionAudioUrl || '',
         score: q.score || 10,
@@ -144,6 +161,9 @@ async function loadQuestions() {
           correct: false
         }))
       }))
+      if (questions.value[0]) {
+        preloadQuestionAudio(questions.value[0])
+      }
     }
   } catch (e) {
     console.log('adaptive: 加载题目失败')
@@ -158,19 +178,84 @@ onMounted(async () => {
   await loadQuestions()
 })
 
-function questionToSpeech() {
-  const q = currentQuestion.value
-  const speech = resolveQuestionSpeech(q)
-  if (speech.text && typeof window !== 'undefined' && window.speechSynthesis) {
+function fallbackToSpeech(text) {
+  if (!speakQuestionText(text)) {
+    uni.showToast({ title: '语音文件准备中', icon: 'none' })
+  }
+}
+
+function playQuestionAudio(audioUrl, fallbackText) {
+  if (!audioUrl || typeof uni.createInnerAudioContext !== 'function') {
+    return false
+  }
+  stopQuestionSpeech()
+  isSpeaking.value = true
+  questionAudio = uni.createInnerAudioContext()
+  questionAudio.src = audioUrl
+  questionAudio.onEnded(() => { stopQuestionSpeech() })
+  questionAudio.onError(() => {
+    stopQuestionSpeech()
+    fallbackToSpeech(fallbackText)
+  })
+  try {
+    const result = questionAudio.play()
+    if (result && typeof result.catch === 'function') {
+      result.catch(() => {
+        stopQuestionSpeech()
+        fallbackToSpeech(fallbackText)
+      })
+    }
+  } catch (e) {
+    return false
+  }
+  return true
+}
+
+function speakQuestionText(text) {
+  // #ifdef H5
+  if (typeof window !== 'undefined' && window.speechSynthesis && window.SpeechSynthesisUtterance && text) {
     window.speechSynthesis.cancel()
     isSpeaking.value = true
-    const utterance = new window.SpeechSynthesisUtterance(speech.text)
+    const utterance = new window.SpeechSynthesisUtterance(text)
     utterance.lang = 'zh-CN'
     utterance.rate = 0.9
     utterance.onend = () => { isSpeaking.value = false }
     utterance.onerror = () => { isSpeaking.value = false }
     window.speechSynthesis.speak(utterance)
+    return true
   }
+  // #endif
+  return false
+}
+
+async function preloadQuestionAudio(question) {
+  const speech = resolveQuestionSpeech(question)
+  if (!speech.audioUrl) return
+  const source = await prefetchAudioFile(speech.audioUrl, uni)
+  if (source && source !== speech.audioUrl) {
+    question.cachedQuestionAudioUrl = source
+  }
+}
+
+function questionToSpeech() {
+  const q = currentQuestion.value
+  const speech = resolveQuestionSpeech(q)
+  let audioUrl = speech.audioUrl
+  const cachedAudioUrl = readCachedAudioUrl(speech.audioUrl, uni)
+  if (cachedAudioUrl) {
+    q.cachedQuestionAudioUrl = cachedAudioUrl
+    audioUrl = cachedAudioUrl
+  } else if (speech.audioUrl) {
+    prefetchAudioFile(speech.audioUrl, uni).then((source) => {
+      if (source && source !== speech.audioUrl) {
+        q.cachedQuestionAudioUrl = source
+      }
+    })
+  }
+  if (playQuestionAudio(audioUrl, speech.text)) {
+    return
+  }
+  fallbackToSpeech(speech.text)
 }
 
 function getOptionClass(opt) {
@@ -213,6 +298,7 @@ function nextQuestion() {
   selectedAnswer.value = ''
   if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value++
+    preloadQuestionAudio(questions.value[currentIndex.value])
   } else {
     screen.value = 'result'
   }

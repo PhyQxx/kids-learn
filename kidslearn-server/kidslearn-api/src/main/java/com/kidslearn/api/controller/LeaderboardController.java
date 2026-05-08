@@ -5,6 +5,7 @@ import com.kidslearn.api.entity.DailyStats;
 import com.kidslearn.api.entity.User;
 import com.kidslearn.api.mapper.DailyStatsMapper;
 import com.kidslearn.api.mapper.UserMapper;
+import com.kidslearn.api.service.ChallengeService;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Tag(name = "排行榜接口")
 @RestController
@@ -24,6 +24,7 @@ public class LeaderboardController {
 
     private final UserMapper userMapper;
     private final DailyStatsMapper dailyStatsMapper;
+    private final ChallengeService challengeService;
 
     @Operation(summary = "获取排行榜")
     @GetMapping("/{type}")
@@ -31,6 +32,9 @@ public class LeaderboardController {
             HttpServletRequest request,
             @PathVariable String type) {
         Long currentUserId = (Long) request.getAttribute("userId");
+        if ("challenge".equals(type) || "ranked".equals(type)) {
+            return R.ok(challengeService.getChallengeRanking(currentUserId));
+        }
 
         // Get all users with their total exp
         List<User> users = userMapper.selectList(
@@ -41,7 +45,6 @@ public class LeaderboardController {
         );
 
         List<Map<String, Object>> result = new ArrayList<>();
-        int rank = 1;
         for (User u : users) {
             Map<String, Object> map = new HashMap<>();
             map.put("id", u.getId());
@@ -59,16 +62,18 @@ public class LeaderboardController {
                 int weeklyExp = weekStats.stream().mapToInt(DailyStats::getEarnedExp).sum();
                 map.put("score", weeklyExp);
             } else {
-                map.put("score", u.getTotalExp());
+                map.put("score", u.getTotalExp() != null ? u.getTotalExp() : 0);
             }
 
             map.put("isMe", u.getId().equals(currentUserId));
             result.add(map);
-            rank++;
         }
 
         // Sort by score desc
         result.sort((a, b) -> ((Integer) b.get("score")).compareTo((Integer) a.get("score")));
+        for (int i = 0; i < result.size(); i++) {
+            result.get(i).put("rank", i + 1);
+        }
 
         return R.ok(result);
     }

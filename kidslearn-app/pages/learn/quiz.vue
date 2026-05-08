@@ -57,7 +57,7 @@
           </view>
 
           <!-- 选项网格 -->
-          <view class="options-grid">
+          <view v-if="currentQuestion.interactionType === 'single'" class="options-grid">
             <view
               v-for="(opt, i) in currentQuestion.options"
               :key="i"
@@ -68,6 +68,55 @@
               <text class="option-label">{{ opt.label }}</text>
               <rich-text class="option-text" :nodes="opt.nodes" />
             </view>
+          </view>
+
+          <view v-else-if="currentQuestion.interactionType === 'order'" class="order-panel card">
+            <view v-for="(item, i) in orderItems" :key="item.answerValue" class="order-row">
+              <text class="order-index">{{ i + 1 }}</text>
+              <text class="order-text">{{ item.text }}</text>
+              <view class="order-actions">
+                <view class="mini-btn" :class="{ disabled: i === 0 }" @tap="moveOrderItem(i, -1)">↑</view>
+                <view class="mini-btn" :class="{ disabled: i === orderItems.length - 1 }" @tap="moveOrderItem(i, 1)">↓</view>
+              </view>
+            </view>
+            <tn-button type="primary" shape="round" size="lg" :disabled="!!selectedAnswer" @click="submitOrderAnswer">提交排序</tn-button>
+          </view>
+
+          <view v-else-if="currentQuestion.interactionType === 'match'" class="match-panel">
+            <view class="match-column card">
+              <view
+                v-for="left in currentQuestion.options"
+                :key="left.answerValue"
+                class="match-item"
+                :class="{ active: selectedMatchLeft === left.answerValue, paired: matchPairs[left.answerValue] }"
+                @tap="selectMatchLeft(left)"
+              >
+                <text class="match-label">{{ left.pairLeft }}</text>
+                <text class="match-pair">{{ matchRightText(matchPairs[left.answerValue]) }}</text>
+              </view>
+            </view>
+            <view class="match-column card">
+              <view
+                v-for="right in matchRightItems"
+                :key="right.answerValue"
+                class="match-item right"
+                :class="{ paired: matchedRightValues.has(right.answerValue) }"
+                @tap="selectMatchRight(right)"
+              >
+                <text class="match-label">{{ right.pairRight }}</text>
+              </view>
+            </view>
+            <tn-button class="match-submit" type="primary" shape="round" size="lg" :disabled="!canSubmitMatch || !!selectedAnswer" @click="submitMatchAnswer">提交连线</tn-button>
+          </view>
+
+          <view v-else-if="currentQuestion.interactionType === 'voice'" class="voice-panel card">
+            <text class="voice-target">{{ currentQuestion.voiceText }}</text>
+            <view class="voice-actions">
+              <tn-button shape="round" size="lg" @click="questionToSpeech()">听一遍</tn-button>
+              <tn-button type="primary" shape="round" size="lg" :loading="voiceListening" @click="startVoicePractice">{{ voiceListening ? '聆听中' : '开始跟读' }}</tn-button>
+            </view>
+            <text v-if="voiceAttempt" class="voice-attempt">{{ voiceAttempt }}</text>
+            <tn-button type="primary" shape="round" size="lg" :disabled="!voiceAttempt || !!selectedAnswer" @click="submitVoiceAnswer">提交跟读</tn-button>
           </view>
         </view>
       </view>
@@ -139,6 +188,17 @@
           </view>
         </view>
 
+        <view v-if="challengeResult" class="challenge-result card">
+          <view class="challenge-result-main">
+            <text class="challenge-result-icon">{{ challengeResult.isWin ? '🏆' : '🛡️' }}</text>
+            <view>
+              <text class="text-md text-bold">{{ challengeResult.isWin ? 'PK 获胜' : 'PK 已完成' }}</text>
+              <text class="text-xs text-light">对手得分 {{ challengeResult.opponentScore }} · 段位积分 {{ challengeResult.rankDelta >= 0 ? '+' : '' }}{{ challengeResult.rankDelta }}</text>
+            </view>
+          </view>
+          <text class="text-sm text-bold text-primary">+{{ challengeResult.rewardGold }} 金币</text>
+        </view>
+
         <view class="result-actions">
           <tn-button type="primary" size="lg" shape="round" @click="goNextLevel" style="background: linear-gradient(135deg, #4A90D9, #6BA3E0);">下一关</tn-button>
           <tn-button size="lg" shape="round" @click="goBack">返回关卡</tn-button>
@@ -183,9 +243,20 @@ import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
 import { usePetStore } from '@/store/pet'
 import { getQuestions, submitAnswer, completeLevel, getHint } from '@/api/learn'
+import { submitChallengeResult } from '@/api/challenge'
 import { getUserInfo } from '@/api/user'
-import { richContentToNodes, richContentToText } from '@/utils/richContent.mjs'
 import { resolveQuestionSpeech } from '@/utils/questionSpeech.mjs'
+import {
+  loadQuestionsWithOfflineCache,
+  prefetchAudioFile,
+  readCachedAudioUrl
+} from '@/utils/offlineQuizCache.mjs'
+import {
+  buildMatchAnswer,
+  buildOrderAnswer,
+  normalizeQuizQuestion,
+  normalizeSpeechAttempt
+} from '@/utils/questionInteraction.mjs'
 
 const learnStore = useLearnStore()
 const userStore = useUserStore()
@@ -198,10 +269,16 @@ let lastCorrectIdx = -1
 let lastWrongIdx = -1
 let feedbackAudio = null
 
+function feedbackAudioUrl(name) {
+  return `${FEEDBACK_AUDIO_BASE}/${name}.wav`
+}
+
 function preloadFeedbackAudio() {
-  const preload = (name) => {
+  const preload = async (name) => {
+    if (typeof uni.createInnerAudioContext !== 'function') return
+    const source = await prefetchAudioFile(feedbackAudioUrl(name), uni)
     const a = uni.createInnerAudioContext()
-    a.src = `${FEEDBACK_AUDIO_BASE}/${name}.wav`
+    a.src = source
     a.onCanplay(() => { a.destroy() })
     a.onError(() => { a.destroy() })
   }
@@ -217,16 +294,18 @@ function stopFeedbackAudio() {
   }
 }
 
-function playFeedbackAudio(type) {
+async function playFeedbackAudio(type) {
+  if (typeof uni.createInnerAudioContext !== 'function') return
   const list = type === 'correct' ? CORRECT_FEEDBACKS : WRONG_FEEDBACKS
   let prevIdx = type === 'correct' ? lastCorrectIdx : lastWrongIdx
   let idx = Math.floor(Math.random() * list.length)
   if (idx === prevIdx && list.length > 1) idx = (idx + 1) % list.length
   if (type === 'correct') lastCorrectIdx = idx; else lastWrongIdx = idx
 
+  const source = await prefetchAudioFile(feedbackAudioUrl(list[idx]), uni)
   stopFeedbackAudio()
   feedbackAudio = uni.createInnerAudioContext()
-  feedbackAudio.src = `${FEEDBACK_AUDIO_BASE}/${list[idx]}.wav`
+  feedbackAudio.src = source
   feedbackAudio.onEnded(() => { feedbackAudio.destroy(); feedbackAudio = null })
   feedbackAudio.onError(() => { feedbackAudio.destroy(); feedbackAudio = null })
   try {
@@ -242,6 +321,12 @@ function playFeedbackAudio(type) {
 const screen = ref('start')
 const currentIndex = ref(0)
 const selectedAnswer = ref('')
+const orderItems = ref([])
+const matchPairs = ref({})
+const matchRightItems = ref([])
+const selectedMatchLeft = ref('')
+const voiceAttempt = ref('')
+const voiceListening = ref(false)
 const showCorrect = ref(false)
 const showWrong = ref(false)
 const countdown = ref(60)
@@ -250,6 +335,8 @@ let timer = null
 
 const levelId = ref(null)
 const pageGradeLevelId = ref(null)
+const challengeId = ref(null)
+const opponentId = ref(null)
 const levelName = ref(learnStore.currentLevel?.name || '第 1 关')
 const levelEmoji = ref('🎮')
 const timeLimit = ref(60)
@@ -324,17 +411,35 @@ function speakQuestionText(text) {
 }
 
 // 语音播报
-function preloadQuestionAudio(question) {
-  if (!question || !question.questionAudioUrl) return
+async function preloadQuestionAudio(question) {
+  const speech = resolveQuestionSpeech(question)
+  if (!speech.audioUrl) return
+  const source = await prefetchAudioFile(speech.audioUrl, uni)
+  if (source && source !== speech.audioUrl) {
+    question.cachedQuestionAudioUrl = source
+  }
+  if (typeof uni.createInnerAudioContext !== 'function') return
   const audio = uni.createInnerAudioContext()
-  audio.src = question.questionAudioUrl
+  audio.src = source || speech.audioUrl
   audio.onCanplay(() => { audio.destroy() })
   audio.onError(() => { audio.destroy() })
 }
 
-const questionToSpeech = (question = currentQuestion.value) => {
+const questionToSpeech = async (question = currentQuestion.value) => {
   const speech = resolveQuestionSpeech(question)
-  if (playQuestionAudio(speech.audioUrl, speech.text)) {
+  let audioUrl = speech.audioUrl
+  const cachedAudioUrl = readCachedAudioUrl(speech.audioUrl, uni)
+  if (cachedAudioUrl) {
+    question.cachedQuestionAudioUrl = cachedAudioUrl
+    audioUrl = cachedAudioUrl
+  } else if (speech.audioUrl) {
+    prefetchAudioFile(speech.audioUrl, uni).then((source) => {
+      if (source && source !== speech.audioUrl) {
+        question.cachedQuestionAudioUrl = source
+      }
+    })
+  }
+  if (playQuestionAudio(audioUrl, speech.text)) {
     return
   }
   if (!speakQuestionText(speech.text)) {
@@ -345,35 +450,28 @@ const questionToSpeech = (question = currentQuestion.value) => {
 onMounted(async () => {
   const pages = getCurrentPages()
   const page = pages[pages.length - 1]
-  levelId.value = page.$page?.options?.levelId || learnStore.currentLevel?.id
-  pageGradeLevelId.value = page.$page?.options?.gradeLevelId || userStore.userInfo?.gradeLevelId || null
+  const options = page.$page?.options || {}
+  levelId.value = options.levelId || learnStore.currentLevel?.id
+  pageGradeLevelId.value = options.gradeLevelId || userStore.userInfo?.gradeLevelId || null
+  challengeId.value = options.challengeId || null
+  opponentId.value = options.opponentId || null
   if (levelId.value) {
     try {
-      const res = await getQuestions(levelId.value, pageGradeLevelId.value)
-      if (res && Array.isArray(res) && res.length > 0) {
-        questions.value = res.map(q => ({
-          id: q.id,
-          emoji: '❓',
-          questionContent: q.questionContent,
-          text: q.questionText || richContentToText(q.questionContent),
-          plainText: q.questionText || richContentToText(q.questionContent),
-          questionSpeechText: q.questionSpeechText || '',
-          questionAudioUrl: q.questionAudioUrl || '',
-          nodes: richContentToNodes(q.questionContent),
-          score: q.score || 10,
-          options: (q.options || []).map((opt, i) => ({
-            label: opt.optionLabel || String.fromCharCode(65 + i),
-            answerValue: opt.answerValue || opt.optionLabel || String.fromCharCode(65 + i),
-            text: opt.optionText || richContentToText(opt.optionContent),
-            speechText: opt.optionSpeechText || '',
-            audioUrl: opt.optionAudioUrl || '',
-            nodes: richContentToNodes(opt.optionContent),
-            correct: false
-          }))
-        }))
+      const res = await loadQuestionsWithOfflineCache({
+        levelId: levelId.value,
+        gradeLevelId: pageGradeLevelId.value,
+        fetchQuestions: getQuestions,
+        storage: uni
+      })
+      if (res.fromCache) {
+        uni.showToast({ title: '已加载离线题目', icon: 'none' })
+      }
+      if (res.questions && Array.isArray(res.questions) && res.questions.length > 0) {
+        questions.value = res.questions.map(q => normalizeQuizQuestion(q))
         // Preload first question audio
         if (questions.value[0]) {
           preloadQuestionAudio(questions.value[0])
+          resetInteractionState()
         }
       }
     } catch (e) {
@@ -384,7 +482,7 @@ onMounted(async () => {
 
 const totalQuestions = computed(() => questions.value.length)
 const currentQuestion = computed(() => {
-  return questions.value[currentIndex.value] || { emoji: '❓', text: '', plainText: '', nodes: [], options: [] }
+  return questions.value[currentIndex.value] || { emoji: '❓', interactionType: 'single', text: '', plainText: '', nodes: [], options: [] }
 })
 const correctCount = ref(0)
 const totalScore = ref(0)
@@ -394,6 +492,7 @@ const questionStartTime = ref(0)
 const usedTime = ref(0)
 
 const rewards = ref({ gold: 15, exp: 10, stickers: 1 })
+const challengeResult = ref(null)
 
 // 奖励动画状态
 const showRewardAnimation = ref(false)
@@ -409,6 +508,11 @@ const petExpGained = ref(0)
 
 const accuracy = computed(() =>
   totalQuestions.value ? Math.round(correctCount.value / totalQuestions.value * 100) : 0
+)
+const matchedRightValues = computed(() => new Set(Object.values(matchPairs.value)))
+const canSubmitMatch = computed(() =>
+  currentQuestion.value.options.length > 0
+  && Object.keys(matchPairs.value).length === currentQuestion.value.options.length
 )
 
 const resultEmoji = computed(() => earnedStars.value >= 3 ? '🎉' : earnedStars.value >= 1 ? '👍' : '💪')
@@ -426,6 +530,7 @@ function getOptionClass(opt) {
 async function useHint() {
   if (hintUsed.value || hintLoading.value || selectedAnswer.value) return
   const q = currentQuestion.value
+  if (q.interactionType !== 'single') return
   if (!q.id) return
   hintLoading.value = true
   try {
@@ -472,10 +577,105 @@ function generateCoinParticles(count = 6) {
   coinParticles.value = particles
 }
 
+function resetInteractionState() {
+  const q = currentQuestion.value
+  orderItems.value = q.interactionType === 'order' ? [...q.options] : []
+  matchPairs.value = {}
+  matchRightItems.value = q.interactionType === 'match' ? [...q.options].reverse() : []
+  selectedMatchLeft.value = ''
+  voiceAttempt.value = ''
+  voiceListening.value = false
+}
+
+function moveOrderItem(index, direction) {
+  if (selectedAnswer.value) return
+  const nextIndex = index + direction
+  if (nextIndex < 0 || nextIndex >= orderItems.value.length) return
+  const next = [...orderItems.value]
+  const temp = next[index]
+  next[index] = next[nextIndex]
+  next[nextIndex] = temp
+  orderItems.value = next
+}
+
+function selectMatchLeft(item) {
+  if (selectedAnswer.value) return
+  selectedMatchLeft.value = item.answerValue
+}
+
+function selectMatchRight(item) {
+  if (selectedAnswer.value || !selectedMatchLeft.value) return
+  matchPairs.value = {
+    ...matchPairs.value,
+    [selectedMatchLeft.value]: item.answerValue
+  }
+  selectedMatchLeft.value = ''
+}
+
+function matchRightText(answerValue) {
+  if (!answerValue) return ''
+  const right = currentQuestion.value.options.find(item => item.answerValue === answerValue)
+  return right ? right.pairRight : ''
+}
+
+function startVoicePractice() {
+  if (selectedAnswer.value || voiceListening.value) return
+  const target = currentQuestion.value.voiceText || currentQuestion.value.questionSpeechText || currentQuestion.value.plainText
+  const SpeechRecognition = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition)
+
+  if (!SpeechRecognition) {
+    voiceListening.value = true
+    questionToSpeech()
+    setTimeout(() => {
+      voiceAttempt.value = target
+      voiceListening.value = false
+    }, 900)
+    return
+  }
+
+  const recognition = new SpeechRecognition()
+  recognition.lang = /[a-zA-Z]/.test(target) ? 'en-US' : 'zh-CN'
+  recognition.interimResults = false
+  recognition.maxAlternatives = 1
+  recognition.onresult = (event) => {
+    const transcript = event.results?.[0]?.[0]?.transcript || ''
+    voiceAttempt.value = normalizeSpeechAttempt(transcript) ? transcript : target
+  }
+  recognition.onerror = () => {
+    voiceAttempt.value = target
+    voiceListening.value = false
+  }
+  recognition.onend = () => {
+    voiceListening.value = false
+  }
+  voiceListening.value = true
+  recognition.start()
+}
+
 function selectOption(opt) {
   if (selectedAnswer.value) return
+  submitCurrentAnswer(opt.answerValue || opt.label, opt.label)
+}
+
+function submitOrderAnswer() {
+  if (selectedAnswer.value) return
+  submitCurrentAnswer(buildOrderAnswer(orderItems.value), 'ORDER')
+}
+
+function submitMatchAnswer() {
+  if (selectedAnswer.value || !canSubmitMatch.value) return
+  submitCurrentAnswer(buildMatchAnswer(matchPairs.value), 'MATCH')
+}
+
+function submitVoiceAnswer() {
+  if (selectedAnswer.value || !voiceAttempt.value) return
+  submitCurrentAnswer(voiceAttempt.value, 'VOICE')
+}
+
+function submitCurrentAnswer(answer, displayAnswer = answer) {
+  if (selectedAnswer.value) return
   stopQuestionSpeech()
-  selectedAnswer.value = opt.label
+  selectedAnswer.value = displayAnswer
   const q = currentQuestion.value
   const answerTime = Math.round((Date.now() - (questionStartTime.value || startTime.value)) / 1000)
 
@@ -484,7 +684,7 @@ function selectOption(opt) {
     submitAnswer({
       levelId: levelId.value,
       questionId: q.id,
-      answer: opt.answerValue || opt.label,
+      answer,
       answerTime
     }).then(res => {
       const isCorrect = res?.correct || false
@@ -521,6 +721,7 @@ function nextQuestion() {
   eliminatedOptions.value = new Set()
   if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value++
+    resetInteractionState()
     questionStartTime.value = Date.now()
     preloadQuestionAudio(questions.value[currentIndex.value])
     setTimeout(() => questionToSpeech(), 250)
@@ -534,6 +735,7 @@ function startQuiz() {
   screen.value = 'quiz'
   startTime.value = Date.now()
   questionStartTime.value = Date.now()
+  resetInteractionState()
   preloadFeedbackAudio()
   setTimeout(() => questionToSpeech(), 250)
   countdown.value = totalTime.value
@@ -597,6 +799,8 @@ async function finishQuiz() {
     }
   }
 
+  await submitChallengeIfNeeded()
+
   screen.value = 'result'
 
   // 触发奖励动画
@@ -607,6 +811,37 @@ async function finishQuiz() {
       generateCoinParticles(12)
     }
   }, 600)
+}
+
+async function submitChallengeIfNeeded() {
+  if (!challengeId.value) return
+  try {
+    const res = await submitChallengeResult({
+      challengeId: Number(challengeId.value),
+      opponentId: opponentId.value ? Number(opponentId.value) : null,
+      userScore: totalScore.value
+    })
+    if (!res) return
+    challengeResult.value = {
+      isWin: !!res.isWin,
+      opponentScore: res.opponentScore || 0,
+      rankDelta: res.rankDelta || 0,
+      rewardGold: res.rewardGold || 0
+    }
+    rewards.value = {
+      ...rewards.value,
+      gold: rewards.value.gold + challengeResult.value.rewardGold
+    }
+    try {
+      const userInfo = await getUserInfo()
+      if (userInfo) userStore.setUserInfo(userInfo)
+    } catch (e) {
+      console.log('挑战奖励后更新用户信息失败:', e)
+    }
+  } catch (e) {
+    console.log('挑战结算失败:', e)
+    uni.showToast({ title: 'PK结算稍后同步', icon: 'none' })
+  }
 }
 
 function exitQuiz() {
@@ -882,6 +1117,141 @@ onUnmounted(() => {
   line-height: 1.35;
 }
 
+.order-panel,
+.voice-panel {
+  width: min(640px, 100%);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.order-row {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: $radius;
+  background: #F7FBFF;
+}
+
+.order-index {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #DBEAFE;
+  color: $learn-blue;
+  font-weight: 800;
+}
+
+.order-text {
+  flex: 1;
+  font-size: 17px;
+  font-weight: 800;
+  color: $text;
+}
+
+.order-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.mini-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: $white;
+  color: $learn-blue;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  box-shadow: $shadow-sm;
+
+  &.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+}
+
+.match-panel {
+  width: min(760px, 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.match-column {
+  min-height: 220px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.match-item {
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 2px solid #E8F0FE;
+  border-radius: $radius;
+  background: $white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+
+  &.active {
+    border-color: $learn-blue;
+    background: #EEF6FF;
+  }
+
+  &.paired {
+    border-color: $success;
+    background: #F0FFF5;
+  }
+}
+
+.match-label {
+  font-size: 16px;
+  font-weight: 800;
+  color: $text;
+}
+
+.match-submit {
+  grid-column: 1 / -1;
+}
+
+.match-pair {
+  font-size: 13px;
+  color: $success;
+  font-weight: 800;
+}
+
+.voice-target {
+  text-align: center;
+  font-size: 28px;
+  font-weight: 900;
+  color: $text;
+  line-height: 1.3;
+}
+
+.voice-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.voice-attempt {
+  text-align: center;
+  font-size: 15px;
+  color: $text-secondary;
+}
+
 /* ===== 结果屏 ===== */
 .result-screen {
   gap: 12px;
@@ -934,6 +1304,23 @@ onUnmounted(() => {
 
   & + .stat-row { border-top: 1px solid #F5F5F5; }
 }
+
+.challenge-result {
+  width: 360px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.challenge-result-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.challenge-result-icon { font-size: 30px; }
 
 .result-actions {
   display: flex;
@@ -1047,7 +1434,10 @@ onUnmounted(() => {
   .question-text { font-size: 22px; }
   .options-grid { grid-template-columns: 1fr; gap: 10px; }
   .option-btn { min-height: 64px; }
+  .match-panel { grid-template-columns: 1fr; }
+  .voice-actions { flex-direction: column; }
   .result-stats { width: 100%; }
+  .challenge-result { width: 100%; }
   .result-actions { width: 100%; flex-direction: column; }
 }
 </style>

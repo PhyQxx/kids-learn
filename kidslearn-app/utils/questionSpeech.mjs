@@ -7,7 +7,7 @@ export function resolveQuestionSpeech(question = {}) {
       firstText(question.questionSpeechText, question.speechText, question.plainText, question.text)
       || richContentToSpeechText(questionContent),
     audioUrl:
-      firstText(question.questionAudioUrl, question.audioUrl)
+      firstText(question.cachedQuestionAudioUrl, question.localAudioUrl, question.questionAudioUrl, question.audioUrl)
       || richContentToSpeechAudioUrl(questionContent),
   }
 }

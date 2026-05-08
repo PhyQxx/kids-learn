@@ -52,6 +52,17 @@
       <tn-tabs-item v-for="tab in tabItems" :key="tab.label" :title="tab.label" />
     </tn-tabs>
 
+    <view class="challenge-entry card" @tap="goChallenge">
+      <view class="challenge-entry-copy">
+        <text class="challenge-entry-icon">⚔️</text>
+        <view>
+          <text class="text-md text-bold">好友PK与段位赛</text>
+          <text class="text-xs text-light">完成挑战赢金币，提升段位积分</text>
+        </view>
+      </view>
+      <text class="text-primary text-sm">去挑战 →</text>
+    </view>
+
     <!-- 我的排名 -->
     <view class="my-rank-card card">
       <view class="my-rank-left">
@@ -75,7 +86,7 @@
     <!-- 排名列表 -->
     <view class="rank-list card">
       <view v-for="(r, i) in rankList" :key="r.id || i" class="rank-item" :class="{ me: r.isMe }">
-        <text class="rank-pos" :class="{ 'top-three': i < 3 }">{{ i + 4 }}</text>
+        <text class="rank-pos" :class="{ 'top-three': r.rank <= 3 }">{{ r.rank }}</text>
         <view class="rank-avatar-sm">
           <text>{{ r.avatar }}</text>
         </view>
@@ -98,13 +109,15 @@
 
 <script setup>
 import { ref, watch, onMounted } from 'vue'
-import { getRanking, getMyRank } from '@/api/ranking'
+import { getRanking } from '@/api/ranking'
+import { normalizeRankingList } from '@/utils/challengeData.mjs'
 
 const loading = ref(true)
 const activeTab = ref(0)
 const tabItems = ref([
   { label: '周榜', type: 'weekly' },
-  { label: '总榜', type: 'total' }
+  { label: '总榜', type: 'total' },
+  { label: '挑战榜', type: 'challenge' }
 ])
 
 const podiumData = ref([])
@@ -119,6 +132,10 @@ function applyMockData() {
   myRankData.value = { rank: '-', name: '我', avatar: '👦', level: 0, city: '', score: 0, stars: 0 }
 }
 
+function goChallenge() {
+  uni.navigateTo({ url: '/pages/challenge/index' })
+}
+
 async function loadData() {
   loading.value = true
   try {
@@ -126,38 +143,15 @@ async function loadData() {
     const result = await getRanking(rankType)
 
     if (result && Array.isArray(result) && result.length > 0) {
-      const top3 = result.slice(0, 3)
-      podiumData.value = top3.map((r, i) => ({
-        rank: i + 1,
-        name: r.nickname || r.name,
+      const normalized = normalizeRankingList(result)
+      podiumData.value = normalized.podium.map((r, i) => ({
+        rank: r.rank,
+        name: r.name,
         avatar: r.avatar || ['🦁', '🐰', '🦊'][i],
-        score: r.score || 0
+        score: r.score
       }))
-      rankList.value = result.slice(3).map(r => ({
-        id: r.id,
-        name: r.nickname || r.name,
-        avatar: r.avatar || '👦',
-        level: r.level || 0,
-        city: r.city || '',
-        score: r.score || 0,
-        stars: Math.min(Math.floor((r.score || 0) / 500), 5),
-        isMe: r.isMe || false
-      }))
-
-      // 从列表中找到"我"的排名
-      const me = result.find(r => r.isMe)
-      if (me) {
-        const rank = result.indexOf(me) + 1
-        myRankData.value = {
-          rank,
-          name: '我',
-          avatar: me.avatar || '👦',
-          level: me.level || 0,
-          city: me.city || '',
-          score: me.score || 0,
-          stars: Math.min(Math.floor((me.score || 0) / 500), 5)
-        }
-      }
+      rankList.value = normalized.list
+      myRankData.value = normalized.me
     }
   } catch (e) {
     console.log('RankingContent: 使用模拟数据', e)
@@ -258,6 +252,23 @@ watch(activeTab, () => {
   padding: 14px 20px;
   border: 2px solid $primary;
 }
+
+.challenge-entry {
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+}
+
+.challenge-entry-copy {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.challenge-entry-icon { font-size: 32px; }
 
 .my-rank-left {
   display: flex;

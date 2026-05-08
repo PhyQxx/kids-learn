@@ -6,16 +6,16 @@
         <view class="season-info">
           <text class="season-emoji">⚔️</text>
           <view>
-            <text class="text-lg text-bold text-white">春季挑战赛</text>
-            <text class="text-sm text-white" style="opacity: 0.8;">剩余 3天 12小时</text>
+            <text class="text-lg text-bold text-white">{{ dashboard.season.name }}</text>
+            <text class="text-sm text-white" style="opacity: 0.8;">{{ dashboard.season.remainingText }}</text>
           </view>
         </view>
-        <tn-button shape="round" size="lg" style="background: rgba(255,255,255,0.2); color: #fff;">参加挑战</tn-button>
+        <tn-button shape="round" size="lg" :loading="matching" style="background: rgba(255,255,255,0.2); color: #fff;" @click="startChallenge('RANKED')">参加挑战</tn-button>
       </view>
 
       <!-- 挑战卡片 -->
       <view class="challenge-grid">
-        <view v-for="c in challenges" :key="c.id" class="challenge-card card" :style="{ borderLeftColor: c.color }">
+        <view v-for="c in challenges" :key="c.id" class="challenge-card card" :style="{ borderLeftColor: c.color }" @tap="startChallenge(c.type)">
           <view class="challenge-header">
             <text class="challenge-icon">{{ c.icon }}</text>
             <view>
@@ -38,12 +38,29 @@
         <view class="tier-info">
           <text class="tier-icon">🛡️</text>
           <view>
-            <text class="text-lg text-bold">白银 III</text>
-            <text class="text-xs text-light">距离晋级还需 200 分</text>
+            <text class="text-lg text-bold">{{ dashboard.tier.tierName }}</text>
+            <text class="text-xs text-light">
+              {{ dashboard.tier.nextTierName ? `距离 ${dashboard.tier.nextTierName} 还需 ${dashboard.tier.pointsToNext} 分` : '已到达当前最高段位' }}
+            </text>
           </view>
         </view>
         <view class="progress-bar" style="width: 200px;">
-          <view class="progress-fill" style="width: 60%; background: linear-gradient(90deg, #9B59B6, #8E44AD);"></view>
+          <view class="progress-fill" :style="{ width: dashboard.tier.progressPercent + '%', background: 'linear-gradient(90deg, #9B59B6, #8E44AD)' }"></view>
+        </view>
+      </view>
+
+      <view class="stats-grid">
+        <view class="stat-card card">
+          <text class="text-xs text-light">胜场</text>
+          <text class="text-lg text-bold">{{ dashboard.stats.wins }}</text>
+        </view>
+        <view class="stat-card card">
+          <text class="text-xs text-light">胜率</text>
+          <text class="text-lg text-bold">{{ dashboard.stats.winRate }}%</text>
+        </view>
+        <view class="stat-card card">
+          <text class="text-xs text-light">积分</text>
+          <text class="text-lg text-bold">{{ dashboard.tier.points }}</text>
         </view>
       </view>
 
@@ -56,6 +73,9 @@
           <text class="text-xs text-light">{{ h.time }}</text>
           <text class="history-score" :class="{ win: h.win, lose: !h.win }">{{ h.score }}</text>
         </view>
+        <view v-if="history.length === 0" class="history-empty">
+          <text class="text-sm text-light">还没有对战记录，先来一局吧</text>
+        </view>
       </view>
     </view>
   </AppLayout>
@@ -64,36 +84,61 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
-import { createChallenge, getChallengeRecords } from '@/api/challenge'
+import { createChallenge, getChallengeDashboard, getChallengeRecords } from '@/api/challenge'
+import { normalizeChallengeDashboard, normalizeChallengeRecords } from '@/utils/challengeData.mjs'
 
 const challenges = ref([
-  { id: 1, name: '好友对战', icon: '👥', tag: '好友', tagBg: '#E8F0FE', tagColor: '#4A90D9', color: '#4A90D9', desc: '邀请好友来一场知识对决', players: 128, reward: 20 },
-  { id: 2, name: '排位赛', icon: '🏆', tag: '排位', tagBg: '#F3E8FF', tagColor: '#9B59B6', color: '#9B59B6', desc: '挑战更高段位', players: 256, reward: 50 },
-  { id: 3, name: '限时挑战', icon: '⏱️', tag: '限时', tagBg: '#FFE8E8', tagColor: '#E74C3C', color: '#E74C3C', desc: '60秒内答对最多题', players: 96, reward: 30 },
-  { id: 4, name: '团队赛', icon: '🎯', tag: '团队', tagBg: '#E8F8F0', tagColor: '#2ECC71', color: '#2ECC71', desc: '组队挑战其他队伍', players: 64, reward: 100 }
+  { id: 1, type: 'FRIEND', name: '好友对战', icon: '👥', tag: '好友', tagBg: '#E8F0FE', tagColor: '#4A90D9', color: '#4A90D9', desc: '匹配好友或同水平对手', players: 128, reward: 20 },
+  { id: 2, type: 'RANKED', name: '排位赛', icon: '🏆', tag: '排位', tagBg: '#F3E8FF', tagColor: '#9B59B6', color: '#9B59B6', desc: '赢得积分挑战更高段位', players: 256, reward: 20 },
+  { id: 3, type: 'RANKED', name: '限时挑战', icon: '⏱️', tag: '限时', tagBg: '#FFE8E8', tagColor: '#E74C3C', color: '#E74C3C', desc: '快速答题冲击高分', players: 96, reward: 20 },
+  { id: 4, type: 'RANKED', name: '综合挑战', icon: '🎯', tag: '综合', tagBg: '#E8F8F0', tagColor: '#2ECC71', color: '#2ECC71', desc: '随机学科知识对决', players: 64, reward: 20 }
 ])
 
-const history = ref([
-  { id: 1, opponent: '小明', time: '5分钟前', score: '8:5', win: true },
-  { id: 2, opponent: '小红', time: '1小时前', score: '4:7', win: false },
-  { id: 3, opponent: '小华', time: '昨天', score: '9:3', win: true }
-])
+const matching = ref(false)
+const dashboard = ref(normalizeChallengeDashboard())
+const history = ref([])
 
-onMounted(async () => {
+async function loadDashboard() {
   try {
-    const res = await getChallengeRecords()
-    if (res && Array.isArray(res) && res.length > 0) {
-      history.value = res.map(r => ({
-        id: r.id,
-        opponent: r.opponentName || '未知对手',
-        time: r.playTime || '',
-        score: `${r.myScore || 0}:${r.opponentScore || 0}`,
-        win: r.isWin || false
-      }))
-    }
+    dashboard.value = normalizeChallengeDashboard(await getChallengeDashboard())
   } catch (e) {
-    console.log('challenge: 使用模拟数据')
+    console.log('challenge: dashboard fallback', e)
   }
+}
+
+async function loadRecords() {
+  try {
+    history.value = normalizeChallengeRecords(await getChallengeRecords())
+  } catch (e) {
+    console.log('challenge: records fallback', e)
+    history.value = []
+  }
+}
+
+async function startChallenge(type) {
+  if (matching.value) return
+  matching.value = true
+  try {
+    const result = await createChallenge(type)
+    const levelId = result?.level?.id || result?.levelId
+    if (!levelId) {
+      uni.showToast({ title: '暂无可挑战关卡', icon: 'none' })
+      return
+    }
+    const opponentId = result?.opponent?.id || ''
+    uni.navigateTo({
+      url: `/pages/learn/quiz?levelId=${levelId}&challengeId=${result.challengeId}&opponentId=${opponentId}`
+    })
+  } catch (e) {
+    uni.showToast({ title: '匹配失败，请稍后再试', icon: 'none' })
+  } finally {
+    matching.value = false
+  }
+}
+
+onMounted(() => {
+  loadDashboard()
+  loadRecords()
 })
 </script>
 
@@ -132,6 +177,7 @@ onMounted(async () => {
 .challenge-card {
   border-left: 4px solid;
   padding: 16px;
+  cursor: pointer;
 }
 
 .challenge-header {
@@ -163,6 +209,19 @@ onMounted(async () => {
   padding: 16px 20px;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.stat-card {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .tier-info {
   display: flex;
   align-items: center;
@@ -188,5 +247,10 @@ onMounted(async () => {
   font-weight: 600;
   &.win { color: $success; }
   &.lose { color: $error; }
+}
+
+.history-empty {
+  padding: 16px 0 4px;
+  text-align: center;
 }
 </style>

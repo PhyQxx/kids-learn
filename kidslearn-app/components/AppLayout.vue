@@ -97,11 +97,16 @@ const navKeyByPath = {
   '/pages/learn/index': 'learn',
   '/pages/learn/courses': 'learn',
   '/pages/learn/levels': 'learn',
+  '/pages/learn/videos': 'learn',
   '/pages/learn/quiz': 'learn',
   '/pages/pet/index': 'pet',
   '/pages/ranking/index': 'ranking',
   '/pages/achievement/index': 'achievement',
   '/pages/parent/index': 'parent',
+  '/pages/parent/monitor': 'parent',
+  '/pages/parent/report': 'parent',
+  '/pages/parent/time-control': 'parent',
+  '/pages/parent/family': 'parent',
   '/pages/mine/vip': 'vip'
 }
 

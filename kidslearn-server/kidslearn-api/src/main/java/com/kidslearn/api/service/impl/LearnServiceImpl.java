@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kidslearn.api.dto.learn.DailyTaskVO;
 import com.kidslearn.api.dto.learn.LevelResultVO;
 import com.kidslearn.api.dto.learn.SubmitAnswerDTO;
+import com.kidslearn.api.dto.learn.SubmitVideoProgressDTO;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
 import com.kidslearn.api.realtime.RealtimeEventPublisher;
@@ -30,13 +31,17 @@ public class LearnServiceImpl implements LearnService {
 
     private final SubjectMapper subjectMapper;
     private final CourseMapper courseMapper;
+    private final CourseVideoMapper courseVideoMapper;
     private final CourseLevelMapper courseLevelMapper;
     private final QuestionMapper questionMapper;
     private final QuestionOptionMapper questionOptionMapper;
     private final LearningRecordMapper learningRecordMapper;
+    private final UserVideoProgressMapper userVideoProgressMapper;
     private final WrongTopicMapper wrongTopicMapper;
     private final DailyStatsMapper dailyStatsMapper;
     private final UserMapper userMapper;
+    private final FamilyMapper familyMapper;
+    private final FamilyChildMapper familyChildMapper;
     private final ChildProfileMapper childProfileMapper;
     private final StickerMapper stickerMapper;
     private final RewardLogMapper rewardLogMapper;
@@ -166,6 +171,119 @@ public class LearnServiceImpl implements LearnService {
         }).filter(m -> (boolean) m.get("_hasCourses")).collect(Collectors.toList());
     }
 
+    @Override
+    public List<Map<String, Object>> getCourseVideos(Long userId, Long courseId) {
+        List<CourseVideo> videos = courseVideoMapper.selectList(
+            new LambdaQueryWrapper<CourseVideo>()
+                .eq(CourseVideo::getCourseId, courseId)
+                .eq(CourseVideo::getStatus, 1)
+                .orderByAsc(CourseVideo::getSortOrder)
+        );
+        if (videos.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> videoIds = videos.stream().map(CourseVideo::getId).collect(Collectors.toList());
+        Map<Long, UserVideoProgress> progressByVideoId = userVideoProgressMapper.selectList(
+            new LambdaQueryWrapper<UserVideoProgress>()
+                .eq(UserVideoProgress::getUserId, userId)
+                .in(UserVideoProgress::getVideoId, videoIds)
+        ).stream().collect(Collectors.toMap(UserVideoProgress::getVideoId, p -> p, (left, right) -> left));
+
+        return videos.stream()
+            .map(video -> toVideoMap(video, progressByVideoId.get(video.getId())))
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> submitVideoProgress(Long userId, SubmitVideoProgressDTO dto) {
+        if (dto == null || dto.getVideoId() == null) {
+            throw new BusinessException("Video id is required");
+        }
+        CourseVideo video = courseVideoMapper.selectById(dto.getVideoId());
+        if (video == null || video.getStatus() == null || video.getStatus() != 1) {
+            throw new BusinessException("Video not found");
+        }
+
+        UserVideoProgress record = userVideoProgressMapper.selectOne(
+            new LambdaQueryWrapper<UserVideoProgress>()
+                .eq(UserVideoProgress::getUserId, userId)
+                .eq(UserVideoProgress::getVideoId, dto.getVideoId())
+                .last("LIMIT 1")
+        );
+
+        int durationSeconds = maxPositive(dto.getDurationSeconds(), video.getDurationSeconds());
+        int progressSeconds = dto.getProgressSeconds() == null ? 0 : dto.getProgressSeconds();
+        if (record != null) {
+            durationSeconds = maxPositive(durationSeconds, record.getDurationSeconds());
+            progressSeconds = Math.max(progressSeconds, record.getProgressSeconds() == null ? 0 : record.getProgressSeconds());
+        }
+
+        VideoProgressEngine.Progress progress = VideoProgressEngine.evaluate(progressSeconds, durationSeconds);
+        boolean completed = progress.completed() || (record != null && Integer.valueOf(1).equals(record.getCompleted()));
+
+        if (record == null) {
+            record = new UserVideoProgress();
+            record.setUserId(userId);
+            record.setVideoId(dto.getVideoId());
+            record.setProgressSeconds(progress.progressSeconds());
+            record.setDurationSeconds(progress.durationSeconds());
+            record.setProgressPercent(progress.progressPercent());
+            record.setCompleted(completed ? 1 : 0);
+            record.setLastWatchTime(LocalDateTime.now());
+            userVideoProgressMapper.insert(record);
+        } else {
+            record.setProgressSeconds(progress.progressSeconds());
+            record.setDurationSeconds(progress.durationSeconds());
+            record.setProgressPercent(progress.progressPercent());
+            record.setCompleted(completed ? 1 : 0);
+            record.setLastWatchTime(LocalDateTime.now());
+            userVideoProgressMapper.updateById(record);
+        }
+
+        return toVideoProgressMap(record);
+    }
+
+    private Map<String, Object> toVideoMap(CourseVideo video, UserVideoProgress savedProgress) {
+        int durationSeconds = maxPositive(video.getDurationSeconds(), savedProgress == null ? null : savedProgress.getDurationSeconds());
+        VideoProgressEngine.Progress progress = VideoProgressEngine.evaluate(
+            savedProgress == null ? 0 : savedProgress.getProgressSeconds(),
+            durationSeconds
+        );
+        boolean completed = progress.completed() || (savedProgress != null && Integer.valueOf(1).equals(savedProgress.getCompleted()));
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", video.getId());
+        map.put("courseId", video.getCourseId());
+        map.put("courseLevelId", video.getCourseLevelId());
+        map.put("title", video.getTitle());
+        map.put("description", video.getDescription());
+        map.put("coverUrl", video.getCoverUrl());
+        map.put("videoUrl", video.getVideoUrl());
+        map.put("durationSeconds", durationSeconds);
+        map.put("sortOrder", video.getSortOrder());
+        map.put("isFree", video.getIsFree());
+        map.put("progressSeconds", progress.progressSeconds());
+        map.put("progressPercent", progress.progressPercent());
+        map.put("completed", completed);
+        return map;
+    }
+
+    private Map<String, Object> toVideoProgressMap(UserVideoProgress record) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("videoId", record.getVideoId());
+        map.put("progressSeconds", record.getProgressSeconds());
+        map.put("durationSeconds", record.getDurationSeconds());
+        map.put("progressPercent", record.getProgressPercent());
+        map.put("completed", Integer.valueOf(1).equals(record.getCompleted()));
+        return map;
+    }
+
+    private int maxPositive(Integer left, Integer right) {
+        return Math.max(left == null ? 0 : Math.max(0, left), right == null ? 0 : Math.max(0, right));
+    }
+
     /**
      * Get course IDs that belong to a given grade level via course_grade.
      */
@@ -205,6 +323,11 @@ public class LearnServiceImpl implements LearnService {
             map.put("totalLevels", c.getTotalLevels());
             map.put("difficulty", c.getDifficulty());
             map.put("isElite", c.getIsElite());
+            map.put("videoCount", courseVideoMapper.selectCount(
+                new LambdaQueryWrapper<CourseVideo>()
+                    .eq(CourseVideo::getCourseId, c.getId())
+                    .eq(CourseVideo::getStatus, 1)
+            ));
 
             // user progress
             Long completedCount = learningRecordMapper.selectCount(
@@ -377,15 +500,14 @@ public class LearnServiceImpl implements LearnService {
             throw new BusinessException("题目不存在");
         }
 
-        QuestionOption correctOption = questionOptionMapper.selectOne(
+        List<QuestionOption> answerOptions = questionOptionMapper.selectList(
             new LambdaQueryWrapper<QuestionOption>()
                 .eq(QuestionOption::getQuestionId, dto.getQuestionId())
-                .eq(QuestionOption::getIsCorrect, 1)
-                .last("LIMIT 1")
+                .orderByAsc(QuestionOption::getSortOrder)
         );
-
-        String correctAnswer = correctOption != null ? correctOption.getOptionLabel() : "";
-        boolean isCorrect = correctAnswer.equalsIgnoreCase(dto.getAnswer());
+        QuestionAnswerEvaluator.Evaluation evaluation = QuestionAnswerEvaluator.evaluate(question, answerOptions, dto.getAnswer());
+        String correctAnswer = evaluation.correctAnswer();
+        boolean isCorrect = evaluation.correct();
 
         Map<String, Object> result = new HashMap<>();
         result.put("correct", isCorrect);
@@ -532,7 +654,76 @@ public class LearnServiceImpl implements LearnService {
             vo.setUnlockedNextLevel(false);
         }
 
+        publishChildActivity(userId, level, record, correctRate);
+
         return vo;
+    }
+
+    private void publishChildActivity(Long userId, CourseLevel level, LearningRecord record, int correctRate) {
+        FamilyChild familyChild = familyChildMapper.selectOne(
+            new LambdaQueryWrapper<FamilyChild>()
+                .eq(FamilyChild::getChildUserId, userId)
+                .last("LIMIT 1")
+        );
+        if (familyChild == null) {
+            return;
+        }
+        Family family = familyMapper.selectById(familyChild.getFamilyId());
+        if (family == null || family.getParentUserId() == null) {
+            return;
+        }
+
+        User child = userMapper.selectById(userId);
+        Course course = level != null ? courseMapper.selectById(level.getCourseId()) : null;
+        List<LearningRecord> todayRecords = learningRecordMapper.selectList(
+            new LambdaQueryWrapper<LearningRecord>()
+                .eq(LearningRecord::getUserId, userId)
+                .ge(LearningRecord::getPlayTime, LocalDate.now().atStartOfDay())
+        );
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("childId", userId);
+        payload.put("nickname", child != null && child.getNickname() != null ? child.getNickname() : "孩子");
+        payload.put("avatar", child != null && child.getAvatar() != null ? child.getAvatar() : "");
+        payload.put("online", true);
+        payload.put("status", "LEARNING");
+        payload.put("todayMinutes", sumTodayLearningMinutes(todayRecords));
+        payload.put("completedLevels", (int) todayRecords.stream().filter(r -> Integer.valueOf(1).equals(r.getIsPass())).count());
+        payload.put("totalQuestions", sumTodayTotalQuestions(todayRecords));
+        payload.put("correctCount", sumTodayCorrectQuestions(todayRecords));
+        payload.put("accuracy", correctRate);
+        payload.put("currentCourseName", course != null ? course.getCourseName() : "");
+        payload.put("currentLevelName", level != null ? level.getLevelName() : "");
+        payload.put("latestScore", record.getScore());
+        payload.put("stars", record.getStars());
+        payload.put("isPass", Integer.valueOf(1).equals(record.getIsPass()));
+        payload.put("lastActivityAt", record.getPlayTime() != null ? record.getPlayTime().toString() : LocalDateTime.now().toString());
+        realtimeEventPublisher.publishChildActivity(family.getParentUserId(), payload);
+    }
+
+    private int sumTodayLearningMinutes(List<LearningRecord> records) {
+        return records.stream()
+            .mapToInt(record -> Math.max(1, (record.getAnswerTime() == null ? 0 : record.getAnswerTime()) / 60))
+            .sum();
+    }
+
+    private int sumTodayTotalQuestions(List<LearningRecord> records) {
+        int total = 0;
+        for (LearningRecord learningRecord : records) {
+            CourseLevel recordLevel = courseLevelMapper.selectById(learningRecord.getCourseLevelId());
+            total += recordLevel != null && recordLevel.getTotalQuestions() != null ? recordLevel.getTotalQuestions() : 0;
+        }
+        return total;
+    }
+
+    private int sumTodayCorrectQuestions(List<LearningRecord> records) {
+        int correct = 0;
+        for (LearningRecord learningRecord : records) {
+            CourseLevel recordLevel = courseLevelMapper.selectById(learningRecord.getCourseLevelId());
+            int questionCount = recordLevel != null && recordLevel.getTotalQuestions() != null ? recordLevel.getTotalQuestions() : 0;
+            correct += Math.max(0, questionCount - (learningRecord.getWrongCount() == null ? 0 : learningRecord.getWrongCount()));
+        }
+        return correct;
     }
 
     private int calculateStars(Integer score, String starThresholds) {

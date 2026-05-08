@@ -10,11 +10,16 @@ import {
   reduceBalanceMessage,
   shouldReconnect
 } from '@/utils/realtime.mjs'
+import {
+  normalizeMonitorSnapshot,
+  reduceMonitorEvent
+} from '@/utils/parentMonitor.mjs'
 
 export const useRealtimeStore = defineStore('realtime', () => {
   const connected = ref(false)
   const connecting = ref(false)
   const lastMessageAt = ref('')
+  const parentMonitor = ref(normalizeMonitorSnapshot())
   const socketTask = ref(null)
   const reconnectTimer = ref(null)
   const closedByUser = ref(false)
@@ -97,7 +102,19 @@ export const useRealtimeStore = defineStore('realtime', () => {
       if (next) {
         userStore.setUserInfo(next)
       }
+      return
     }
+
+    if (
+      message.type === REALTIME_MESSAGE_TYPES.CHILD_ACTIVITY_UPDATE ||
+      message.type === REALTIME_MESSAGE_TYPES.PARENT_MONITOR_UPDATE
+    ) {
+      parentMonitor.value = reduceMonitorEvent(parentMonitor.value, message)
+    }
+  }
+
+  function setParentMonitor(snapshot) {
+    parentMonitor.value = normalizeMonitorSnapshot(snapshot)
   }
 
   function scheduleReconnect() {
@@ -123,9 +140,11 @@ export const useRealtimeStore = defineStore('realtime', () => {
     connected,
     connecting,
     lastMessageAt,
+    parentMonitor,
     connect,
     close,
     send,
-    handleMessage
+    handleMessage,
+    setParentMonitor
   }
 })

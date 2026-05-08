@@ -1,6 +1,7 @@
 <script>
 import { useRealtimeStore } from '@/store/realtime'
 import { useUserStore } from '@/store/user'
+import { getPostAuthRedirectUrl } from '@/utils/onboardingFlow.mjs'
 
 export default {
   onLaunch() {
@@ -13,12 +14,7 @@ export default {
       useRealtimeStore().connect()
       // 检查新手引导是否完成
       const userStore = useUserStore()
-      const step = userStore.onboardingStep
-      if (step > 0 && step < 3) {
-        uni.reLaunch({ url: '/pages/onboarding/index' })
-      } else {
-        uni.reLaunch({ url: '/pages/main/index' })
-      }
+      uni.reLaunch({ url: getPostAuthRedirectUrl(userStore.userInfo) })
     }
   },
   onShow() {

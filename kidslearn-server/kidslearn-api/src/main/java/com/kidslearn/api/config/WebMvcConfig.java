@@ -21,7 +21,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/v1/**")
                 .excludePathPatterns(
                         "/api/v1/auth/**",
-                        "/api/v1/public/**"
+                        "/api/v1/public/**",
+                        "/api/v1/order/pay-callback"
                 );
     }
 }

@@ -3,6 +3,7 @@ package com.kidslearn.api.controller;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.realtime.RealtimeSessionRegistry;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -32,6 +33,7 @@ public class ParentController {
     private final CourseLevelMapper courseLevelMapper;
     private final CourseMapper courseMapper;
     private final SubjectMapper subjectMapper;
+    private final RealtimeSessionRegistry realtimeSessionRegistry;
 
     @Operation(summary = "获取学习报告")
     @GetMapping("/report")
@@ -249,5 +251,183 @@ public class ParentController {
         }
 
         return R.ok(result);
+    }
+
+    @Operation(summary = "获取家长实时监控")
+    @GetMapping("/realtime-monitor")
+    public R<Map<String, Object>> getRealtimeMonitor(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        Family family = findFamily(userId);
+        Map<String, Object> result = new HashMap<>();
+        result.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+
+        if (family == null) {
+            result.put("family", Map.of("familyName", "", "inviteCode", ""));
+            result.put("children", List.of());
+            result.put("summary", buildMonitorSummary(List.of()));
+            return R.ok(result);
+        }
+
+        result.put("family", Map.of(
+            "familyName", family.getFamilyName() != null ? family.getFamilyName() : "我的家庭",
+            "inviteCode", family.getFamilyCode() != null ? family.getFamilyCode() : ""
+        ));
+
+        Set<Long> onlineUserIds = realtimeSessionRegistry.connectedUserIds();
+        List<FamilyChild> children = familyChildMapper.selectList(
+            new LambdaQueryWrapper<FamilyChild>().eq(FamilyChild::getFamilyId, family.getId())
+        );
+        List<Map<String, Object>> childSnapshots = new ArrayList<>();
+        for (FamilyChild fc : children) {
+            Map<String, Object> childSnapshot = buildChildMonitorSnapshot(fc, onlineUserIds.contains(fc.getChildUserId()));
+            if (!childSnapshot.isEmpty()) {
+                childSnapshots.add(childSnapshot);
+            }
+        }
+
+        result.put("children", childSnapshots);
+        result.put("summary", buildMonitorSummary(childSnapshots));
+        return R.ok(result);
+    }
+
+    private Family findFamily(Long userId) {
+        Family family = familyMapper.selectOne(
+            new LambdaQueryWrapper<Family>().eq(Family::getParentUserId, userId).last("LIMIT 1")
+        );
+        if (family != null) {
+            return family;
+        }
+        FamilyChild fc = familyChildMapper.selectOne(
+            new LambdaQueryWrapper<FamilyChild>().eq(FamilyChild::getChildUserId, userId).last("LIMIT 1")
+        );
+        return fc != null ? familyMapper.selectById(fc.getFamilyId()) : null;
+    }
+
+    private Map<String, Object> buildChildMonitorSnapshot(FamilyChild familyChild, boolean online) {
+        User child = userMapper.selectById(familyChild.getChildUserId());
+        if (child == null) {
+            return Map.of();
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime todayStart = today.atStartOfDay();
+        List<LearningRecord> todayRecords = learningRecordMapper.selectList(
+            new LambdaQueryWrapper<LearningRecord>()
+                .eq(LearningRecord::getUserId, child.getId())
+                .ge(LearningRecord::getPlayTime, todayStart)
+        );
+        LearningRecord latestRecord = learningRecordMapper.selectOne(
+            new LambdaQueryWrapper<LearningRecord>()
+                .eq(LearningRecord::getUserId, child.getId())
+                .orderByDesc(LearningRecord::getPlayTime)
+                .last("LIMIT 1")
+        );
+
+        CourseLevel latestLevel = latestRecord != null ? courseLevelMapper.selectById(latestRecord.getCourseLevelId()) : null;
+        Course latestCourse = latestLevel != null ? courseMapper.selectById(latestLevel.getCourseId()) : null;
+        TimeControl timeControl = timeControlMapper.selectOne(
+            new LambdaQueryWrapper<TimeControl>()
+                .eq(TimeControl::getChildUserId, child.getId())
+                .last("LIMIT 1")
+        );
+        int totalQuestions = sumTotalQuestions(todayRecords);
+        int correctCount = sumCorrectQuestions(todayRecords);
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("childId", child.getId());
+        map.put("nickname", child.getNickname() != null ? child.getNickname() : "孩子");
+        map.put("avatar", child.getAvatar() != null ? child.getAvatar() : "");
+        map.put("online", online);
+        map.put("status", monitorStatus(online, latestRecord, timeControl, todayStart));
+        map.put("lastActivityAt", latestRecord != null && latestRecord.getPlayTime() != null
+            ? latestRecord.getPlayTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : "");
+        map.put("todayMinutes", sumLearningMinutes(todayRecords));
+        map.put("dailyLimitMinutes", timeControl != null && timeControl.getDailyLimit() != null ? timeControl.getDailyLimit() : 60);
+        map.put("completedLevels", (int) todayRecords.stream().filter(r -> Integer.valueOf(1).equals(r.getIsPass())).count());
+        map.put("totalQuestions", totalQuestions);
+        map.put("correctCount", correctCount);
+        map.put("accuracy", totalQuestions > 0 ? Math.round(correctCount * 100.0 / totalQuestions) : 0);
+        map.put("currentCourseName", latestCourse != null ? latestCourse.getCourseName() : "");
+        map.put("currentLevelName", latestLevel != null ? latestLevel.getLevelName() : "");
+        map.put("latestScore", latestRecord != null && latestRecord.getScore() != null ? latestRecord.getScore() : 0);
+        map.put("stars", latestRecord != null && latestRecord.getStars() != null ? latestRecord.getStars() : 0);
+        map.put("isPass", latestRecord != null && Integer.valueOf(1).equals(latestRecord.getIsPass()));
+        return map;
+    }
+
+    private String monitorStatus(boolean online, LearningRecord latestRecord, TimeControl timeControl, LocalDateTime todayStart) {
+        if (!online) {
+            return "OFFLINE";
+        }
+        if (timeControl != null && Integer.valueOf(1).equals(timeControl.getIsEnabled()) && timeControl.getDailyLimit() != null) {
+            DailyStats stats = dailyStatsMapper.selectOne(
+                new LambdaQueryWrapper<DailyStats>()
+                    .eq(DailyStats::getUserId, timeControl.getChildUserId())
+                    .eq(DailyStats::getStatDate, LocalDate.now())
+                    .last("LIMIT 1")
+            );
+            if (stats != null && stats.getLearnMinutes() != null && stats.getLearnMinutes() >= timeControl.getDailyLimit()) {
+                return "LIMITED";
+            }
+        }
+        if (latestRecord != null && latestRecord.getPlayTime() != null && latestRecord.getPlayTime().isAfter(todayStart)) {
+            return "LEARNING";
+        }
+        return "ONLINE";
+    }
+
+    private int sumLearningMinutes(List<LearningRecord> records) {
+        return records.stream()
+            .mapToInt(record -> Math.max(1, (record.getAnswerTime() == null ? 0 : record.getAnswerTime()) / 60))
+            .sum();
+    }
+
+    private int sumTotalQuestions(List<LearningRecord> records) {
+        int total = 0;
+        for (LearningRecord record : records) {
+            CourseLevel level = courseLevelMapper.selectById(record.getCourseLevelId());
+            total += level != null && level.getTotalQuestions() != null ? level.getTotalQuestions() : 0;
+        }
+        return total;
+    }
+
+    private int sumCorrectQuestions(List<LearningRecord> records) {
+        int correct = 0;
+        for (LearningRecord record : records) {
+            CourseLevel level = courseLevelMapper.selectById(record.getCourseLevelId());
+            int total = level != null && level.getTotalQuestions() != null ? level.getTotalQuestions() : 0;
+            correct += Math.max(0, total - (record.getWrongCount() == null ? 0 : record.getWrongCount()));
+        }
+        return correct;
+    }
+
+    private Map<String, Object> buildMonitorSummary(List<Map<String, Object>> children) {
+        int onlineCount = 0;
+        int learningCount = 0;
+        int todayMinutes = 0;
+        int completedLevels = 0;
+        int alertCount = 0;
+        for (Map<String, Object> child : children) {
+            if (Boolean.TRUE.equals(child.get("online"))) {
+                onlineCount++;
+            }
+            if ("LEARNING".equals(child.get("status"))) {
+                learningCount++;
+            }
+            todayMinutes += ((Number) child.getOrDefault("todayMinutes", 0)).intValue();
+            completedLevels += ((Number) child.getOrDefault("completedLevels", 0)).intValue();
+            int limit = ((Number) child.getOrDefault("dailyLimitMinutes", 0)).intValue();
+            if (limit > 0 && ((Number) child.getOrDefault("todayMinutes", 0)).intValue() >= limit) {
+                alertCount++;
+            }
+        }
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("childCount", children.size());
+        summary.put("onlineCount", onlineCount);
+        summary.put("learningCount", learningCount);
+        summary.put("todayMinutes", todayMinutes);
+        summary.put("completedLevels", completedLevels);
+        summary.put("alertCount", alertCount);
+        return summary;
     }
 }

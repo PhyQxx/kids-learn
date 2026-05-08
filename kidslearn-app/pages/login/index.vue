@@ -33,6 +33,7 @@
 import { login } from '@/api/auth'
 import { useUserStore } from '@/store/user'
 import { useRealtimeStore } from '@/store/realtime'
+import { getPostAuthRedirectUrl } from '@/utils/onboardingFlow.mjs'
 
 export default {
   data() {
@@ -57,12 +58,7 @@ export default {
         }
         useRealtimeStore().connect()
         uni.hideLoading()
-        const step = res.userInfo?.onboardingStep ?? 0
-        if (step > 0 && step < 3) {
-          uni.reLaunch({ url: '/pages/onboarding/index' })
-        } else {
-          uni.reLaunch({ url: '/pages/main/index' })
-        }
+        uni.reLaunch({ url: getPostAuthRedirectUrl(res.userInfo) })
       } catch (e) {
         uni.hideLoading()
         this.loginError = e?.msg || '登录失败，请检查账号密码'

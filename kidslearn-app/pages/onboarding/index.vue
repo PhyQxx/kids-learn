@@ -94,6 +94,12 @@ import { getAssessmentQuestions, submitAnswer } from '@/api/learn'
 import { useUserStore } from '@/store/user'
 import { usePetStore } from '@/store/pet'
 import { getUserInfo } from '@/api/user'
+import {
+  getOnboardingPayload,
+  normalizePetOptions,
+  normalizeQuestionOptions,
+  wasAnswerCorrect
+} from '@/utils/onboardingData.mjs'
 
 const userStore = useUserStore()
 const petStore = usePetStore()
@@ -119,9 +125,7 @@ const quizProgress = computed(() => questions.value.length ? ((currentIndex.valu
 
 onMounted(async () => {
   const res = await getAvailablePets()
-  if (res.code === 200) {
-    pets.value = res.data || []
-  }
+  pets.value = normalizePetOptions(res)
 })
 
 async function confirmPet() {
@@ -129,8 +133,9 @@ async function confirmPet() {
   uni.showLoading({ title: '领养中...' })
   try {
     const res = await selectPet(selectedPetId.value)
-    if (res.code === 200) {
-      petStore.setPetInfo(res.data)
+    const petInfo = getOnboardingPayload(res)
+    if (petInfo) {
+      petStore.setPetInfo(petInfo)
       await updateOnboardingStep(1)
       step.value = 2
     }
@@ -143,11 +148,9 @@ async function startQuiz() {
   uni.showLoading({ title: '准备题目...' })
   try {
     const res = await getAssessmentQuestions()
-    if (res.code === 200) {
-      questions.value = res.data || []
-      assessmentTotal.value = questions.value.length
-      quizStarted.value = true
-    }
+    questions.value = normalizeQuestionOptions(res)
+    assessmentTotal.value = questions.value.length
+    quizStarted.value = true
   } finally {
     uni.hideLoading()
   }
@@ -167,7 +170,7 @@ async function submitQuizAnswer() {
       answer: chosenAnswer.value,
       timeTaken: 0
     })
-    if (res.code === 200 && res.data?.correct) {
+    if (wasAnswerCorrect(res)) {
       correctCount.value++
     }
   } catch (_) { /* ignore errors in assessment */ }
@@ -186,8 +189,9 @@ async function finishOnboarding() {
   await updateOnboardingStep(3)
   try {
     const infoRes = await getUserInfo()
-    if (infoRes.code === 200) {
-      userStore.setUserInfo(infoRes.data)
+    const info = getOnboardingPayload(infoRes)
+    if (info) {
+      userStore.setUserInfo(info)
     }
   } catch (_) {}
   uni.reLaunch({ url: '/pages/main/index' })
@@ -236,7 +240,7 @@ async function finishOnboarding() {
 .step-title {
   font-size: 28px;
   font-weight: 700;
-  color: $text-primary;
+  color: $text;
   margin-bottom: 8px;
 }
 .step-desc {
@@ -343,7 +347,7 @@ async function finishOnboarding() {
 .question-text {
   font-size: 18px;
   font-weight: 600;
-  color: $text-primary;
+  color: $text;
   margin-bottom: 16px;
   line-height: 1.5;
 }
@@ -381,7 +385,7 @@ async function finishOnboarding() {
   font-weight: 700;
   flex-shrink: 0;
 }
-.option-text { font-size: 15px; color: $text-primary; }
+.option-text { font-size: 15px; color: $text; }
 
 // Tour
 .tour-cards {
@@ -401,6 +405,6 @@ async function finishOnboarding() {
   box-shadow: 0 4px 16px rgba(0,0,0,0.06);
 }
 .tour-icon { font-size: 36px; }
-.tour-title { font-size: 16px; font-weight: 700; color: $text-primary; }
+.tour-title { font-size: 16px; font-weight: 700; color: $text; }
 .tour-desc { font-size: 12px; color: $text-secondary; text-align: center; line-height: 1.5; }
 </style>

@@ -81,8 +81,8 @@
 
 ## Phase 8: Server端付费系统 (P2)
 
-- [ ] **8.1** SubscriptionService + Controller — 会员套餐查询、订阅
-- [ ] **8.2** OrderService + Controller — 订单创建、支付回调
+- [x] **8.1** SubscriptionService + Controller — 会员套餐查询、订阅
+- [x] **8.2** OrderService + Controller — 订单创建、支付回调
 
 ---
 
@@ -184,10 +184,10 @@
 | Server成就系统 (Phase 5) | 2 | 2 | 100% |
 | Server排行榜/挑战 (Phase 6) | 2 | 2 | 100% |
 | Server家长中心 (Phase 7) | 1 | 1 | 100% |
-| Server付费系统 (Phase 8) | 2 | 0 | 0% |
+| Server付费系统 (Phase 8) | 2 | 2 | 100% |
 | Server管理后台API (Phase 9) | 4 | 4 | 100% |
 | Admin UI管理后台 (Phase 10) | 17 | 17 | 100% |
 | Mobile App (Phase 11) | 34 | 34 | 100% |
-| **总计** | **84** | **82** | **97.6%** |
+| **总计** | **84** | **84** | **100%** |
 
-> 剩余未完成: Phase 8 付费系统 (P2优先级，可后续迭代)
+> 全部任务已实现；真实支付网关签名/验签可作为后续集成项。

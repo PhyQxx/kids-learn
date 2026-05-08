@@ -35,3 +35,16 @@ test('rich content speech metadata is used when direct fields are absent', () =>
     audioUrl: 'https://example.com/rich.mp3',
   })
 })
+
+test('cached local audio is preferred over remote audio', () => {
+  const speech = resolveQuestionSpeech({
+    questionSpeechText: 'Read local copy',
+    questionAudioUrl: 'https://example.com/q.wav',
+    cachedQuestionAudioUrl: '/saved/q.wav',
+  })
+
+  assert.deepEqual(speech, {
+    text: 'Read local copy',
+    audioUrl: '/saved/q.wav',
+  })
+})

@@ -3,6 +3,7 @@ package com.kidslearn.api.service;
 import com.kidslearn.api.dto.learn.DailyTaskVO;
 import com.kidslearn.api.dto.learn.LevelResultVO;
 import com.kidslearn.api.dto.learn.SubmitAnswerDTO;
+import com.kidslearn.api.dto.learn.SubmitVideoProgressDTO;
 import com.kidslearn.common.result.PageResult;
 
 import java.util.List;
@@ -17,6 +18,10 @@ public interface LearnService {
     PageResult<Map<String, Object>> getCourses(Long userId, Long subjectId, Long gradeLevelId, Integer page, Integer pageSize);
 
     List<Map<String, Object>> getLevels(Long userId, Long courseId);
+
+    List<Map<String, Object>> getCourseVideos(Long userId, Long courseId);
+
+    Map<String, Object> submitVideoProgress(Long userId, SubmitVideoProgressDTO dto);
 
     List<Map<String, Object>> getQuestions(Long levelId);
 

@@ -69,6 +69,10 @@
             <text class="action-emoji">👔</text>
             <text class="text-sm">换装</text>
           </view>
+          <view class="action-btn-item card card-hover" @tap="openPetPicker">
+            <text class="action-emoji">🐾</text>
+            <text class="text-sm">换宠物</text>
+          </view>
         </view>
       </view>
 
@@ -137,6 +141,28 @@
         </view>
       </view>
     </tn-popup>
+
+    <!-- 换宠物弹窗 -->
+    <tn-popup v-model="showPetPicker" direction="center" :custom-style="{ width: '520px', maxHeight: '80vh' }">
+      <view class="pet-picker-modal">
+        <text class="text-lg text-bold" style="margin-bottom: 16px;">选择你的宠物伙伴</text>
+        <scroll-view scroll-y style="max-height: 320px;">
+          <view class="pet-picker-grid">
+            <view v-for="pet in availablePets" :key="pet.id"
+              class="pet-picker-item card"
+              :class="{ selected: pickedPetId === pet.id }"
+              @tap="pickedPetId = pet.id">
+              <text class="pet-emoji">{{ pet.imageUrl }}</text>
+              <text class="text-xs">{{ pet.petName }}</text>
+            </view>
+          </view>
+        </scroll-view>
+        <view style="display: flex; gap: 12px; margin-top: 16px;">
+          <tn-button type="primary" shape="round" @click="confirmPetChange" :disabled="!pickedPetId" block>确认更换</tn-button>
+          <tn-button shape="round" @click="showPetPicker = false" block>取消</tn-button>
+        </view>
+      </view>
+    </tn-popup>
     </template>
   </view>
 </template>
@@ -145,7 +171,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePetStore } from '@/store/pet'
 import { useUserStore } from '@/store/user'
-import { getPetStatus, getInventory, getDecorationInventory, feedPet as feedPetApi, playPet as playPetApi, bathPet as bathPetApi } from '@/api/pet'
+import { getPetStatus, getInventory, getDecorationInventory, feedPet as feedPetApi, playPet as playPetApi, bathPet as bathPetApi, getAvailablePets, selectPet } from '@/api/pet'
 import { normalizeInventoryItems, normalizeDecorations } from '@/utils/petFeature.mjs'
 
 const petStore = usePetStore()
@@ -154,6 +180,9 @@ const userStore = useUserStore()
 const loading = ref(true)
 const showFeedModal = ref(false)
 const selectedFood = ref(null)
+const showPetPicker = ref(false)
+const availablePets = ref([])
+const pickedPetId = ref(null)
 
 const foodItems = ref([])
 const costumeItems = ref([])
@@ -235,6 +264,30 @@ async function handlePlay() {
 
 function goDress() { uni.navigateTo({ url: '/pages/pet/dress' }) }
 function goShop() { uni.navigateTo({ url: '/pages/pet/shop' }) }
+
+async function openPetPicker() {
+  pickedPetId.value = null
+  try {
+    const res = await getAvailablePets()
+    availablePets.value = res.data || res || []
+  } catch (_) {}
+  showPetPicker.value = true
+}
+
+async function confirmPetChange() {
+  if (!pickedPetId.value) return
+  try {
+    const res = await selectPet(pickedPetId.value)
+    if (res.code === 200 || res) {
+      petStore.setPetInfo(res.data || res)
+      showPetPicker.value = false
+      uni.showToast({ title: '更换成功！', icon: 'success' })
+      loadData()
+    }
+  } catch (e) {
+    uni.showToast({ title: e?.msg || '更换失败', icon: 'none' })
+  }
+}
 
 async function confirmFeed() {
   if (!selectedFood.value) return
@@ -445,5 +498,29 @@ function syncUserBalance(petRes) {
 @media (max-width: 640px) {
   .pet-layout { grid-template-columns: 1fr; }
   .pet-panel { padding: 12px; }
+}
+
+.pet-picker-modal {
+  padding: 24px;
+}
+.pet-picker-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+.pet-picker-item {
+  width: 80px;
+  height: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 2px solid transparent;
+  &.selected {
+    border-color: #FF6B6B;
+    background: rgba(255, 107, 107, 0.08);
+  }
 }
 </style>

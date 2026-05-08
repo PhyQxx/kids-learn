@@ -11,3 +11,5 @@ export const updateTimeControl = (data) => put('/parent/time-control', data)
 
 // 获取家庭成员
 export const getFamilyMembers = () => get('/parent/family')
+
+export const getRealtimeMonitor = () => get('/parent/realtime-monitor')
