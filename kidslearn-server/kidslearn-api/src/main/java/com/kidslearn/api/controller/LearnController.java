@@ -42,25 +42,13 @@ public class LearnController {
         return R.ok(learnService.getSubjects(userId, gradeLevelId));
     }
 
-    @Operation(summary = "获取课程列表")
-    @GetMapping("/courses")
-    public R<PageResult<Map<String, Object>>> getCourses(
-            HttpServletRequest request,
-            @RequestParam(required = false) Long subjectId,
-            @RequestParam(required = false) Long gradeLevelId,
-            @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "10") Integer pageSize) {
-        Long userId = (Long) request.getAttribute("userId");
-        return R.ok(learnService.getCourses(userId, subjectId, gradeLevelId, page, pageSize));
-    }
-
     @Operation(summary = "获取关卡列表")
     @GetMapping("/levels")
     public R<List<Map<String, Object>>> getLevels(
             HttpServletRequest request,
-            @RequestParam Long courseId) {
+            @RequestParam Long subjectId) {
         Long userId = (Long) request.getAttribute("userId");
-        return R.ok(learnService.getLevels(userId, courseId));
+        return R.ok(learnService.getLevels(userId, subjectId));
     }
 
     @Operation(summary = "鑾峰彇瑙嗛璇剧▼鍒楄〃")
@@ -83,8 +71,11 @@ public class LearnController {
 
     @Operation(summary = "获取题目列表")
     @GetMapping("/questions")
-    public R<List<Map<String, Object>>> getQuestions(@RequestParam Long levelId) {
-        return R.ok(learnService.getQuestions(levelId));
+    public R<List<Map<String, Object>>> getQuestions(
+            HttpServletRequest request,
+            @RequestParam Long levelId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getQuestions(userId, levelId));
     }
 
     @Operation(summary = "提交答案")

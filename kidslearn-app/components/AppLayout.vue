@@ -95,7 +95,6 @@ const themeClass = computed(() => `theme-${props.theme}`)
 const navKeyByPath = {
   '/pages/main/index': 'home',
   '/pages/learn/index': 'learn',
-  '/pages/learn/courses': 'learn',
   '/pages/learn/levels': 'learn',
   '/pages/learn/videos': 'learn',
   '/pages/learn/quiz': 'learn',

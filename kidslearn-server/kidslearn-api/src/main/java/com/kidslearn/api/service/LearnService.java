@@ -17,15 +17,13 @@ public interface LearnService {
 
     List<Map<String, Object>> getSubjects(Long userId, Long gradeLevelId);
 
-    PageResult<Map<String, Object>> getCourses(Long userId, Long subjectId, Long gradeLevelId, Integer page, Integer pageSize);
-
-    List<Map<String, Object>> getLevels(Long userId, Long courseId);
+    List<Map<String, Object>> getLevels(Long userId, Long subjectId);
 
     List<Map<String, Object>> getCourseVideos(Long userId, Long courseId);
 
     Map<String, Object> submitVideoProgress(Long userId, SubmitVideoProgressDTO dto);
 
-    List<Map<String, Object>> getQuestions(Long levelId);
+    List<Map<String, Object>> getQuestions(Long userId, Long levelId);
 
     Map<String, Object> submitAnswer(Long userId, SubmitAnswerDTO dto);
 

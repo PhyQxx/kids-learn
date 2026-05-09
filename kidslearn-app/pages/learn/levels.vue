@@ -2,7 +2,7 @@
   <AppLayout theme="learn" title="关卡列表" :show-back="true" active-nav="/pages/learn/index">
     <template #topbar-left-extra>
       <view class="badge badge-blue" style="margin-left: 8px;">
-        <text class="text-xs">{{ courseName }}</text>
+        <text class="text-xs">{{ subjectName }}</text>
       </view>
     </template>
 
@@ -45,27 +45,28 @@ import { getUserInfo } from '@/api/user'
 
 const learnStore = useLearnStore()
 const userStore = useUserStore()
-const courseName = ref(learnStore.currentCourse?.name || '课程')
-const pageCourseId = ref(null)
+const subjectName = ref(learnStore.currentSubject?.name || '学科')
+const pageSubjectId = ref(null)
 const pageGradeLevelId = ref(null)
 
 const units = ref([])
 
 onLoad((query) => {
-  pageCourseId.value = query.courseId || null
+  pageSubjectId.value = query.subjectId || null
   pageGradeLevelId.value = query.gradeLevelId || null
+  if (query.subjectName) subjectName.value = decodeURIComponent(query.subjectName)
 })
 
 async function loadLevels() {
   // 优先使用 store，其次用 URL 参数
-  let courseId = learnStore.currentCourse?.id
-  if (!courseId) {
-    courseId = pageCourseId.value
+  let subjectId = learnStore.currentSubject?.id
+  if (!subjectId) {
+    subjectId = pageSubjectId.value
   }
-  if (courseId) {
+  if (subjectId) {
     try {
       const gradeLevelId = pageGradeLevelId.value || userStore.userInfo?.gradeLevelId || null
-      const res = await getLevels(courseId, gradeLevelId)
+      const res = await getLevels(subjectId, gradeLevelId)
       if (res && Array.isArray(res) && res.length > 0) {
         const levelList = res.map(l => ({
           id: l.id,

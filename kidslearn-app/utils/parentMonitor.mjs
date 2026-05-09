@@ -49,7 +49,7 @@ function normalizeChild(raw = {}) {
     totalQuestions: clampNonNegative(raw.totalQuestions),
     correctCount: clampNonNegative(raw.correctCount),
     accuracy: Math.min(100, clampNonNegative(raw.accuracy)),
-    currentCourseName: raw.currentCourseName || '',
+    currentSubjectName: raw.currentSubjectName || '',
     currentLevelName: raw.currentLevelName || '',
     latestScore: clampNonNegative(raw.latestScore),
     stars: clampNonNegative(raw.stars),

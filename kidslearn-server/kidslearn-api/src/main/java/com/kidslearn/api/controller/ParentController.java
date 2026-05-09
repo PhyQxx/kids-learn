@@ -31,7 +31,6 @@ public class ParentController {
     private final DailyStatsMapper dailyStatsMapper;
     private final LearningRecordMapper learningRecordMapper;
     private final CourseLevelMapper courseLevelMapper;
-    private final CourseMapper courseMapper;
     private final SubjectMapper subjectMapper;
     private final RealtimeSessionRegistry realtimeSessionRegistry;
 
@@ -88,11 +87,8 @@ public class ParentController {
         List<Subject> subjects = subjectMapper.selectList(null);
         List<Map<String, Object>> subjectStats = new ArrayList<>();
         for (Subject s : subjects) {
-            Set<Long> courseIds = courseMapper.selectList(
-                new LambdaQueryWrapper<Course>().eq(Course::getSubjectId, s.getId())
-            ).stream().map(Course::getId).collect(Collectors.toSet());
             Set<Long> levelIds = courseLevelMapper.selectList(
-                new LambdaQueryWrapper<CourseLevel>().in(!courseIds.isEmpty(), CourseLevel::getCourseId, courseIds)
+                new LambdaQueryWrapper<CourseLevel>().eq(CourseLevel::getSubjectId, s.getId())
             ).stream().map(CourseLevel::getId).collect(Collectors.toSet());
 
             int time = monthStats.stream()
@@ -324,7 +320,7 @@ public class ParentController {
         );
 
         CourseLevel latestLevel = latestRecord != null ? courseLevelMapper.selectById(latestRecord.getCourseLevelId()) : null;
-        Course latestCourse = latestLevel != null ? courseMapper.selectById(latestLevel.getCourseId()) : null;
+        Subject latestSubject = latestLevel != null && latestLevel.getSubjectId() != null ? subjectMapper.selectById(latestLevel.getSubjectId()) : null;
         TimeControl timeControl = timeControlMapper.selectOne(
             new LambdaQueryWrapper<TimeControl>()
                 .eq(TimeControl::getChildUserId, child.getId())
@@ -347,7 +343,7 @@ public class ParentController {
         map.put("totalQuestions", totalQuestions);
         map.put("correctCount", correctCount);
         map.put("accuracy", totalQuestions > 0 ? Math.round(correctCount * 100.0 / totalQuestions) : 0);
-        map.put("currentCourseName", latestCourse != null ? latestCourse.getCourseName() : "");
+        map.put("currentSubjectName", latestSubject != null ? latestSubject.getSubjectName() : "");
         map.put("currentLevelName", latestLevel != null ? latestLevel.getLevelName() : "");
         map.put("latestScore", latestRecord != null && latestRecord.getScore() != null ? latestRecord.getScore() : 0);
         map.put("stars", latestRecord != null && latestRecord.getStars() != null ? latestRecord.getStars() : 0);

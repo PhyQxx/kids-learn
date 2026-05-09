@@ -26,7 +26,7 @@ public class AdminSystemController {
     private final AdminRoleMapper adminRoleMapper;
     private final AppConfigMapper appConfigMapper;
     private final OperationLogMapper operationLogMapper;
-    private final CourseMapper courseMapper;
+    private final CourseLevelMapper courseLevelMapper;
     private final OrderMapper orderMapper;
 
     // ==================== Dashboard ====================
@@ -37,7 +37,7 @@ public class AdminSystemController {
         Map<String, Object> stats = new HashMap<>();
         stats.put("totalUsers", userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getUserType, 1)));
         stats.put("todayActiveUsers", 0L); // placeholder, requires Redis tracking
-        stats.put("totalCourses", courseMapper.selectCount(new LambdaQueryWrapper<>()));
+        stats.put("totalLevels", courseLevelMapper.selectCount(new LambdaQueryWrapper<>()));
         stats.put("totalOrders", orderMapper.selectCount(new LambdaQueryWrapper<>()));
         stats.put("todayRevenue", 0L);
         return R.ok(stats);

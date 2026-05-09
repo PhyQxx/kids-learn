@@ -201,7 +201,7 @@ function goSubject(subject) {
 
 function goCourses(subject) {
   learnStore.setSubject(subject)
-  uni.navigateTo({ url: `/pages/learn/courses?subjectId=${subject.id}` })
+  uni.navigateTo({ url: `/pages/learn/levels?subjectId=${subject.id}&subjectName=${encodeURIComponent(subject.name)}` })
 }
 
 async function checkGradeSetup() {

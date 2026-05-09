@@ -32,7 +32,6 @@ public class AchievementServiceImpl implements AchievementService {
     private final RewardLogMapper rewardLogMapper;
     private final LearningRecordMapper learningRecordMapper;
     private final CourseLevelMapper courseLevelMapper;
-    private final CourseMapper courseMapper;
     private final SubjectMapper subjectMapper;
 
     @Override
@@ -298,12 +297,8 @@ public class AchievementServiceImpl implements AchievementService {
         Set<Long> subjectIds = new HashSet<>();
         for (Long levelId : completedLevelIds) {
             CourseLevel level = courseLevelMapper.selectById(levelId);
-            if (level == null) {
-                continue;
-            }
-            Course course = courseMapper.selectById(level.getCourseId());
-            if (course != null) {
-                subjectIds.add(course.getSubjectId());
+            if (level != null && level.getSubjectId() != null) {
+                subjectIds.add(level.getSubjectId());
             }
         }
         return subjectIds.size();
@@ -347,11 +342,10 @@ public class AchievementServiceImpl implements AchievementService {
     }
 
     private boolean isMathLevel(CourseLevel level) {
-        Course course = courseMapper.selectById(level.getCourseId());
-        if (course == null) {
+        if (level == null || level.getSubjectId() == null) {
             return false;
         }
-        Subject subject = subjectMapper.selectById(course.getSubjectId());
+        Subject subject = subjectMapper.selectById(level.getSubjectId());
         return subject != null && "MATH".equalsIgnoreCase(subject.getSubjectCode());
     }
 

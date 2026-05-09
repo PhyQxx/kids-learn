@@ -3,7 +3,7 @@
     <!-- Loading -->
     <view v-if="loading" class="loading-state">
       <tn-loading size="60" />
-      <text class="text-sm text-light" style="margin-top: 12px;">加载中...</text>
+      <text class="text-sm text-light" style="margin-top: 12px;">呼唤宠物中...</text>
     </view>
 
     <template v-else>
@@ -11,67 +11,88 @@
       <!-- 左侧：宠物展示 -->
       <view class="pet-panel">
         <view class="pet-display">
-          <text class="pet-emoji animate-float">{{ petStore.currentImageUrl }}</text>
-          <view class="pet-name-row">
-            <text class="text-lg text-bold">{{ petStore.name }}</text>
-            <tn-badge type="primary" :text="'Lv.' + petStore.level" />
+          <view class="pet-stage animate-bounce-slow">
+            <text class="pet-emoji">{{ petStore.currentImageUrl }}</text>
           </view>
-          <text v-if="petStore.evolutionName" class="text-xs text-light">{{ petStore.evolutionName }}</text>
+
+          <view class="pet-name-row">
+            <text class="text-xl text-bold" style="color: #2C3E50;">{{ petStore.name }}</text>
+            <view class="level-badge">Lv.{{ petStore.level }}</view>
+          </view>
+          <text v-if="petStore.evolutionName" class="text-sm" style="color: #E74C3C; font-weight: bold; margin-top: 4px;">{{ petStore.evolutionName }}</text>
+
           <view class="wallet-row">
-            <text class="wallet-pill">🪙 {{ userStore.gold || 0 }}</text>
-            <text class="wallet-pill">💎 {{ userStore.userInfo?.diamond || 0 }}</text>
+            <view class="wallet-pill gold-pill">
+              <text class="wallet-icon">🪙</text>
+              <text class="wallet-amount">{{ userStore.gold || 0 }}</text>
+            </view>
+            <view class="wallet-pill diamond-pill">
+              <text class="wallet-icon">💎</text>
+              <text class="wallet-amount">{{ userStore.userInfo?.diamond || 0 }}</text>
+            </view>
           </view>
         </view>
 
         <!-- 进化进度 -->
         <view class="evolution-section">
           <view class="evo-header">
-            <text class="text-sm text-bold">进化进度</text>
-            <text class="text-xs text-light">{{ petStore.expInLevel }}/{{ petStore.nextLevelExp }} XP</text>
+            <text class="text-sm text-bold" style="color: #2C3E50;">进化进度</text>
+            <text class="text-xs text-bold" style="color: #FF6B6B;">{{ petStore.expInLevel }} / {{ petStore.nextLevelExp }} XP</text>
           </view>
-          <tn-line-progress :percent="petStore.nextLevelExp > 0 ? petStore.expInLevel / petStore.nextLevelExp * 100 : 0" active-color="#FF6B6B" inactive-color="rgba(255,255,255,0.3)" :height="12" :show-percent="false" />
+          <view class="progress-bar-container">
+            <tn-line-progress :percent="petStore.nextLevelExp > 0 ? petStore.expInLevel / petStore.nextLevelExp * 100 : 0" active-color="#FF6B6B" inactive-color="#FFE0E0" :height="14" :show-percent="false" />
+          </view>
         </view>
 
         <!-- 状态条 -->
         <view class="stats-bars">
           <view class="stat-row">
-            <text class="stat-label text-sm">饱食度</text>
-            <tn-line-progress :percent="petStore.hunger" active-color="#FFB74D" :height="12" :show-percent="false" style="flex: 1;" />
-            <text class="text-xs text-light">{{ petStore.hunger }}%</text>
+            <view class="stat-label-wrap">
+              <text class="stat-icon">🍗</text>
+              <text class="stat-label text-sm text-bold">饱食</text>
+            </view>
+            <tn-line-progress :percent="petStore.hunger" active-color="#FFB74D" inactive-color="#FFF0D4" :height="12" :show-percent="false" style="flex: 1;" />
+            <text class="stat-value text-xs text-bold">{{ petStore.hunger }}%</text>
           </view>
           <view class="stat-row">
-            <text class="stat-label text-sm">心情</text>
-            <tn-line-progress :percent="petStore.moodPercent" active-color="#4ECDC4" :height="12" :show-percent="false" style="flex: 1;" />
-            <text class="text-xs text-light">{{ petStore.moodText }}</text>
+            <view class="stat-label-wrap">
+              <text class="stat-icon">💖</text>
+              <text class="stat-label text-sm text-bold">心情</text>
+            </view>
+            <tn-line-progress :percent="petStore.moodPercent" active-color="#4ECDC4" inactive-color="#D4F0ED" :height="12" :show-percent="false" style="flex: 1;" />
+            <text class="stat-value text-xs text-bold">{{ petStore.moodText }}</text>
           </view>
           <view class="stat-row">
-            <text class="stat-label text-sm">活力</text>
-            <tn-line-progress :percent="petStore.energy" active-color="#2ECC71" :height="12" :show-percent="false" style="flex: 1;" />
-            <text class="text-xs text-light">{{ petStore.energy }}%</text>
+            <view class="stat-label-wrap">
+              <text class="stat-icon">⚡</text>
+              <text class="stat-label text-sm text-bold">活力</text>
+            </view>
+            <tn-line-progress :percent="petStore.energy" active-color="#2ECC71" inactive-color="#D4F0E0" :height="12" :show-percent="false" style="flex: 1;" />
+            <text class="stat-value text-xs text-bold">{{ petStore.energy }}%</text>
           </view>
         </view>
 
         <!-- 操作按钮 -->
         <view class="action-grid">
-          <view class="action-btn-item card card-hover" @tap="handleFeed">
+          <view class="action-btn-item card card-hover" style="background: linear-gradient(135deg, #FFEFD5, #FFDAB9);" @tap="handleFeed">
             <text class="action-emoji">🍖</text>
-            <text class="text-sm">喂食</text>
+            <text class="text-sm text-bold" style="color: #D35400;">喂食</text>
           </view>
-          <view class="action-btn-item card card-hover" @tap="handleBath">
+          <view class="action-btn-item card card-hover" style="background: linear-gradient(135deg, #E0FFFF, #AFEEEE);" @tap="handleBath">
             <text class="action-emoji">🛁</text>
-            <text class="text-sm">洗澡</text>
+            <text class="text-sm text-bold" style="color: #008080;">洗澡</text>
           </view>
-          <view class="action-btn-item card card-hover" @tap="handlePlay">
+          <view class="action-btn-item card card-hover" style="background: linear-gradient(135deg, #F0FFF0, #98FB98);" @tap="handlePlay">
             <text class="action-emoji">🎾</text>
-            <text class="text-sm">玩耍</text>
+            <text class="text-sm text-bold" style="color: #2E8B57;">玩耍</text>
           </view>
-          <view class="action-btn-item card card-hover" @tap="goDress">
+          <view class="action-btn-item card card-hover" style="background: linear-gradient(135deg, #F8F8FF, #E6E6FA);" @tap="goDress">
             <text class="action-emoji">👔</text>
-            <text class="text-sm">换装</text>
+            <text class="text-sm text-bold" style="color: #483D8B;">换装</text>
           </view>
-          <view class="action-btn-item card card-hover" @tap="openPetPicker">
+          <view class="action-btn-item card card-hover" style="background: linear-gradient(135deg, #FFF0F5, #FFB6C1); grid-column: 1 / -1;" @tap="openPetPicker">
             <text class="action-emoji">🐾</text>
-            <text class="text-sm">换宠物</text>
+            <text class="text-sm text-bold" style="color: #C71585;">更换宠物伙伴</text>
           </view>
         </view>
       </view>
@@ -81,44 +102,63 @@
         <!-- 背包食物 -->
         <view class="inventory-section card">
           <view class="inv-header">
-            <text class="text-md text-bold">🎒 背包 / 食物</text>
-            <text class="text-xs text-primary" @tap="goShop">去商店 →</text>
-          </view>
-          <view v-if="foodItems.length > 0" class="item-grid">
-            <view v-for="item in foodItems" :key="item.id" class="item-card" :class="{ empty: item.count <= 0 }" @tap="selectFood(item)">
-              <text class="item-emoji">{{ item.icon }}</text>
-              <text class="text-xs">{{ item.name }}</text>
-              <text class="text-xs text-light">x{{ item.count }}</text>
+            <view style="display:flex;align-items:center;gap:8px">
+              <text class="inv-title-icon">🎒</text>
+              <text class="text-lg text-bold" style="color: #2C3E50;">背包食物</text>
+            </view>
+            <view class="shop-btn" @tap="goShop">
+              <text class="text-sm text-bold">🛒 去商店</text>
             </view>
           </view>
-          <view v-else class="empty-hint">
-            <text class="text-xs text-light">背包空空，去商店买点吧</text>
-          </view>
+
+          <scroll-view scroll-y style="flex:1; min-height: 200px;">
+            <view v-if="foodItems.length > 0" class="item-grid">
+              <view v-for="item in foodItems" :key="item.id" class="item-card card-hover" :class="{ empty: item.count <= 0 }" @tap="selectFood(item)">
+                <view class="item-icon-bg">
+                  <text class="item-emoji">{{ item.icon }}</text>
+                </view>
+                <text class="text-sm text-bold" style="margin-top:8px">{{ item.name }}</text>
+                <view class="item-count-badge">x{{ item.count }}</view>
+              </view>
+            </view>
+            <view v-else class="empty-hint">
+              <text class="empty-emoji">🥣</text>
+              <text class="text-sm text-light" style="margin-top:8px">背包空空，去商店买点好吃的吧</text>
+            </view>
+          </scroll-view>
         </view>
 
         <!-- 装扮物品 -->
         <view class="inventory-section card">
           <view class="inv-header">
-            <text class="text-md text-bold">🎭 装扮</text>
-          </view>
-          <view v-if="costumeItems.length > 0" class="item-grid">
-            <view v-for="item in costumeItems" :key="item.id" class="item-card">
-              <text class="item-emoji">{{ item.icon }}</text>
-              <text class="text-xs">{{ item.name }}</text>
-              <text class="text-xs text-success">已拥有</text>
+            <view style="display:flex;align-items:center;gap:8px">
+              <text class="inv-title-icon">🎭</text>
+              <text class="text-lg text-bold" style="color: #2C3E50;">我的装扮</text>
             </view>
           </view>
-          <view v-else class="empty-hint">
-            <text class="text-xs text-light">暂无装扮，去商店看看吧</text>
-          </view>
+          <scroll-view scroll-y style="flex:1; min-height: 160px;">
+            <view v-if="costumeItems.length > 0" class="item-grid">
+              <view v-for="item in costumeItems" :key="item.id" class="item-card">
+                <view class="item-icon-bg" style="background: #F4ECF7;">
+                  <text class="item-emoji">{{ item.icon }}</text>
+                </view>
+                <text class="text-sm text-bold" style="margin-top:8px">{{ item.name }}</text>
+                <text class="text-xs" style="color: #8E44AD; font-weight:bold; margin-top:4px;">已拥有</text>
+              </view>
+            </view>
+            <view v-else class="empty-hint">
+              <text class="empty-emoji">👕</text>
+              <text class="text-sm text-light" style="margin-top:8px">暂无装扮，快去收集吧</text>
+            </view>
+          </scroll-view>
         </view>
       </view>
     </view>
 
     <!-- 喂食弹窗 -->
-    <tn-popup v-model="showFeedModal" direction="center" :custom-style="{ width: '400px' }">
+    <tn-popup v-model="showFeedModal" direction="center" :custom-style="{ width: '420px', borderRadius: '24px' }">
       <view class="feed-modal">
-        <text class="text-lg text-bold" style="margin-bottom: 16px;">选择食物</text>
+        <text class="text-xl text-bold" style="margin-bottom: 20px; display:block; text-align:center; color:#D35400;">🍖 要喂哪个食物？</text>
         <view v-if="availableFood.length > 0" class="feed-grid">
           <view
             v-for="item in availableFood"
@@ -128,38 +168,40 @@
             @tap="selectedFood = item.id"
           >
             <text class="feed-emoji">{{ item.icon }}</text>
-            <text class="text-sm">{{ item.name }}</text>
-            <text class="text-xs text-light">x{{ item.count }}</text>
+            <text class="text-md text-bold" style="margin-top:8px">{{ item.name }}</text>
+            <view class="item-count-badge">余: {{ item.count }}</view>
           </view>
         </view>
-        <view v-else class="empty-hint">
-          <text class="text-sm text-light">没有可用的食物</text>
+        <view v-else class="empty-hint" style="padding: 40px 0;">
+          <text class="text-md text-light">没有可用的食物了哦</text>
         </view>
-        <view style="display: flex; gap: 12px; margin-top: 16px;">
-          <tn-button type="primary" shape="round" @click="confirmFeed" :disabled="!selectedFood" block>确认喂食</tn-button>
-          <tn-button shape="round" @click="showFeedModal = false" block>取消</tn-button>
+        <view style="display: flex; gap: 16px; margin-top: 24px;">
+          <tn-button shape="round" size="lg" @click="showFeedModal = false" style="flex:1; background:#F5F5F5; color:#666; border:none;">不吃了</tn-button>
+          <tn-button type="primary" shape="round" size="lg" @click="confirmFeed" :disabled="!selectedFood" style="flex:1; background:linear-gradient(135deg, #FFB74D, #FF8C00); border:none;">确认喂食</tn-button>
         </view>
       </view>
     </tn-popup>
 
     <!-- 换宠物弹窗 -->
-    <tn-popup v-model="showPetPicker" direction="center" :custom-style="{ width: '520px', maxHeight: '80vh' }">
+    <tn-popup v-model="showPetPicker" direction="center" :custom-style="{ width: '520px', maxHeight: '80vh', borderRadius: '24px' }">
       <view class="pet-picker-modal">
-        <text class="text-lg text-bold" style="margin-bottom: 16px;">选择你的宠物伙伴</text>
-        <scroll-view scroll-y style="max-height: 320px;">
+        <text class="text-xl text-bold" style="margin-bottom: 20px; display:block; text-align:center; color:#2C3E50;">🌟 召唤新的小伙伴</text>
+        <scroll-view scroll-y style="max-height: 400px;">
           <view class="pet-picker-grid">
             <view v-for="pet in availablePets" :key="pet.id"
               class="pet-picker-item card"
               :class="{ selected: pickedPetId === pet.id }"
               @tap="pickedPetId = pet.id">
-              <text class="pet-emoji">{{ pet.imageUrl }}</text>
-              <text class="text-xs">{{ pet.petName }}</text>
+              <view class="pet-picker-bg">
+                <text class="pet-emoji">{{ pet.imageUrl }}</text>
+              </view>
+              <text class="text-md text-bold" style="margin-top:12px; color:#34495E;">{{ pet.petName }}</text>
             </view>
           </view>
         </scroll-view>
-        <view style="display: flex; gap: 12px; margin-top: 16px;">
-          <tn-button type="primary" shape="round" @click="confirmPetChange" :disabled="!pickedPetId" block>确认更换</tn-button>
-          <tn-button shape="round" @click="showPetPicker = false" block>取消</tn-button>
+        <view style="display: flex; gap: 16px; margin-top: 24px;">
+          <tn-button shape="round" size="lg" @click="showPetPicker = false" style="flex:1; background:#F5F5F5; color:#666; border:none;">取消</tn-button>
+          <tn-button type="primary" shape="round" size="lg" @click="confirmPetChange" :disabled="!pickedPetId" style="flex:1; background:linear-gradient(135deg, #4A90D9, #6BA3E0); border:none;">确认召唤</tn-button>
         </view>
       </view>
     </tn-popup>
@@ -331,196 +373,326 @@ function syncUserBalance(petRes) {
 
 .pet-layout {
   display: grid;
-  grid-template-columns: 340px 1fr;
-  gap: 16px;
+  grid-template-columns: 360px 1fr;
+  gap: 20px;
   height: 100%;
 }
 
 .pet-panel {
-  background: linear-gradient(135deg, #FFB6C1, #FFD4E5);
-  border-radius: $radius-md;
+  background: linear-gradient(135deg, #FFF0F5, #FFD4E5);
+  border: 4px solid #FFF;
+  border-radius: $radius-xl;
   padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
+  box-shadow: 0 12px 36px rgba(255, 182, 193, 0.3);
 }
 
 .pet-display {
   text-align: center;
-  padding: 12px 0;
+  padding: 16px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.pet-emoji { font-size: 80px; display: block; margin-bottom: 8px; }
+.pet-stage {
+  width: 140px;
+  height: 140px;
+  background: rgba(255,255,255,0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  box-shadow: inset 0 -8px 12px rgba(0,0,0,0.05), 0 12px 24px rgba(255, 182, 193, 0.4);
+}
+
+.pet-emoji { font-size: 80px; }
 
 .pet-name-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.level-badge {
+  background: #FF6B6B;
+  color: #FFF;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(255, 107, 107, 0.3);
 }
 
 .wallet-row {
   display: flex;
   justify-content: center;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 12px;
+  margin-top: 16px;
 }
 
 .wallet-pill {
-  background: rgba(255, 255, 255, 0.58);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 13px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFF;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
 }
 
+.gold-pill .wallet-amount { color: #F39C12; }
+.diamond-pill .wallet-amount { color: #3498DB; }
+.wallet-icon { font-size: 16px; }
+
 .evolution-section {
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: $radius;
-  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: $radius-lg;
+  padding: 14px 18px;
 }
 
 .evo-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
 }
 
 .stats-bars {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: $radius-lg;
+  padding: 16px 18px;
 }
 
 .stat-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.stat-label { width: 52px; }
+.stat-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 68px;
+}
+.stat-icon { font-size: 16px; }
 
 .action-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 12px;
 }
 
 .action-btn-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 14px;
+  gap: 10px;
+  padding: 16px;
   cursor: pointer;
-  min-height: 72px;
-  min-width: 72px;
-  &:active { transform: scale(0.94); opacity: 0.9; }
+  border: none;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+  border-radius: 20px;
+  &:active { transform: scale(0.94); }
 }
 
-.action-emoji { font-size: 28px; }
+.action-emoji { font-size: 24px; }
 
 .inventory-panel {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .inventory-section {
-  padding: 16px 20px;
+  padding: 20px 24px;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #FFF;
+  border-radius: $radius-xl;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.02);
+  border: 1px solid rgba(0,0,0,0.02);
 }
 
 .inv-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px dashed #F0F0F0;
+}
+
+.inv-title-icon { font-size: 24px; }
+
+.shop-btn {
+  background: #EEF6FF;
+  color: #4A90D9;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  &:active { background: #DBEAFE; }
 }
 
 .item-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 16px;
+  padding: 8px 0;
 }
 
 .item-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 12px 8px;
-  background: #F8F8F8;
-  border-radius: $radius;
+  padding: 16px 12px;
+  background: #F8F9FA;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  position: relative;
+  transition: all 0.2s;
 
-  &.empty { opacity: 0.4; }
+  &.empty {
+    opacity: 0.5;
+    filter: grayscale(1);
+  }
 }
 
-.item-emoji { font-size: 28px; }
+.item-icon-bg {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: #FFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+}
+
+.item-emoji { font-size: 36px; }
+
+.item-count-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #E74C3C;
+  color: #FFF;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 2px solid #FFF;
+  box-shadow: 0 2px 6px rgba(231,76,60,0.3);
+}
 
 .empty-hint {
-  text-align: center;
-  padding: 20px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  height: 100%;
 }
+.empty-emoji { font-size: 48px; opacity: 0.5; margin-bottom: 12px; }
 
 .feed-modal {
-  padding: 24px;
+  padding: 10px;
 }
 
 .feed-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 12px;
 }
 
 .feed-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 14px;
+  gap: 8px;
+  padding: 20px;
   cursor: pointer;
-  border: 2px solid transparent;
+  border: 3px solid transparent;
+  background: #F8F9FA;
+  border-radius: 20px;
 
-  &.selected { border-color: $primary; background: #FFF0F0; }
+  &.selected {
+    border-color: #FFB74D;
+    background: #FFF8E6;
+    transform: scale(1.02);
+  }
 }
 
-.feed-emoji { font-size: 32px; }
-
-@media (max-width: 800px) {
-  .pet-layout { grid-template-columns: 260px 1fr; gap: 10px; }
-  .pet-emoji { font-size: 60px; }
-  .pet-panel { padding: 16px; }
-  .item-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 640px) {
-  .pet-layout { grid-template-columns: 1fr; }
-  .pet-panel { padding: 12px; }
-}
+.feed-emoji { font-size: 48px; }
 
 .pet-picker-modal {
-  padding: 24px;
+  padding: 10px;
 }
 .pet-picker-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  padding: 10px;
 }
 .pet-picker-item {
-  width: 80px;
-  height: 90px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  border: 2px solid transparent;
+  padding: 16px;
+  border: 3px solid transparent;
+  background: #F8F9FA;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+
   &.selected {
-    border-color: #FF6B6B;
-    background: rgba(255, 107, 107, 0.08);
+    border-color: #4A90D9;
+    background: #EEF6FF;
+    transform: scale(1.05);
   }
+}
+.pet-picker-bg {
+  width: 72px;
+  height: 72px;
+  background: #FFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.pet-picker-item .pet-emoji { font-size: 48px; }
+
+@media (max-width: 800px) {
+  .pet-layout { grid-template-columns: 300px 1fr; gap: 16px; }
+  .pet-emoji { font-size: 64px; }
+  .pet-stage { width: 110px; height: 110px; }
+  .item-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .pet-layout { grid-template-columns: 1fr; }
+  .pet-panel { padding: 20px; }
+  .pet-picker-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Animations */
+.animate-bounce-slow {
+  animation: bounce-slow 3s ease-in-out infinite;
+}
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 </style>

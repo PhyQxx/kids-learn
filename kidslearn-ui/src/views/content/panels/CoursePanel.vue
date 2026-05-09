@@ -6,9 +6,6 @@
     </div>
     <el-table :data="tableData" stripe v-loading="loading">
       <el-table-column prop="courseName" label="课程名称" />
-      <el-table-column prop="difficulty" label="难度" width="80">
-        <template #default="{ row }">{{ ['', '简单', '普通', '困难'][row.difficulty] }}</template>
-      </el-table-column>
       <el-table-column prop="totalLevels" label="关卡数" width="80" />
       <el-table-column prop="isElite" label="精英关" width="80">
         <template #default="{ row }"><el-tag :type="row.isElite ? 'warning' : 'info'" size="small">{{ row.isElite ? '是' : '否' }}</el-tag></template>

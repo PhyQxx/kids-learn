@@ -7,13 +7,15 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @TableName("course_level")
 public class CourseLevel extends BaseEntity {
-    private Long courseId;
-    private Long gradeLevelId; // 新增: 关卡的年级属性 (从 course 推导或单独配置)
+    private Long subjectId;
+    private Long gradeLevelId; // 新增年级属性
     private Integer levelNum;
     private String levelName;
     private String levelDesc;
     private String coverUrl;
     private Integer totalQuestions;
+    private Integer baseQuestionCount;
+    private Integer advancedQuestionCount;
     private Integer passScore;
     private String starThresholds;
     private Integer expReward;

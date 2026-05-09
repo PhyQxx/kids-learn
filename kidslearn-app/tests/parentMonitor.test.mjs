@@ -19,7 +19,7 @@ test('normalizes parent monitor snapshot and derives summary totals', () => {
         dailyLimitMinutes: 40,
         completedLevels: 2,
         accuracy: 83,
-        currentCourseName: 'Math',
+        currentSubjectName: 'Math',
         currentLevelName: 'Level 3',
         lastActivityAt: '2026-05-07T18:10:00'
       },

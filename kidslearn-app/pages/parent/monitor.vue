@@ -77,7 +77,7 @@
           </view>
 
           <view class="course-line">
-            <text class="course-name">{{ child.currentCourseName || '未开始课程' }}</text>
+            <text class="course-name">{{ child.currentSubjectName || '未开始学科' }}</text>
             <text class="level-name">{{ child.currentLevelName || '等待学习' }}</text>
           </view>
         </view>

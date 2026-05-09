@@ -32,7 +32,6 @@ import java.util.stream.Collectors;
 public class LearnServiceImpl implements LearnService {
 
     private final SubjectMapper subjectMapper;
-    private final CourseMapper courseMapper;
     private final CourseVideoMapper courseVideoMapper;
     private final CourseLevelMapper courseLevelMapper;
     private final QuestionMapper questionMapper;
@@ -49,7 +48,6 @@ public class LearnServiceImpl implements LearnService {
     private final RewardLogMapper rewardLogMapper;
     private final UserStickerMapper userStickerMapper;
     private final GradeLevelMapper gradeLevelMapper;
-    private final CourseGradeMapper courseGradeMapper;
     private final DailyCheckinMapper dailyCheckinMapper;
     private final AchievementService achievementService;
     private final RealtimeEventPublisher realtimeEventPublisher;
@@ -61,13 +59,12 @@ public class LearnServiceImpl implements LearnService {
     public DailyTaskVO getDailyTasks(Long userId) {
         DailyTaskVO vo = new DailyTaskVO();
         vo.setDate(LocalDate.now().toString());
-        vo.setTotalTime(30); // target 30 mins per day
+        vo.setTotalTime(30);
 
         List<Subject> subjects = subjectMapper.selectList(
             new LambdaQueryWrapper<Subject>().eq(Subject::getStatus, 1).orderByAsc(Subject::getSortOrder)
         );
 
-        // get today's learning records
         LocalDateTime todayStart = LocalDate.now().atStartOfDay();
         List<LearningRecord> todayRecords = learningRecordMapper.selectList(
             new LambdaQueryWrapper<LearningRecord>().eq(LearningRecord::getUserId, userId).ge(LearningRecord::getCreateTime, todayStart)
@@ -81,18 +78,15 @@ public class LearnServiceImpl implements LearnService {
             task.setSubjectIcon(subject.getIconUrl());
             task.setTargetMinutes(5);
 
-            // calculate today minutes for this subject
-            Set<Long> courseIds = courseMapper.selectList(
-                new LambdaQueryWrapper<Course>().eq(Course::getSubjectId, subject.getId())
-            ).stream().map(Course::getId).collect(Collectors.toSet());
+            Set<Long> levelIds = courseLevelMapper.selectList(
+                new LambdaQueryWrapper<CourseLevel>()
+                    .eq(CourseLevel::getSubjectId, subject.getId())
+                    .eq(CourseLevel::getStatus, 1)
+            ).stream().map(CourseLevel::getId).collect(Collectors.toSet());
 
-            if (courseIds.isEmpty()) {
+            if (levelIds.isEmpty()) {
                 continue;
             }
-
-            Set<Long> levelIds = courseLevelMapper.selectList(
-                new LambdaQueryWrapper<CourseLevel>().in(CourseLevel::getCourseId, courseIds)
-            ).stream().map(CourseLevel::getId).collect(Collectors.toSet());
 
             int todayMins = todayRecords.stream()
                 .filter(r -> levelIds.contains(r.getCourseLevelId()))
@@ -111,20 +105,10 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public List<Map<String, Object>> getSubjects(Long userId, Long gradeLevelId) {
-        // resolve courseIds for the grade level
-        Set<Long> gradeCourseIds = null;
-        if (gradeLevelId != null) {
-            gradeCourseIds = getCourseIdsByGradeLevel(gradeLevelId);
-            if (gradeCourseIds.isEmpty()) {
-                return List.of();
-            }
-        }
-
         List<Subject> subjects = subjectMapper.selectList(
             new LambdaQueryWrapper<Subject>().eq(Subject::getStatus, 1).orderByAsc(Subject::getSortOrder)
         );
 
-        final Set<Long> finalGradeCourseIds = gradeCourseIds;
         return subjects.stream().map(s -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", s.getId());
@@ -132,46 +116,34 @@ public class LearnServiceImpl implements LearnService {
             map.put("name", s.getSubjectName());
             map.put("icon", s.getIconUrl());
             map.put("color", s.getColor());
-            LambdaQueryWrapper<Course> countWrapper = new LambdaQueryWrapper<Course>()
-                .eq(Course::getSubjectId, s.getId()).eq(Course::getStatus, 1);
-            if (finalGradeCourseIds != null) {
-                countWrapper.in(Course::getId, finalGradeCourseIds);
-            }
-            Long courseCount = courseMapper.selectCount(countWrapper);
-            map.put("courseCount", courseCount);
-            map.put("_hasCourses", courseCount > 0);
 
-            // 计算学科进度：已完成关卡数 / 总关卡数
-            List<Course> subjectCourses = courseMapper.selectList(
-                new LambdaQueryWrapper<Course>()
-                    .eq(Course::getSubjectId, s.getId())
-                    .eq(Course::getStatus, 1)
+            Long levelCount = courseLevelMapper.selectCount(
+                new LambdaQueryWrapper<CourseLevel>()
+                    .eq(CourseLevel::getSubjectId, s.getId())
+                    .eq(CourseLevel::getStatus, 1)
             );
-            if (!subjectCourses.isEmpty()) {
-                Set<Long> courseIdsSet = subjectCourses.stream()
-                    .filter(c -> finalGradeCourseIds == null || finalGradeCourseIds.contains(c.getId()))
-                    .map(Course::getId)
-                    .collect(Collectors.toSet());
-                if (!courseIdsSet.isEmpty()) {
-                    Long totalLevels = courseLevelMapper.selectCount(
-                        new LambdaQueryWrapper<CourseLevel>()
-                            .in(CourseLevel::getCourseId, courseIdsSet)
-                            .eq(CourseLevel::getStatus, 1)
-                    );
-                    String inClause = courseIdsSet.stream().map(String::valueOf).collect(Collectors.joining(","));
-                    Long completedLevels = learningRecordMapper.selectCount(
-                        new LambdaQueryWrapper<LearningRecord>()
-                            .eq(LearningRecord::getUserId, userId)
-                            .eq(LearningRecord::getIsPass, 1)
-                            .apply("course_level_id IN (SELECT id FROM course_level WHERE course_id IN (" + inClause + "))")
-                    );
-                    int progress = totalLevels > 0 ? (int) (completedLevels * 100 / totalLevels) : 0;
-                    map.put("progress", progress);
-                }
+            map.put("levelCount", levelCount);
+            map.put("_hasLevels", levelCount > 0);
+
+            Long totalLevels = courseLevelMapper.selectCount(
+                new LambdaQueryWrapper<CourseLevel>()
+                    .eq(CourseLevel::getSubjectId, s.getId())
+                    .eq(CourseLevel::getStatus, 1)
+            );
+            if (totalLevels > 0) {
+                Long completedLevels = learningRecordMapper.selectCount(
+                    new LambdaQueryWrapper<LearningRecord>()
+                        .eq(LearningRecord::getUserId, userId)
+                        .eq(LearningRecord::getIsPass, 1)
+                        .inSql(LearningRecord::getCourseLevelId,
+                            "SELECT id FROM course_level WHERE subject_id = " + s.getId() + " AND status = 1")
+                );
+                int progress = (int) (completedLevels * 100 / totalLevels);
+                map.put("progress", progress);
             }
 
             return map;
-        }).filter(m -> (boolean) m.get("_hasCourses")).collect(Collectors.toList());
+        }).filter(m -> (boolean) m.get("_hasLevels")).collect(Collectors.toList());
     }
 
     @Override
@@ -287,86 +259,11 @@ public class LearnServiceImpl implements LearnService {
         return Math.max(left == null ? 0 : Math.max(0, left), right == null ? 0 : Math.max(0, right));
     }
 
-    /**
-     * Get course IDs that belong to a given grade level via course_grade.
-     */
-    private Set<Long> getCourseIdsByGradeLevel(Long gradeLevelId) {
-        List<Long> courseIds = courseGradeMapper.selectList(
-            new LambdaQueryWrapper<CourseGrade>().eq(CourseGrade::getGradeLevelId, gradeLevelId)
-        ).stream().map(CourseGrade::getCourseId).collect(Collectors.toList());
-        return new HashSet<>(courseIds);
-    }
-
     @Override
-    public PageResult<Map<String, Object>> getCourses(Long userId, Long subjectId, Long gradeLevelId, Integer page, Integer pageSize) {
-        LambdaQueryWrapper<Course> wrapper = new LambdaQueryWrapper<Course>()
-            .eq(Course::getStatus, 1)
-            .eq(subjectId != null, Course::getSubjectId, subjectId);
-
-        // filter by grade level via course_grade
-        if (gradeLevelId != null) {
-            Set<Long> gradeCourseIds = getCourseIdsByGradeLevel(gradeLevelId);
-            if (gradeCourseIds.isEmpty()) {
-                return new PageResult<>(List.of(), 0L, page, pageSize);
-            }
-            wrapper.in(Course::getId, gradeCourseIds);
-        }
-
-        wrapper.orderByAsc(Course::getSortOrder);
-
-        Page<Course> coursePage = courseMapper.selectPage(new Page<>(page, pageSize), wrapper);
-
-        List<Map<String, Object>> list = coursePage.getRecords().stream().map(c -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", c.getId());
-            map.put("subjectId", c.getSubjectId());
-            map.put("courseName", c.getCourseName());
-            map.put("courseDesc", c.getCourseDesc());
-            map.put("coverUrl", c.getCoverUrl());
-            map.put("totalLevels", c.getTotalLevels());
-            map.put("isElite", c.getIsElite());
-            map.put("videoCount", courseVideoMapper.selectCount(
-                new LambdaQueryWrapper<CourseVideo>()
-                    .eq(CourseVideo::getCourseId, c.getId())
-                    .eq(CourseVideo::getStatus, 1)
-            ));
-
-            // user progress
-            Long completedCount = learningRecordMapper.selectCount(
-                new LambdaQueryWrapper<LearningRecord>()
-                    .eq(LearningRecord::getUserId, userId)
-                    .eq(LearningRecord::getIsPass, 1)
-                    .inSql(LearningRecord::getCourseLevelId,
-                        "SELECT id FROM course_level WHERE course_id = " + c.getId())
-            );
-            map.put("completedLevels", completedCount);
-
-            // total stars - get best star for each level in this course
-            List<LearningRecord> allRecords = learningRecordMapper.selectList(
-                new LambdaQueryWrapper<LearningRecord>()
-                    .eq(LearningRecord::getUserId, userId)
-                    .inSql(LearningRecord::getCourseLevelId,
-                        "SELECT id FROM course_level WHERE course_id = " + c.getId())
-            );
-            // group by level, take max stars per level
-            Map<Long, Integer> bestStarsPerLevel = new HashMap<>();
-            for (LearningRecord r : allRecords) {
-                bestStarsPerLevel.merge(r.getCourseLevelId(), r.getStars(), Math::max);
-            }
-            int totalStars = bestStarsPerLevel.values().stream().mapToInt(Integer::intValue).sum();
-            map.put("totalStars", totalStars);
-
-            return map;
-        }).collect(Collectors.toList());
-
-        return new PageResult<>(list, coursePage.getTotal(), page, pageSize);
-    }
-
-    @Override
-    public List<Map<String, Object>> getLevels(Long userId, Long courseId) {
+    public List<Map<String, Object>> getLevels(Long userId, Long subjectId) {
         List<CourseLevel> levels = courseLevelMapper.selectList(
             new LambdaQueryWrapper<CourseLevel>()
-                .eq(CourseLevel::getCourseId, courseId)
+                .eq(CourseLevel::getSubjectId, subjectId)
                 .eq(CourseLevel::getStatus, 1)
                 .orderByAsc(CourseLevel::getLevelNum)
         );
@@ -385,7 +282,6 @@ public class LearnServiceImpl implements LearnService {
             map.put("expReward", level.getExpReward());
             map.put("goldReward", level.getGoldReward());
 
-            // user best record
             LearningRecord bestRecord = learningRecordMapper.selectOne(
                 new LambdaQueryWrapper<LearningRecord>()
                     .eq(LearningRecord::getUserId, userId)
@@ -398,14 +294,8 @@ public class LearnServiceImpl implements LearnService {
             map.put("myStars", myStars);
             map.put("isPassed", isPassed);
 
-            // 判断关卡是否解锁
-            // 1. 第一关默认解锁
-            // 2. 已通过的关卡自动解锁下一关
-            // 3. 手动设置解锁的关卡
-            // 4. 需要满足 unlockCondition 中的星星数要求
             boolean isUnlock = level.getIsUnlock() == 1;
             if (!isUnlock && i > 0) {
-                // 检查前置关卡的通过情况和星星数
                 CourseLevel prevLevel = levels.get(i - 1);
                 LearningRecord prevRecord = learningRecordMapper.selectOne(
                     new LambdaQueryWrapper<LearningRecord>()
@@ -415,25 +305,19 @@ public class LearnServiceImpl implements LearnService {
                         .last("LIMIT 1")
                 );
                 if (prevRecord != null && prevRecord.getIsPass() == 1) {
-                    // 检查 unlockCondition 中的 minStars 要求
                     String unlockCondition = level.getUnlockCondition();
                     if (unlockCondition != null && unlockCondition.contains("minStars")) {
-                        // 解析 JSON 格式的 unlockCondition: {"preLevelId":X,"minStars":Y}
                         try {
                             if (unlockCondition.contains("\"" + prevLevel.getId() + "\"")) {
-                                // 包含前置关卡ID，检查 minStars
                                 int minStars = extractMinStars(unlockCondition);
                                 isUnlock = prevRecord.getStars() >= minStars;
                             } else {
-                                // 前置关卡不匹配，默认不解锁
                                 isUnlock = false;
                             }
                         } catch (Exception e) {
-                            // 解析失败，默认解锁（兼容旧数据）
                             isUnlock = true;
                         }
                     } else {
-                        // 没有 minStars 要求，只要通过即可解锁
                         isUnlock = true;
                     }
                 } else {
@@ -446,45 +330,80 @@ public class LearnServiceImpl implements LearnService {
         return result;
     }
 
-    /**
-     * 从 unlockCondition JSON 中提取 minStars 值
-     */
     private int extractMinStars(String unlockCondition) {
         try {
-            // 简单解析 {"preLevelId":1,"minStars":1} 格式
             String minStarsPart = unlockCondition.substring(unlockCondition.indexOf("minStars") + 9);
-            int minStars = Integer.parseInt(minStarsPart.split("[,}")[0]);
+            int minStars = Integer.parseInt(minStarsPart.split("[,}[")[0]);
             return minStars;
         } catch (Exception e) {
-            return 1; // 默认要求1颗星
+            return 1;
         }
     }
 
     @Override
-    public List<Map<String, Object>> getQuestions(Long levelId) {
+    public List<Map<String, Object>> getQuestions(Long userId, Long levelId) {
         CourseLevel level = courseLevelMapper.selectById(levelId);
-        int totalLimit = level != null && level.getTotalQuestions() != null ? level.getTotalQuestions() : 10;
-
-        // Phase 12+: 基于年级和学科从大题库中随机抽取试题
-        LambdaQueryWrapper<Question> queryWrapper = new LambdaQueryWrapper<>();
-        if (level != null) {
-            Course course = courseMapper.selectById(level.getCourseId());
-            if (course != null) {
-                queryWrapper.eq(Question::getSubjectId, course.getSubjectId());
-            }
-            if (level.getGradeLevelId() != null) {
-                queryWrapper.eq(Question::getGradeLevelId, level.getGradeLevelId());
-            }
+        if (level == null || level.getSubjectId() == null) {
+            return List.of();
         }
 
-        List<Question> questions = questionMapper.selectList(queryWrapper);
+        Long subjectId = level.getSubjectId();
+        int baseCount = level.getBaseQuestionCount() != null ? level.getBaseQuestionCount() : 8;
+        int advancedCount = level.getAdvancedQuestionCount() != null ? level.getAdvancedQuestionCount() : 2;
+
+        Long userGradeLevelId = null;
+        try {
+            ChildProfile profile = childProfileMapper.selectOne(
+                new LambdaQueryWrapper<ChildProfile>()
+                    .eq(ChildProfile::getUserId, userId)
+                    .last("LIMIT 1")
+            );
+            if (profile != null && profile.getGradeLevel() != null) {
+                userGradeLevelId = profile.getGradeLevel().longValue();
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+
         Random random = new Random();
-        List<Question> shuffled = QuestionRandomizer.shuffledCopy(questions, random);
-        if (shuffled.size() > totalLimit) {
-            shuffled = shuffled.subList(0, totalLimit);
+        List<Question> selectedQuestions = new ArrayList<>();
+
+        if (userGradeLevelId != null) {
+            LambdaQueryWrapper<Question> baseWrapper = new LambdaQueryWrapper<Question>()
+                .eq(Question::getSubjectId, subjectId)
+                .eq(Question::getGradeLevelId, userGradeLevelId);
+            List<Question> baseQuestions = questionMapper.selectList(baseWrapper);
+            Collections.shuffle(baseQuestions, random);
+            int limit = Math.min(baseCount, baseQuestions.size());
+            for (int i = 0; i < limit; i++) {
+                selectedQuestions.add(baseQuestions.get(i));
+            }
+
+            Long nextGradeLevelId = userGradeLevelId + 1;
+            LambdaQueryWrapper<Question> advancedWrapper = new LambdaQueryWrapper<Question>()
+                .eq(Question::getSubjectId, subjectId)
+                .eq(Question::getGradeLevelId, nextGradeLevelId);
+            List<Question> advancedQuestions = questionMapper.selectList(advancedWrapper);
+            Collections.shuffle(advancedQuestions, random);
+            int advLimit = Math.min(advancedCount, advancedQuestions.size());
+            for (int i = 0; i < advLimit; i++) {
+                selectedQuestions.add(advancedQuestions.get(i));
+            }
         }
 
-        return shuffled.stream().map(q -> {
+        if (selectedQuestions.isEmpty()) {
+            LambdaQueryWrapper<Question> fallbackWrapper = new LambdaQueryWrapper<Question>()
+                .eq(Question::getSubjectId, subjectId)
+                .last("LIMIT 20");
+            List<Question> fallback = questionMapper.selectList(fallbackWrapper);
+            Collections.shuffle(fallback, random);
+            int fallbackLimit = Math.min(baseCount + advancedCount, fallback.size());
+            for (int i = 0; i < fallbackLimit; i++) {
+                selectedQuestions.add(fallback.get(i));
+            }
+        }
+
+        return selectedQuestions.stream().map(q -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", q.getId());
             map.put("questionType", q.getQuestionType());
@@ -537,7 +456,6 @@ public class LearnServiceImpl implements LearnService {
             result.put("petExp", 2);
             petService.addPetExp(userId, 2);
 
-            // 如果该题之前做错过，标记为已掌握
             WrongTopic existingWrong = wrongTopicMapper.selectOne(
                 new LambdaQueryWrapper<WrongTopic>()
                     .eq(WrongTopic::getUserId, userId)
@@ -549,7 +467,6 @@ public class LearnServiceImpl implements LearnService {
                 wrongTopicMapper.updateById(existingWrong);
             }
         } else {
-            // save to wrong topic
             saveWrongTopic(userId, dto.getQuestionId(), dto.getAnswer(), correctAnswer);
             result.put("gold", 0);
             result.put("exp", 0);
@@ -566,15 +483,12 @@ public class LearnServiceImpl implements LearnService {
             throw new BusinessException("关卡不存在");
         }
 
-        // calculate correct rate percentage (totalScore is actual score earned, each question = 10 points)
         int totalPossibleScore = level.getTotalQuestions() * 10;
         int correctRate = totalPossibleScore > 0 ? (totalScore * 100 / totalPossibleScore) : 0;
 
-        // calculate stars based on correct rate percentage
         int stars = calculateStars(correctRate, level.getStarThresholds());
         boolean isPass = correctRate >= level.getPassScore();
 
-        // save learning record
         LearningRecord record = new LearningRecord();
         record.setUserId(userId);
         record.setCourseLevelId(levelId);
@@ -586,7 +500,6 @@ public class LearnServiceImpl implements LearnService {
         record.setPlayTime(LocalDateTime.now());
         learningRecordMapper.insert(record);
 
-        // build result
         LevelResultVO vo = new LevelResultVO();
         vo.setScore(totalScore);
         vo.setCorrectRate(correctRate);
@@ -595,7 +508,6 @@ public class LearnServiceImpl implements LearnService {
         vo.setIsPass(isPass);
 
         if (isPass) {
-            // award gold and exp
             int goldReward = level.getGoldReward() + (stars == 3 ? 10 : 0);
             int expReward = level.getExpReward();
             vo.setGold(goldReward);
@@ -608,10 +520,9 @@ public class LearnServiceImpl implements LearnService {
             userMapper.updateById(user);
             realtimeEventPublisher.publishBalance(userId, user.getGold(), user.getDiamond());
 
-            // reward log
             RewardLog goldLog = new RewardLog();
             goldLog.setUserId(userId);
-            goldLog.setRewardType(1); // gold
+            goldLog.setRewardType(1);
             goldLog.setQuantity(goldReward);
             goldLog.setSourceType("COMPLETE_LEVEL");
             goldLog.setSourceId(levelId);
@@ -620,13 +531,12 @@ public class LearnServiceImpl implements LearnService {
 
             RewardLog expLog = new RewardLog();
             expLog.setUserId(userId);
-            expLog.setRewardType(2); // exp
+            expLog.setRewardType(2);
             expLog.setQuantity(expReward);
             expLog.setSourceType("COMPLETE_LEVEL");
             expLog.setSourceId(levelId);
             rewardLogMapper.insert(expLog);
 
-            // sticker reward
             if (level.getStickerId() != null) {
                 Sticker sticker = stickerMapper.selectById(level.getStickerId());
                 if (sticker != null) {
@@ -651,17 +561,12 @@ public class LearnServiceImpl implements LearnService {
                 }
             }
 
-            // unlock next level
             boolean unlockedNext = unlockNextLevel(level, userId, stars);
             vo.setUnlockedNextLevel(unlockedNext);
 
-            // update daily stats
             updateDailyStats(userId, totalTime, 1, goldReward, expReward);
-
-            // refresh achievement unlock state after learning/sticker progress changes
             achievementService.syncAchievementProgress(userId);
 
-            // pet bonus exp for completing level
             int petBonusExp = stars * 5;
             petService.addPetExp(userId, petBonusExp);
         } else {
@@ -671,7 +576,6 @@ public class LearnServiceImpl implements LearnService {
         }
 
         publishChildActivity(userId, level, record, correctRate);
-
         return vo;
     }
 
@@ -690,7 +594,6 @@ public class LearnServiceImpl implements LearnService {
         }
 
         User child = userMapper.selectById(userId);
-        Course course = level != null ? courseMapper.selectById(level.getCourseId()) : null;
         List<LearningRecord> todayRecords = learningRecordMapper.selectList(
             new LambdaQueryWrapper<LearningRecord>()
                 .eq(LearningRecord::getUserId, userId)
@@ -708,13 +611,18 @@ public class LearnServiceImpl implements LearnService {
         payload.put("totalQuestions", sumTodayTotalQuestions(todayRecords));
         payload.put("correctCount", sumTodayCorrectQuestions(todayRecords));
         payload.put("accuracy", correctRate);
-        payload.put("currentCourseName", course != null ? course.getCourseName() : "");
+        payload.put("currentSubjectName", level != null && level.getSubjectId() != null ? getSubjectName(level.getSubjectId()) : "");
         payload.put("currentLevelName", level != null ? level.getLevelName() : "");
         payload.put("latestScore", record.getScore());
         payload.put("stars", record.getStars());
         payload.put("isPass", Integer.valueOf(1).equals(record.getIsPass()));
         payload.put("lastActivityAt", record.getPlayTime() != null ? record.getPlayTime().toString() : LocalDateTime.now().toString());
         realtimeEventPublisher.publishChildActivity(family.getParentUserId(), payload);
+    }
+
+    private String getSubjectName(Long subjectId) {
+        Subject subject = subjectMapper.selectById(subjectId);
+        return subject != null ? subject.getSubjectName() : "";
     }
 
     private int sumTodayLearningMinutes(List<LearningRecord> records) {
@@ -762,14 +670,13 @@ public class LearnServiceImpl implements LearnService {
         if (totalExp < 3600) return 8;
         if (totalExp < 4500) return 9;
         if (totalExp < 5500) return 10;
-        // beyond level 10, every 1200 exp = 1 level
         return 10 + (totalExp - 5500) / 1200 + 1;
     }
 
     private boolean unlockNextLevel(CourseLevel currentLevel, Long userId, int earnedStars) {
         CourseLevel nextLevel = courseLevelMapper.selectOne(
             new LambdaQueryWrapper<CourseLevel>()
-                .eq(CourseLevel::getCourseId, currentLevel.getCourseId())
+                .eq(CourseLevel::getSubjectId, currentLevel.getSubjectId())
                 .eq(CourseLevel::getLevelNum, currentLevel.getLevelNum() + 1)
                 .last("LIMIT 1")
         );
@@ -849,19 +756,11 @@ public class LearnServiceImpl implements LearnService {
             map.put("wrongCount", r.getWrongCount());
             map.put("isPass", r.getIsPass());
             map.put("createTime", r.getCreateTime() != null ? r.getCreateTime().toString() : null);
-            // lookup level name
             CourseLevel level = courseLevelMapper.selectById(r.getCourseLevelId());
             if (level != null) {
                 map.put("levelName", level.getLevelName());
-                Course course = courseMapper.selectById(level.getCourseId());
-                if (course != null) {
-                    map.put("courseId", course.getId());
-                    map.put("courseName", course.getCourseName());
-                    List<Long> gradeLevelIds = courseGradeMapper.selectList(
-                        new LambdaQueryWrapper<CourseGrade>().eq(CourseGrade::getCourseId, course.getId())
-                    ).stream().map(CourseGrade::getGradeLevelId).collect(Collectors.toList());
-                    map.put("gradeLevelIds", gradeLevelIds);
-                    Subject subject = subjectMapper.selectById(course.getSubjectId());
+                if (level.getSubjectId() != null) {
+                    Subject subject = subjectMapper.selectById(level.getSubjectId());
                     if (subject != null) map.put("subjectName", subject.getSubjectName());
                 }
             }
@@ -886,7 +785,6 @@ public class LearnServiceImpl implements LearnService {
             map.put("wrongCount", wt.getTimes());
             map.put("masteryLevel", wt.getMasteryLevel());
             map.put("continuousCorrectCount", wt.getContinuousCorrectCount());
-            // lookup question content
             Question q = questionMapper.selectById(wt.getQuestionId());
             if (q != null) {
                 map.put("questionContent", q.getQuestionContent());
@@ -927,7 +825,6 @@ public class LearnServiceImpl implements LearnService {
         }
     }
 
-    // ===== 每日签到 =====
     private static final int[] CHECKIN_GOLD  = {5, 10, 15, 20, 30, 40, 50};
     private static final int[] CHECKIN_EXP   = {5, 5, 10, 10, 15, 20, 50};
 
@@ -942,7 +839,6 @@ public class LearnServiceImpl implements LearnService {
         if (existing != null) {
             throw new BusinessException("今日已签到");
         }
-        // Check yesterday to compute streak
         DailyCheckin yesterday = dailyCheckinMapper.selectOne(
             new LambdaQueryWrapper<DailyCheckin>()
                 .eq(DailyCheckin::getUserId, userId)
@@ -959,7 +855,6 @@ public class LearnServiceImpl implements LearnService {
         record.setExpReward(exp);
         dailyCheckinMapper.insert(record);
 
-        // Add rewards to user
         User user = userMapper.selectById(userId);
         if (user != null) {
             user.setGold(user.getGold() + gold);
@@ -981,13 +876,11 @@ public class LearnServiceImpl implements LearnService {
             new LambdaQueryWrapper<DailyCheckin>()
                 .eq(DailyCheckin::getUserId, userId)
                 .eq(DailyCheckin::getCheckinDate, today));
-        // Get recent 7 days for the streak display
         List<DailyCheckin> recentList = dailyCheckinMapper.selectList(
             new LambdaQueryWrapper<DailyCheckin>()
                 .eq(DailyCheckin::getUserId, userId)
                 .ge(DailyCheckin::getCheckinDate, today.minusDays(6))
                 .orderByAsc(DailyCheckin::getCheckinDate));
-        // Calculate current streak
         int streak = 0;
         LocalDate d = today;
         if (todayRecord != null) {
@@ -999,10 +892,9 @@ public class LearnServiceImpl implements LearnService {
             boolean found = recentList.stream().anyMatch(r -> r.getCheckinDate().equals(checkDate));
             if (found) { streak++; d = d.minusDays(1); } else break;
         }
-        // Determine current reward day (what day the user would get if they check in now)
         int nextRewardDay;
         if (todayRecord != null) {
-            nextRewardDay = todayRecord.getRewardDay(); // already checked in
+            nextRewardDay = todayRecord.getRewardDay();
         } else if (streak > 0) {
             nextRewardDay = (streak % 7) + 1;
         } else {
@@ -1016,7 +908,6 @@ public class LearnServiceImpl implements LearnService {
         result.put("nextGoldReward", CHECKIN_GOLD[nextRewardDay - 1]);
         result.put("nextExpReward", CHECKIN_EXP[nextRewardDay - 1]);
         result.put("today", today.toString());
-        // Build 7-day history: which days in the current cycle were checked in
         List<Map<String, Object>> weekDays = new ArrayList<>();
         int cycleStart = todayRecord != null ? todayRecord.getRewardDay() : nextRewardDay;
         for (int i = 1; i <= 7; i++) {
@@ -1034,7 +925,6 @@ public class LearnServiceImpl implements LearnService {
         return result;
     }
 
-    // ===== 宠物提示技能 =====
     @Override
     public Map<String, Object> getHint(Long userId, Long questionId) {
         List<QuestionOption> options = questionOptionMapper.selectList(
@@ -1046,7 +936,6 @@ public class LearnServiceImpl implements LearnService {
             throw new BusinessException("题目选项不足，无法使用提示");
         }
 
-        // Find the correct option and one random wrong option to keep
         QuestionOption correctOpt = options.stream()
             .filter(o -> o.getIsCorrect() == 1).findFirst().orElse(null);
         if (correctOpt == null) {
@@ -1058,7 +947,6 @@ public class LearnServiceImpl implements LearnService {
         Random random = new Random();
         QuestionOption keepWrong = wrongOpts.get(random.nextInt(wrongOpts.size()));
 
-        // Build "keep" labels — frontend will gray out the rest
         List<String> keepLabels = List.of(correctOpt.getOptionLabel(), keepWrong.getOptionLabel());
         Map<String, Object> result = new HashMap<>();
         result.put("keepOptions", keepLabels);
@@ -1066,7 +954,6 @@ public class LearnServiceImpl implements LearnService {
         return result;
     }
 
-    // ===== 薄弱点分析 =====
     @Override
     public List<Map<String, Object>> getWeakPoints(Long userId) {
         List<WrongTopic> wrongTopics = wrongTopicMapper.selectList(
@@ -1103,11 +990,8 @@ public class LearnServiceImpl implements LearnService {
         Map<Long, List<LearningRecord>> recordsBySubject = new HashMap<>();
         for (LearningRecord r : recentRecords) {
             CourseLevel level = courseLevelMapper.selectById(r.getCourseLevelId());
-            if (level != null) {
-                Course course = courseMapper.selectById(level.getCourseId());
-                if (course != null) {
-                    recordsBySubject.computeIfAbsent(course.getSubjectId(), k -> new ArrayList<>()).add(r);
-                }
+            if (level != null && level.getSubjectId() != null) {
+                recordsBySubject.computeIfAbsent(level.getSubjectId(), k -> new ArrayList<>()).add(r);
             }
         }
 
@@ -1156,7 +1040,6 @@ public class LearnServiceImpl implements LearnService {
         return result.stream().limit(3).collect(Collectors.toList());
     }
 
-    // ===== 自适应题目 =====
     @Override
     public List<Map<String, Object>> getAdaptiveQuestions(Long userId, Long subjectId) {
         List<Question> selectedQuestions = new ArrayList<>();
@@ -1226,7 +1109,6 @@ public class LearnServiceImpl implements LearnService {
         }).collect(Collectors.toList());
     }
 
-    // ===== 错题AI讲解 =====
     @Override
     public Map<String, Object> explainWrong(Long userId, Long questionId) {
         Question question = questionMapper.selectById(questionId);
@@ -1238,7 +1120,6 @@ public class LearnServiceImpl implements LearnService {
         result.put("questionId", questionId);
         result.put("analysisText", RichContentUtil.toPlainText(question.getAnalysis()));
 
-        // 获取选项文本
         List<QuestionOption> options = questionOptionMapper.selectList(
             new LambdaQueryWrapper<QuestionOption>()
                 .eq(QuestionOption::getQuestionId, questionId)
@@ -1249,7 +1130,6 @@ public class LearnServiceImpl implements LearnService {
             .collect(Collectors.toList());
         result.put("options", optionTexts);
 
-        // 获取用户错题记录
         WrongTopic wt = wrongTopicMapper.selectOne(
             new LambdaQueryWrapper<WrongTopic>()
                 .eq(WrongTopic::getUserId, userId)
@@ -1259,7 +1139,6 @@ public class LearnServiceImpl implements LearnService {
         String wrongAnswer = wt != null ? wt.getWrongAnswer() : "";
         String correctAnswer = wt != null ? wt.getCorrectAnswer() : "";
 
-        // AI讲解
         String aiAvailable = "false";
         String aiExplanation = null;
         if (aiService.isAvailable()) {
@@ -1277,7 +1156,6 @@ public class LearnServiceImpl implements LearnService {
         return result;
     }
 
-    // ===== 错题重做 =====
     @Override
     @Transactional
     public Map<String, Object> retryWrong(Long userId, Long questionId, String answer) {
@@ -1326,7 +1204,6 @@ public class LearnServiceImpl implements LearnService {
         return result;
     }
 
-    // ===== 新手测评 =====
     @Override
     public List<Map<String, Object>> getAssessmentQuestions(Long userId) {
         User user = userMapper.selectById(userId);
@@ -1366,12 +1243,8 @@ public class LearnServiceImpl implements LearnService {
         }).collect(Collectors.toList());
     }
 
-    // --- Phase 12: 专项练习与智能错题本 ---
-
     @Override
     public List<PracticeModeVO> getPracticeModes(Long userId, Long subjectId) {
-        // 由于取消了 practice_mode 表，我们直接返回基于“大题库全量刷题”模式的模拟数据
-        // 前端也可以不再调用这个接口，而是直接跳转到 Practice Quiz。如果保留这个接口，就返回固定的一条“全题库练习”
         List<PracticeModeVO> modes = new ArrayList<>();
         PracticeModeVO vo = new PracticeModeVO();
         vo.setId(subjectId != null ? subjectId : 1L);
@@ -1386,7 +1259,6 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public Map<String, Object> startPractice(Long userId, Long practiceModeId) {
-        // 这里的 practiceModeId 其实传进来的是 subjectId，因为上面的模拟数据把 id 设置为了 subjectId
         Long subjectId = practiceModeId;
 
         User user = userMapper.selectById(userId);
@@ -1438,7 +1310,6 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public Map<String, Object> submitPracticeAnswer(Long userId, Long practiceSessionId, SubmitAnswerDTO dto) {
-        // 复用 submitAnswer 逻辑，获取对错
         return submitAnswer(userId, dto);
     }
 
@@ -1447,11 +1318,10 @@ public class LearnServiceImpl implements LearnService {
         LambdaQueryWrapper<WrongTopic> wrapper = new LambdaQueryWrapper<WrongTopic>()
             .eq(WrongTopic::getUserId, userId)
             .eq(WrongTopic::getIsMastered, 0)
-            .orderByAsc(WrongTopic::getContinuousCorrectCount) // 优先复习掌握度低的
-            .orderByAsc(WrongTopic::getLastReviewTime) // 优先复习很久没复习的
+            .orderByAsc(WrongTopic::getContinuousCorrectCount)
+            .orderByAsc(WrongTopic::getLastReviewTime)
             .last("LIMIT " + questionCount);
 
-        // 暂时不按学科筛，简化实现
         List<WrongTopic> topics = wrongTopicMapper.selectList(wrapper);
 
         SmartReviewQuizVO vo = new SmartReviewQuizVO();
@@ -1473,13 +1343,13 @@ public class LearnServiceImpl implements LearnService {
             wt.setContinuousCorrectCount((wt.getContinuousCorrectCount() == null ? 0 : wt.getContinuousCorrectCount()) + 1);
             if (wt.getContinuousCorrectCount() >= 3) {
                 wt.setIsMastered(1);
-                wt.setMasteryLevel(2); // 已掌握
+                wt.setMasteryLevel(2);
             } else {
-                wt.setMasteryLevel(1); // 练习中
+                wt.setMasteryLevel(1);
             }
         } else {
             wt.setContinuousCorrectCount(0);
-            wt.setMasteryLevel(0); // 未掌握
+            wt.setMasteryLevel(0);
             wt.setTimes(wt.getTimes() + 1);
             wt.setLastWrongTime(LocalDateTime.now());
         }

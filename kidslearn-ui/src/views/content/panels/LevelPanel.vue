@@ -1,13 +1,14 @@
 <template>
   <div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <span style="font-size:15px;font-weight:600">{{ course.courseName }} - 关卡列表</span>
+      <span style="font-size:15px;font-weight:600">{{ subject.subjectName }} - 关卡列表</span>
       <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增关卡</el-button>
     </div>
     <el-table :data="tableData" stripe v-loading="loading">
       <el-table-column prop="levelNum" label="序号" width="80" />
       <el-table-column prop="levelName" label="关卡名称" />
-      <el-table-column prop="totalQuestions" label="抽题数量" width="90" />
+      <el-table-column prop="baseQuestionCount" label="基础题数" width="90" />
+      <el-table-column prop="advancedQuestionCount" label="高阶题数" width="90" />
       <el-table-column prop="passScore" label="及格分" width="80" />
       <el-table-column prop="starThresholds" label="星级门槛" />
       <el-table-column prop="expReward" label="经验" width="70" />
@@ -26,22 +27,17 @@
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑关卡' : '新增关卡'" width="600">
-      <el-form :model="form" label-width="90px">
-        <el-form-item label="所属课程">
-          <el-select v-model="form.courseId" style="width:100%" disabled>
-            <el-option :label="course.courseName" :value="course.id" />
+      <el-form :model="form" label-width="100px">
+        <el-form-item label="所属学科">
+          <el-select v-model="form.subjectId" style="width:100%" disabled>
+            <el-option :label="subject.subjectName" :value="subject.id" />
           </el-select>
-        </el-form-item>
-        <el-form-item label="所属年级">
-          <el-select v-model="form.gradeLevelId" style="width:100%">
-            <el-option v-for="g in grades" :key="g.id" :label="g.levelName" :value="g.id" />
-          </el-select>
-          <div style="font-size: 12px; color: #999;">决定从题库哪个年级抽题</div>
         </el-form-item>
         <el-form-item label="关卡序号"><el-input-number v-model="form.levelNum" :min="1" /></el-form-item>
-        <el-form-item label="关卡名称"><el-input v-model="form.levelName" /></el-form-item>
+        <el-form-item label="关卡名称"><el-input v-model="form.levelName" placeholder="如：第一关" /></el-form-item>
         <el-form-item label="关卡描述"><el-input v-model="form.levelDesc" type="textarea" :rows="2" /></el-form-item>
-        <el-form-item label="抽题数量"><el-input-number v-model="form.totalQuestions" :min="1" /> <span style="margin-left: 8px; font-size: 12px; color: #999;">自动从题库中抽取该数量的试题</span></el-form-item>
+        <el-form-item label="基础题数量"><el-input-number v-model="form.baseQuestionCount" :min="1" /> <span style="margin-left: 8px; font-size: 12px; color: #999;">从学生当前年级抽取</span></el-form-item>
+        <el-form-item label="高阶题数量"><el-input-number v-model="form.advancedQuestionCount" :min="0" /> <span style="margin-left: 8px; font-size: 12px; color: #999;">从学生下一年级抽取</span></el-form-item>
         <el-form-item label="及格分"><el-input-number v-model="form.passScore" :min="0" :max="100" /></el-form-item>
         <el-form-item label="星级门槛"><el-input v-model="form.starThresholds" placeholder="如 60,80,100" /></el-form-item>
         <el-form-item label="经验奖励"><el-input-number v-model="form.expReward" :min="0" /></el-form-item>
@@ -59,20 +55,15 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getLevelList, saveLevel, deleteLevel, getGradeLevelList } from '@/api/request'
+import { getLevelList, saveLevel, deleteLevel } from '@/api/request'
 
 const props = defineProps<{
-  course: any
-}>()
-
-defineEmits<{
-  select: [row: any]
+  subject: any
 }>()
 
 const loading = ref(false)
 const saving = ref(false)
 const tableData = ref<any[]>([])
-const grades = ref<any[]>([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
@@ -80,19 +71,14 @@ const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 
 const form = reactive({
-  courseId: null as number | null, gradeLevelId: null as number | null, levelNum: 1, levelName: '', levelDesc: '',
-  totalQuestions: 10, passScore: 60, starThresholds: '60,80,100', expReward: 10, goldReward: 10, status: 1
+  subjectId: null as number | null, levelNum: 1, levelName: '', levelDesc: '',
+  baseQuestionCount: 8, advancedQuestionCount: 2, passScore: 60, starThresholds: '60,80,100', expReward: 10, goldReward: 10, status: 1
 })
-
-async function fetchGrades() {
-  const res = await getGradeLevelList()
-  if (res.code === 200) grades.value = res.data
-}
 
 async function fetchData() {
   loading.value = true
   try {
-    const res = await getLevelList({ page: currentPage.value, pageSize: pageSize.value, courseId: props.course.id })
+    const res = await getLevelList({ page: currentPage.value, pageSize: pageSize.value, subjectId: props.subject.id })
     if (res.code === 200) { tableData.value = res.data.list; total.value = res.data.total }
   } finally { loading.value = false }
 }
@@ -104,18 +90,14 @@ function openDialog(row?: any) {
   } else {
     editingId.value = null
     Object.assign(form, {
-      courseId: props.course.id, gradeLevelId: null, levelNum: 1, levelName: '', levelDesc: '',
-      totalQuestions: 10, passScore: 60, starThresholds: '60,80,100', expReward: 10, goldReward: 10, status: 1
+      subjectId: props.subject.id, levelNum: 1, levelName: '', levelDesc: '',
+      baseQuestionCount: 8, advancedQuestionCount: 2, passScore: 60, starThresholds: '60,80,100', expReward: 10, goldReward: 10, status: 1
     })
   }
   dialogVisible.value = true
 }
 
 async function handleSave() {
-  if (!form.gradeLevelId) {
-    ElMessage.warning('请选择所属年级')
-    return
-  }
   saving.value = true
   try {
     const res = await saveLevel({ ...form, id: editingId.value })
@@ -131,7 +113,6 @@ async function handleDelete(id: number) {
 }
 
 onMounted(() => {
-  fetchGrades()
   fetchData()
 })
 </script>

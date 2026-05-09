@@ -9,7 +9,7 @@
         :style="{ background: item.bgColor }" @click="goNext(item)">
         <text class="subject-icon">{{ item.icon }}</text>
         <text class="subject-name">{{ item.name }}</text>
-        <text v-if="!isPractice" class="subject-count">{{ item.courseCount }}门课程</text>
+        <text v-if="!isPractice" class="subject-count">{{ item.levelCount }}个关卡</text>
         <view class="progress-bar" v-if="!isPractice && item.progress > 0">
           <view class="progress-fill" :style="{ width: item.progress + '%' }"></view>
         </view>
@@ -52,7 +52,7 @@ export default {
             name: s.name || s.subjectName,
             icon: iconMap[s.code || s.subjectCode] || '📚',
             bgColor: bgMap[s.code || s.subjectCode] || '#F5F5F5',
-            courseCount: s.courseCount || 0,
+            levelCount: s.levelCount || 0,
             progress: s.progress || 0,
             locked: s.locked || s.status === 0
           }))
@@ -68,7 +68,7 @@ export default {
         // 直接跳转到答题页，传递 practiceModeId
         uni.navigateTo({ url: `/pages/learn/quiz?practiceModeId=${item.id}&timeLimit=0` })
       } else {
-        uni.navigateTo({ url: `/pages/learn/courses?subjectId=${item.id}&subjectCode=${item.code}` })
+        uni.navigateTo({ url: `/pages/learn/levels?subjectId=${item.id}&subjectName=${encodeURIComponent(item.name)}` })
       }
     },
   },
