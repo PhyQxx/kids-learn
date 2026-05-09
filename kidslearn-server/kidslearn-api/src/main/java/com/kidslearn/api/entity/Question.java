@@ -7,10 +7,10 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @TableName("question")
 public class Question extends BaseEntity {
-    private Long courseLevelId;
+    private Long subjectId; // 题库原子化：所属学科
+    private Long gradeLevelId; // 题库原子化：取代 difficulty，所属年级
     private Integer questionType;
     private String questionContent;
-    private Integer difficulty;
     private Integer score;
     private Integer timeLimit;
     private String analysis;

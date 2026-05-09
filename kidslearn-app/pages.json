@@ -11,6 +11,7 @@
         { "path": "pages/onboarding/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
         { "path": "pages/main/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "趣学星球" } },
         { "path": "pages/learn/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "学习中心" } },
+        { "path": "pages/learn/subjects", "style": { "navigationStyle": "custom", "navigationBarTitleText": "选择学科" } },
         { "path": "pages/learn/courses", "style": { "navigationStyle": "custom", "navigationBarTitleText": "课程列表" } },
         { "path": "pages/learn/levels", "style": { "navigationStyle": "custom", "navigationBarTitleText": "关卡列表" } },
         { "path": "pages/learn/videos", "style": { "navigationStyle": "custom", "navigationBarTitleText": "视频课程" } },

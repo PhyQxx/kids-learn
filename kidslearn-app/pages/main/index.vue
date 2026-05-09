@@ -195,7 +195,8 @@ function goNotifications() {
 
 function goSubject(subject) {
   learnStore.setSubject(subject)
-  uni.navigateTo({ url: `/pages/learn/courses?subjectId=${subject.id}` })
+  // 移动端首页今日学习进入专项练习，不再是闯关
+  uni.navigateTo({ url: `/pages/learn/quiz?practiceModeId=${subject.id}&timeLimit=0` })
 }
 
 function goCourses(subject) {

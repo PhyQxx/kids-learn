@@ -2,6 +2,8 @@ package com.kidslearn.api.controller;
 
 import com.kidslearn.api.dto.learn.DailyTaskVO;
 import com.kidslearn.api.dto.learn.LevelResultVO;
+import com.kidslearn.api.dto.learn.PracticeModeVO;
+import com.kidslearn.api.dto.learn.SmartReviewQuizVO;
 import com.kidslearn.api.dto.learn.SubmitAnswerDTO;
 import com.kidslearn.api.dto.learn.SubmitVideoProgressDTO;
 import com.kidslearn.api.service.LearnService;
@@ -181,5 +183,55 @@ public class LearnController {
     public R<List<Map<String, Object>>> getAssessmentQuestions(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(learnService.getAssessmentQuestions(userId));
+    }
+
+    // --- Phase 12: 专项练习与智能错题本 ---
+
+    @Operation(summary = "获取专项练习模式列表")
+    @GetMapping("/practice/modes")
+    public R<List<PracticeModeVO>> getPracticeModes(
+            HttpServletRequest request,
+            @RequestParam(required = false) Long subjectId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getPracticeModes(userId, subjectId));
+    }
+
+    @Operation(summary = "开始专项练习")
+    @PostMapping("/practice/start")
+    public R<Map<String, Object>> startPractice(
+            HttpServletRequest request,
+            @RequestParam Long practiceModeId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.startPractice(userId, practiceModeId));
+    }
+
+    @Operation(summary = "提交专项练习答案")
+    @PostMapping("/practice/submit")
+    public R<Map<String, Object>> submitPracticeAnswer(
+            HttpServletRequest request,
+            @RequestParam Long practiceSessionId,
+            @RequestBody SubmitAnswerDTO dto) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.submitPracticeAnswer(userId, practiceSessionId, dto));
+    }
+
+    @Operation(summary = "获取智能复习组卷")
+    @GetMapping("/review/smart-quiz")
+    public R<SmartReviewQuizVO> getSmartReviewQuiz(
+            HttpServletRequest request,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(defaultValue = "15") Integer questionCount) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getSmartReviewQuiz(userId, subjectId, questionCount));
+    }
+
+    @Operation(summary = "更新错题掌握度")
+    @PostMapping("/review/mastery")
+    public R<Map<String, Object>> updateWrongTopicMastery(
+            HttpServletRequest request,
+            @RequestParam Long wrongTopicId,
+            @RequestParam boolean isCorrect) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.updateWrongTopicMastery(userId, wrongTopicId, isCorrect));
     }
 }

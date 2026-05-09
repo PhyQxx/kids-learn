@@ -62,13 +62,9 @@
         >
           <text class="subject-emoji">{{ subject.icon }}</text>
           <text class="subject-name">{{ subject.name }}</text>
-          <view class="subject-progress-wrap" v-if="subject.progress > 0">
-            <view class="subject-progress-bar">
-              <view class="subject-progress-fill" :style="{ width: subject.progress + '%' }"></view>
-            </view>
-            <text class="subject-progress-text text-xs">{{ subject.progress }}%</text>
+          <view class="subject-practice-tag">
+            <text class="text-xs">专项练习 →</text>
           </view>
-          <text v-else class="subject-progress-text text-xs text-light">未开始</text>
         </view>
       </view>
 
@@ -189,12 +185,12 @@ const myRankText = computed(() =>
 )
 
 const subjects = ref([
-  { id: 1, name: '语文', icon: '📖', progress: 0, locked: false },
-  { id: 2, name: '数学', icon: '🔢', progress: 0, locked: false },
-  { id: 3, name: '英语', icon: '🔤', progress: 0, locked: false },
-  { id: 4, name: '逻辑', icon: '🧩', progress: 0, locked: false },
-  { id: 5, name: '科学', icon: '🔬', progress: 0, locked: false },
-  { id: 6, name: '音乐', icon: '🎵', progress: 0, locked: true }
+  { id: 1, name: '语文', icon: '📖', locked: false },
+  { id: 2, name: '数学', icon: '🔢', locked: false },
+  { id: 3, name: '英语', icon: '🔤', locked: false },
+  { id: 4, name: '逻辑', icon: '🧩', locked: false },
+  { id: 5, name: '科学', icon: '🔬', locked: false },
+  { id: 6, name: '音乐', icon: '🎵', locked: true }
 ])
 
 const topRankers = ref([])
@@ -206,12 +202,12 @@ function applyMockData() {
   myRank.value = null
   achievementCount.value = 32
   subjects.value = [
-    { id: 1, name: '语文', icon: '📖', progress: 75, locked: false },
-    { id: 2, name: '数学', icon: '🔢', progress: 60, locked: false },
-    { id: 3, name: '英语', icon: '🔤', progress: 45, locked: false },
-    { id: 4, name: '逻辑', icon: '🧩', progress: 30, locked: false },
-    { id: 5, name: '科学', icon: '🔬', progress: 20, locked: false },
-    { id: 6, name: '音乐', icon: '🎵', progress: 0, locked: true }
+    { id: 1, name: '语文', icon: '📖', locked: false },
+    { id: 2, name: '数学', icon: '🔢', locked: false },
+    { id: 3, name: '英语', icon: '🔤', locked: false },
+    { id: 4, name: '逻辑', icon: '🧩', locked: false },
+    { id: 5, name: '科学', icon: '🔬', locked: false },
+    { id: 6, name: '音乐', icon: '🎵', locked: true }
   ]
 }
 
@@ -241,7 +237,6 @@ async function loadData() {
         id: s.id,
         name: s.name || s.subjectName,
         icon: s.icon || s.iconUrl || { 'CHINESE': '📖', 'MATH': '🔢', 'ENGLISH': '🔤', 'LOGIC': '🧩', 'SCIENCE': '🔬', 'MUSIC': '🎵' }[s.code || s.subjectCode] || '📚',
-        progress: s.progress || 0,
         locked: s.status === 0 || s.isVip || s.locked
       }))
     }
@@ -437,18 +432,25 @@ function goAdaptivePractice(wp) {
 }
 .subject-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .subject-card {
-  min-height: 142px;
+  min-height: 120px;
   padding: 22px 16px; text-align: center; cursor: pointer;
   border: 1px solid rgba(84, 108, 138, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   &:active { transform: scale(0.96); opacity: 0.9; }
   &.locked { opacity: 0.5; background: #F5F5F5; box-shadow: none; }
 }
 .subject-emoji { font-size: 52px; display: block; margin-bottom: 8px; }
 .subject-name { font-size: 17px; font-weight: 800; color: $text; display: block; }
-.subject-progress-text { font-size: 13px; color: $text-light; display: block; margin-top: 4px; }
-.subject-progress-wrap { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
-.subject-progress-bar { flex: 1; height: 6px; background: rgba(0,0,0,0.1); border-radius: 3px; overflow: hidden; }
-.subject-progress-fill { height: 100%; background: $primary; border-radius: 3px; transition: width 0.3s; }
+.subject-practice-tag {
+  margin-top: 8px;
+  background: #EEF6FF;
+  color: $learn-blue;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: bold;
+}
 
 .weak-grid { display: flex; flex-direction: column; gap: 10px; }
 .weak-card { padding: 14px 18px; }
@@ -507,6 +509,6 @@ function goAdaptivePractice(wp) {
   .rank-banner { padding: 14px 16px; }
   .rank-action { min-width: 52px; }
   .subject-grid { grid-template-columns: repeat(2, 1fr); }
-  .subject-card { min-height: 128px; }
+  .subject-card { min-height: 110px; }
 }
 </style>

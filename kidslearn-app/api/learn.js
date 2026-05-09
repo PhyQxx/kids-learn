@@ -57,3 +57,23 @@ export const getExplainWrong = (questionId) => get('/learn/explain-wrong', { que
 
 // 获取新手测评题目
 export const getAssessmentQuestions = () => get('/learn/assessment')
+
+// --- Phase 12: 专项练习与智能错题本 ---
+
+// 获取专项练习模式列表
+export const getPracticeModes = (subjectId) => get('/learn/practice/modes', { subjectId })
+
+// 开始专项练习
+export const startPractice = (practiceModeId) => post(`/learn/practice/start?practiceModeId=${practiceModeId}`)
+
+// 提交专项练习答案
+export const submitPracticeAnswer = (practiceSessionId, data) => 
+  post(`/learn/practice/submit?practiceSessionId=${practiceSessionId}`, data)
+
+// 获取智能复习组卷
+export const getSmartReviewQuiz = (subjectId, questionCount = 15) => 
+  get('/learn/review/smart-quiz', { subjectId, questionCount })
+
+// 更新错题掌握度
+export const updateWrongTopicMastery = (wrongTopicId, isCorrect) => 
+  post(`/learn/review/mastery?wrongTopicId=${wrongTopicId}&isCorrect=${isCorrect}`)

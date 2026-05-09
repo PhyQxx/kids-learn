@@ -7,7 +7,7 @@
     <el-table :data="tableData" stripe v-loading="loading">
       <el-table-column prop="levelNum" label="序号" width="80" />
       <el-table-column prop="levelName" label="关卡名称" />
-      <el-table-column prop="totalQuestions" label="题目数" width="80" />
+      <el-table-column prop="totalQuestions" label="抽题数量" width="90" />
       <el-table-column prop="passScore" label="及格分" width="80" />
       <el-table-column prop="starThresholds" label="星级门槛" />
       <el-table-column prop="expReward" label="经验" width="70" />
@@ -15,9 +15,8 @@
       <el-table-column prop="status" label="状态" width="80">
         <template #default="{ row }"><el-tag :type="row.status === 1 ? 'success' : 'danger'" size="small">{{ row.status === 1 ? '启用' : '禁用' }}</el-tag></template>
       </el-table-column>
-      <el-table-column label="操作" width="240">
+      <el-table-column label="操作" width="160">
         <template #default="{ row }">
-          <el-button link type="primary" @click="$emit('select', row)">管理题目</el-button>
           <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
           <el-button link type="danger" @click="handleDelete(row.id)">删除</el-button>
         </template>
@@ -27,15 +26,22 @@
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑关卡' : '新增关卡'" width="600">
-      <el-form :model="form" label-width="80px">
+      <el-form :model="form" label-width="90px">
         <el-form-item label="所属课程">
           <el-select v-model="form.courseId" style="width:100%" disabled>
             <el-option :label="course.courseName" :value="course.id" />
           </el-select>
         </el-form-item>
+        <el-form-item label="所属年级">
+          <el-select v-model="form.gradeLevelId" style="width:100%">
+            <el-option v-for="g in grades" :key="g.id" :label="g.levelName" :value="g.id" />
+          </el-select>
+          <div style="font-size: 12px; color: #999;">决定从题库哪个年级抽题</div>
+        </el-form-item>
         <el-form-item label="关卡序号"><el-input-number v-model="form.levelNum" :min="1" /></el-form-item>
         <el-form-item label="关卡名称"><el-input v-model="form.levelName" /></el-form-item>
         <el-form-item label="关卡描述"><el-input v-model="form.levelDesc" type="textarea" :rows="2" /></el-form-item>
+        <el-form-item label="抽题数量"><el-input-number v-model="form.totalQuestions" :min="1" /> <span style="margin-left: 8px; font-size: 12px; color: #999;">自动从题库中抽取该数量的试题</span></el-form-item>
         <el-form-item label="及格分"><el-input-number v-model="form.passScore" :min="0" :max="100" /></el-form-item>
         <el-form-item label="星级门槛"><el-input v-model="form.starThresholds" placeholder="如 60,80,100" /></el-form-item>
         <el-form-item label="经验奖励"><el-input-number v-model="form.expReward" :min="0" /></el-form-item>
@@ -53,7 +59,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getLevelList, saveLevel, deleteLevel } from '@/api/request'
+import { getLevelList, saveLevel, deleteLevel, getGradeLevelList } from '@/api/request'
 
 const props = defineProps<{
   course: any
@@ -66,6 +72,7 @@ defineEmits<{
 const loading = ref(false)
 const saving = ref(false)
 const tableData = ref<any[]>([])
+const grades = ref<any[]>([])
 const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(20)
@@ -73,9 +80,14 @@ const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 
 const form = reactive({
-  courseId: null as number | null, levelNum: 1, levelName: '', levelDesc: '',
-  passScore: 60, starThresholds: '60,80,100', expReward: 10, goldReward: 10, status: 1
+  courseId: null as number | null, gradeLevelId: null as number | null, levelNum: 1, levelName: '', levelDesc: '',
+  totalQuestions: 10, passScore: 60, starThresholds: '60,80,100', expReward: 10, goldReward: 10, status: 1
 })
+
+async function fetchGrades() {
+  const res = await getGradeLevelList()
+  if (res.code === 200) grades.value = res.data
+}
 
 async function fetchData() {
   loading.value = true
@@ -92,14 +104,18 @@ function openDialog(row?: any) {
   } else {
     editingId.value = null
     Object.assign(form, {
-      courseId: props.course.id, levelNum: 1, levelName: '', levelDesc: '',
-      passScore: 60, starThresholds: '60,80,100', expReward: 10, goldReward: 10, status: 1
+      courseId: props.course.id, gradeLevelId: null, levelNum: 1, levelName: '', levelDesc: '',
+      totalQuestions: 10, passScore: 60, starThresholds: '60,80,100', expReward: 10, goldReward: 10, status: 1
     })
   }
   dialogVisible.value = true
 }
 
 async function handleSave() {
+  if (!form.gradeLevelId) {
+    ElMessage.warning('请选择所属年级')
+    return
+  }
   saving.value = true
   try {
     const res = await saveLevel({ ...form, id: editingId.value })
@@ -114,5 +130,8 @@ async function handleDelete(id: number) {
   if (res.code === 200) { ElMessage.success('删除成功'); fetchData() }
 }
 
-onMounted(() => fetchData())
+onMounted(() => {
+  fetchGrades()
+  fetchData()
+})
 </script>

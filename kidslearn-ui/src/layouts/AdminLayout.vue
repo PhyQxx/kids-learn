@@ -18,10 +18,14 @@
           <template #title>首页概览</template>
         </el-menu-item>
 
-        <el-menu-item index="/content">
-          <el-icon><Reading /></el-icon>
-          <template #title>内容管理</template>
-        </el-menu-item>
+        <el-sub-menu index="learning">
+          <template #title>
+            <el-icon><Reading /></el-icon>
+            <span>学习管理</span>
+          </template>
+          <el-menu-item index="/question-bank">题库管理</el-menu-item>
+          <el-menu-item index="/content">闯关管理</el-menu-item>
+        </el-sub-menu>
 
         <el-sub-menu index="pet">
           <template #title>

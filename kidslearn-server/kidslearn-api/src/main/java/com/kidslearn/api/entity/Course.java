@@ -13,7 +13,6 @@ public class Course extends BaseEntity {
     private String courseDesc;
     private String coverUrl;
     private Integer totalLevels;
-    private Integer difficulty;
     private Integer isElite;
     private Integer sortOrder;
     private Integer status;

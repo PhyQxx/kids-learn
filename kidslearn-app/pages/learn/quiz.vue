@@ -12,13 +12,17 @@
             <text class="info-emoji">📝</text>
             <text class="info-text text-sm">{{ totalQuestions }} 题</text>
           </view>
-          <view class="info-item card">
+          <view class="info-item card" v-if="!isPractice">
             <text class="info-emoji">⭐</text>
             <text class="info-text text-sm">目标 3 星</text>
           </view>
-          <view class="info-item card">
+          <view class="info-item card" v-if="timeLimit > 0">
             <text class="info-emoji">⏱️</text>
             <text class="info-text text-sm">{{ timeLimit }} 秒</text>
+          </view>
+          <view class="info-item card" v-else-if="isPractice">
+            <text class="info-emoji">🔄</text>
+            <text class="info-text text-sm">无尽模式</text>
           </view>
         </view>
         <tn-button type="primary" size="xl" shape="round" :disabled="!totalQuestions" @click="startQuiz" style="background: linear-gradient(135deg, #4A90D9, #6BA3E0);">开始答题</tn-button>
@@ -37,8 +41,9 @@
           <view class="hint-btn" :class="{ used: hintUsed }" @tap="useHint">
             <text>{{ hintUsed ? '🐾 已用' : '🐾 提示' }}</text>
           </view>
-          <view class="timer" :class="{ warning: countdown <= 10 }">
-            <text>{{ countdown }}s</text>
+          <view class="timer" :class="{ warning: timeLimit > 0 && countdown <= 10 }">
+            <text v-if="timeLimit > 0">{{ countdown }}s</text>
+            <text v-else>{{ usedTimeInQuiz }}s</text>
           </view>
         </view>
 
@@ -56,7 +61,7 @@
             <rich-text :nodes="currentQuestion.nodes" />
           </view>
 
-          <!-- 选项网格 -->
+          <!-- 选项网格 (单选/判断) -->
           <view v-if="currentQuestion.interactionType === 'single'" class="options-grid">
             <view
               v-for="(opt, i) in currentQuestion.options"
@@ -65,11 +70,18 @@
               :class="getOptionClass(opt)"
               @tap="selectOption(opt)"
             >
-              <text class="option-label">{{ opt.label }}</text>
+              <text class="option-label" v-if="opt.label">{{ opt.label }}</text>
               <rich-text class="option-text" :nodes="opt.nodes" />
             </view>
           </view>
 
+          <!-- 填空题 -->
+          <view v-else-if="currentQuestion.interactionType === 'fill'" class="fill-panel card">
+            <input class="fill-input" v-model="fillAttempt" placeholder="请输入答案..." />
+            <tn-button type="primary" shape="round" size="lg" :disabled="!fillAttempt || !!selectedAnswer" @click="submitFillAnswer">提交答案</tn-button>
+          </view>
+
+          <!-- 排序题 -->
           <view v-else-if="currentQuestion.interactionType === 'order'" class="order-panel card">
             <view v-for="(item, i) in orderItems" :key="item.answerValue" class="order-row">
               <text class="order-index">{{ i + 1 }}</text>
@@ -82,6 +94,7 @@
             <tn-button type="primary" shape="round" size="lg" :disabled="!!selectedAnswer" @click="submitOrderAnswer">提交排序</tn-button>
           </view>
 
+          <!-- 连线题 -->
           <view v-else-if="currentQuestion.interactionType === 'match'" class="match-panel">
             <view class="match-column card">
               <view
@@ -109,6 +122,7 @@
             <tn-button class="match-submit" type="primary" shape="round" size="lg" :disabled="!canSubmitMatch || !!selectedAnswer" @click="submitMatchAnswer">提交连线</tn-button>
           </view>
 
+          <!-- 语音题 -->
           <view v-else-if="currentQuestion.interactionType === 'voice'" class="voice-panel card">
             <text class="voice-target">{{ currentQuestion.voiceText }}</text>
             <view class="voice-actions">
@@ -137,8 +151,8 @@
         </view>
         <text v-else class="result-emoji animate-pop-in">{{ resultEmoji }}</text>
 
-        <!-- 星级 -->
-        <view class="result-stars">
+        <!-- 星级 (闯关时显示) -->
+        <view class="result-stars" v-if="!isPractice">
           <text
             v-for="s in 3"
             :key="s"
@@ -164,7 +178,7 @@
             <text v-else class="reward-value text-md text-bold">+{{ rewards.exp }}</text>
             <text class="reward-label text-xs text-light">经验</text>
           </view>
-          <view class="reward-card card">
+          <view class="reward-card card" v-if="!isPractice">
             <text class="reward-emoji">🎨</text>
             <AnimatedNumber v-if="showRewardAnimation" :value="rewards.stickers" :duration="600" prefix="x" class="reward-value text-md text-bold" />
             <text v-else class="reward-value text-md text-bold">x{{ rewards.stickers }}</text>
@@ -200,8 +214,8 @@
         </view>
 
         <view class="result-actions">
-          <tn-button type="primary" size="lg" shape="round" @click="goNextLevel" style="background: linear-gradient(135deg, #4A90D9, #6BA3E0);">下一关</tn-button>
-          <tn-button size="lg" shape="round" @click="goBack">返回关卡</tn-button>
+          <tn-button type="primary" size="lg" shape="round" @click="goNextLevel" style="background: linear-gradient(135deg, #4A90D9, #6BA3E0);">{{ isPractice ? '再来一次' : '下一关' }}</tn-button>
+          <tn-button size="lg" shape="round" @click="goBack">{{ isPractice ? '结束练习' : '返回' }}</tn-button>
         </view>
       </view>
 
@@ -242,7 +256,7 @@ import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
 import { usePetStore } from '@/store/pet'
-import { getQuestions, submitAnswer, completeLevel, getHint } from '@/api/learn'
+import { getQuestions, submitAnswer, completeLevel, getHint, startPractice } from '@/api/learn'
 import { submitChallengeResult } from '@/api/challenge'
 import { getUserInfo } from '@/api/user'
 import { resolveQuestionSpeech } from '@/utils/questionSpeech.mjs'
@@ -326,20 +340,23 @@ const matchPairs = ref({})
 const matchRightItems = ref([])
 const selectedMatchLeft = ref('')
 const voiceAttempt = ref('')
+const fillAttempt = ref('')
 const voiceListening = ref(false)
 const showCorrect = ref(false)
 const showWrong = ref(false)
 const countdown = ref(60)
-const totalTime = ref(60)
+const timeLimit = ref(60)
+const usedTimeInQuiz = ref(0)
 let timer = null
 
 const levelId = ref(null)
 const pageGradeLevelId = ref(null)
 const challengeId = ref(null)
 const opponentId = ref(null)
+const isPractice = ref(false)
+const practiceModeId = ref(null)
 const levelName = ref(learnStore.currentLevel?.name || '第 1 关')
 const levelEmoji = ref('🎮')
-const timeLimit = ref(60)
 
 // 题目列表，由后端加载
 const questions = ref([])
@@ -451,31 +468,54 @@ onMounted(async () => {
   const pages = getCurrentPages()
   const page = pages[pages.length - 1]
   const options = page.$page?.options || {}
-  levelId.value = options.levelId || learnStore.currentLevel?.id
-  pageGradeLevelId.value = options.gradeLevelId || userStore.userInfo?.gradeLevelId || null
-  challengeId.value = options.challengeId || null
-  opponentId.value = options.opponentId || null
-  if (levelId.value) {
+
+  if (options.practiceModeId) {
+    isPractice.value = true
+    practiceModeId.value = options.practiceModeId
+    timeLimit.value = parseInt(options.timeLimit) || 0
     try {
-      const res = await loadQuestionsWithOfflineCache({
-        levelId: levelId.value,
-        gradeLevelId: pageGradeLevelId.value,
-        fetchQuestions: getQuestions,
-        storage: uni
-      })
-      if (res.fromCache) {
-        uni.showToast({ title: '已加载离线题目', icon: 'none' })
-      }
+      const res = await startPractice(practiceModeId.value)
+      levelName.value = res.modeName || '专项练习'
+      levelEmoji.value = '📝'
       if (res.questions && Array.isArray(res.questions) && res.questions.length > 0) {
         questions.value = res.questions.map(q => normalizeQuizQuestion(q))
-        // Preload first question audio
         if (questions.value[0]) {
           preloadQuestionAudio(questions.value[0])
           resetInteractionState()
         }
+      } else {
+        uni.showToast({ title: '该练习下没有题目', icon: 'none' })
       }
     } catch (e) {
-      console.log('quiz: 使用模拟题目')
+      uni.showToast({ title: '加载练习失败', icon: 'none' })
+    }
+  } else {
+    levelId.value = options.levelId || learnStore.currentLevel?.id
+    pageGradeLevelId.value = options.gradeLevelId || userStore.userInfo?.gradeLevelId || null
+    challengeId.value = options.challengeId || null
+    opponentId.value = options.opponentId || null
+    if (levelId.value) {
+      try {
+        const res = await loadQuestionsWithOfflineCache({
+          levelId: levelId.value,
+          gradeLevelId: pageGradeLevelId.value,
+          fetchQuestions: getQuestions,
+          storage: uni
+        })
+        if (res.fromCache) {
+          uni.showToast({ title: '已加载离线题目', icon: 'none' })
+        }
+        if (res.questions && Array.isArray(res.questions) && res.questions.length > 0) {
+          questions.value = res.questions.map(q => normalizeQuizQuestion(q))
+          // Preload first question audio
+          if (questions.value[0]) {
+            preloadQuestionAudio(questions.value[0])
+            resetInteractionState()
+          }
+        }
+      } catch (e) {
+        console.log('quiz: 使用模拟题目')
+      }
     }
   }
 })
@@ -515,9 +555,18 @@ const canSubmitMatch = computed(() =>
   && Object.keys(matchPairs.value).length === currentQuestion.value.options.length
 )
 
-const resultEmoji = computed(() => earnedStars.value >= 3 ? '🎉' : earnedStars.value >= 1 ? '👍' : '💪')
-const resultTitle = computed(() => earnedStars.value >= 3 ? '太棒了！' : earnedStars.value >= 1 ? '不错哦！' : '继续加油！')
-const resultSubtitle = computed(() => earnedStars.value >= 3 ? '你获得了满星评价！' : '再努力一下就能获得更多星星！')
+const resultEmoji = computed(() => {
+  if (isPractice.value) return '🏆'
+  return earnedStars.value >= 3 ? '🎉' : earnedStars.value >= 1 ? '👍' : '💪'
+})
+const resultTitle = computed(() => {
+  if (isPractice.value) return '练习完成！'
+  return earnedStars.value >= 3 ? '太棒了！' : earnedStars.value >= 1 ? '不错哦！' : '继续加油！'
+})
+const resultSubtitle = computed(() => {
+  if (isPractice.value) return `本次练习你答对了 ${correctCount.value} 题`
+  return earnedStars.value >= 3 ? '你获得了满星评价！' : '再努力一下就能获得更多星星！'
+})
 
 function getOptionClass(opt) {
   if (eliminatedOptions.value.has(opt.label)) return 'eliminated'
@@ -584,6 +633,7 @@ function resetInteractionState() {
   matchRightItems.value = q.interactionType === 'match' ? [...q.options].reverse() : []
   selectedMatchLeft.value = ''
   voiceAttempt.value = ''
+  fillAttempt.value = ''
   voiceListening.value = false
 }
 
@@ -672,6 +722,11 @@ function submitVoiceAnswer() {
   submitCurrentAnswer(voiceAttempt.value, 'VOICE')
 }
 
+function submitFillAnswer() {
+  if (selectedAnswer.value || !fillAttempt.value) return
+  submitCurrentAnswer(fillAttempt.value, 'FILL')
+}
+
 function submitCurrentAnswer(answer, displayAnswer = answer) {
   if (selectedAnswer.value) return
   stopQuestionSpeech()
@@ -680,9 +735,8 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
   const answerTime = Math.round((Date.now() - (questionStartTime.value || startTime.value)) / 1000)
 
   // 提交答案到后端判定
-  if (levelId.value && q.id) {
+  if (q.id) {
     submitAnswer({
-      levelId: levelId.value,
       questionId: q.id,
       answer,
       answerTime
@@ -698,6 +752,11 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
       } else {
         showWrong.value = true
         playFeedbackAudio('wrong')
+        // Mark correct answer in options
+        if (res?.correctAnswer) {
+          const cOpt = q.options.find(o => (o.answerValue || o.label) === res.correctAnswer)
+          if (cOpt) cOpt.correct = true
+        }
       }
       setTimeout(() => {
         showCorrect.value = false
@@ -710,7 +769,7 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
       setTimeout(() => { showWrong.value = false; nextQuestion() }, 3000)
     })
   } else {
-    // 无 levelId 时随机判定（fallback mock 题目）
+    // 无 levelId 或 questionId 时随机判定（fallback mock 题目）
     showWrong.value = true
     setTimeout(() => { showWrong.value = false; nextQuestion() }, 1000)
   }
@@ -738,11 +797,18 @@ function startQuiz() {
   resetInteractionState()
   preloadFeedbackAudio()
   setTimeout(() => questionToSpeech(), 250)
-  countdown.value = totalTime.value
+
+  if (timeLimit.value > 0) {
+    countdown.value = timeLimit.value
+  }
+
   timer = setInterval(() => {
-    countdown.value--
-    if (countdown.value <= 0) {
-      finishQuiz()
+    usedTimeInQuiz.value++
+    if (timeLimit.value > 0) {
+      countdown.value--
+      if (countdown.value <= 0) {
+        finishQuiz()
+      }
     }
   }, 1000)
 }
@@ -753,19 +819,18 @@ async function finishQuiz() {
   usedTime.value = Math.round((Date.now() - startTime.value) / 1000)
 
   // Calculate stars
-  const acc = correctCount.value / questions.value.length
+  const acc = totalQuestions.value > 0 ? correctCount.value / totalQuestions.value : 0
   if (acc >= 0.9) earnedStars.value = 3
   else if (acc >= 0.7) earnedStars.value = 2
   else if (acc >= 0.5) earnedStars.value = 1
   else earnedStars.value = 0
 
-  const wrongCount = questions.value.length - correctCount.value
+  const wrongCount = totalQuestions.value - correctCount.value
 
-  // 提交关卡完成
-  if (levelId.value) {
+  // 提交关卡完成 (仅闯关模式)
+  if (levelId.value && !isPractice.value) {
     try {
       const res = await completeLevel(levelId.value, totalScore.value, usedTime.value, wrongCount)
-      console.log('completeLevel result:', res)
       if (res) {
         earnedStars.value = res.stars || earnedStars.value
         rewards.value = {
@@ -792,22 +857,31 @@ async function finishQuiz() {
       }
     }
   } else {
+    // 专项练习结算
+    const practiceGold = Math.floor(correctCount.value * 2)
+    const practiceExp = Math.floor(correctCount.value * 2)
     rewards.value = {
-      gold: 10 + earnedStars.value * 10,
-      exp: 10 + earnedStars.value * 5,
-      stickers: earnedStars.value >= 2 ? 1 : 0
+      gold: practiceGold,
+      exp: practiceExp,
+      stickers: 0
     }
+    try {
+      const userInfo = await getUserInfo()
+      if (userInfo) userStore.setUserInfo(userInfo)
+    } catch (e) {}
   }
 
-  await submitChallengeIfNeeded()
+  if (!isPractice.value) {
+    await submitChallengeIfNeeded()
+  }
 
   screen.value = 'result'
 
   // 触发奖励动画
-  showTreasureChest.value = earnedStars.value >= 3
+  showTreasureChest.value = earnedStars.value >= 3 || isPractice.value
   setTimeout(() => {
     showRewardAnimation.value = true
-    if (earnedStars.value >= 3) {
+    if (showTreasureChest.value) {
       generateCoinParticles(12)
     }
   }, 600)
@@ -852,7 +926,23 @@ function exitQuiz() {
 }
 
 function goNextLevel() {
-  uni.navigateBack()
+  if (isPractice.value) {
+    // 重新开始练习
+    screen.value = 'start'
+    currentIndex.value = 0
+    correctCount.value = 0
+    totalScore.value = 0
+    earnedStars.value = 0
+    usedTime.value = 0
+    usedTimeInQuiz.value = 0
+    showRewardAnimation.value = false
+    showTreasureChest.value = false
+    if (questions.value[0]) {
+      preloadQuestionAudio(questions.value[0])
+    }
+  } else {
+    uni.navigateBack()
+  }
 }
 
 function goBack() {
@@ -1115,6 +1205,30 @@ onUnmounted(() => {
   font-weight: 700;
   color: $text;
   line-height: 1.35;
+}
+
+.fill-panel {
+  width: min(640px, 100%);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.fill-input {
+  width: 100%;
+  height: 56px;
+  border: 2px solid #E8F0FE;
+  border-radius: $radius-md;
+  padding: 0 16px;
+  font-size: 18px;
+  text-align: center;
+
+  &:focus {
+    border-color: $learn-blue;
+    background: #F7FBFF;
+  }
 }
 
 .order-panel,

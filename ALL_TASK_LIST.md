@@ -156,7 +156,7 @@
 ### 个人中心
 - [x] **11.23** 完善个人中心 — 用户信息、统计、菜单导航 (`pages/mine/index.vue`)
 - [x] **11.24** 新增学习记录页 (`pages/mine/records.vue`)
-- [x] **11.25** 新增错题本页 (`pages/mine/wrong.vue`)
+- [x] **11.25** 完善错题本页 (`pages/mine/wrong.vue`)
 - [x] **11.26** 新增VIP页 (`pages/mine/vip.vue`)
 - [x] **11.27** 新增设置页 — 昵称修改、称号管理、退出登录 (`pages/mine/settings.vue`)
 
@@ -170,6 +170,22 @@
 ### 社交功能
 - [x] **11.33** 新增排行榜页 (`pages/ranking/index.vue`)
 - [x] **11.34** 新增挑战赛页 (`pages/challenge/index.vue`)
+
+---
+
+## Phase 12: 专项练习与智能错题本 (P0)
+
+- [x] **12.1** Server端: 新增专项练习模式表 (`practice_mode`)
+- [x] **12.2** Server端: 新增专项练习DTO (`dto/learn/PracticeModeVO.java`, `PracticeQuestionVO.java`)
+- [x] **12.3** Server端: `LearnService` 新增 `getPracticeModes`, `startPractice` 方法
+- [x] **12.4** Server端: `LearnController` 新增 `/api/v1/learn/practice/**` 相关接口
+- [x] **12.5** Server端: `wrong_topic` 表增加 `mastery_level` (掌握度) 字段
+- [x] **12.6** Server端: `LearnService` 新增 `getSmartReviewQuestions` (智能复习组卷)
+- [x] **12.7** Server端: `LearnController` 新增 `/api/v1/learn/review/smart-quiz` 接口
+- [x] **12.8** Admin UI: 新增专项练习模式管理页面 (`views/content/practice.vue`)
+- [x] **12.9** Mobile App: 新增专项练习模块入口页 (`pages/learn/practice/index.vue`)
+- [x] **12.10** Mobile App: 新增专项练习答题页 (`pages/learn/practice/quiz.vue`)
+- [x] **12.11** Mobile App: 改造错题本页面 (`pages/mine/wrong.vue`)，增加筛选、掌握度、智能复习功能
 
 ---
 
@@ -188,6 +204,7 @@
 | Server管理后台API (Phase 9) | 4 | 4 | 100% |
 | Admin UI管理后台 (Phase 10) | 17 | 17 | 100% |
 | Mobile App (Phase 11) | 34 | 34 | 100% |
-| **总计** | **84** | **84** | **100%** |
+| **专项练习与智能错题本 (Phase 12)** | **11** | **11** | **100%** |
+| **总计** | **95** | **95** | **100%** |
 
 > 全部任务已实现；真实支付网关签名/验签可作为后续集成项。

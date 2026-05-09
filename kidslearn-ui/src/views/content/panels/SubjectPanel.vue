@@ -25,7 +25,7 @@
           <el-tag :type="row.status === 1 ? 'success' : 'danger'">{{ row.status === 1 ? '启用' : '禁用' }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="240">
+      <el-table-column label="操作" width="300">
         <template #default="{ row }">
           <el-button link type="primary" @click="$emit('select', row)">管理课程</el-button>
           <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
@@ -60,6 +60,8 @@ import { getSubjectList, saveSubject, deleteSubject, getDictDataByType } from '@
 
 const emit = defineEmits<{
   select: [row: any]
+  'select-practice': [row: any]
+  'update:ageGroup': [val: number | null]
 }>()
 
 const loading = ref(false)

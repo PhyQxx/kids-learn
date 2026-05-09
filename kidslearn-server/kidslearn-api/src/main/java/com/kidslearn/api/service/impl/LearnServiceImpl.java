@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kidslearn.api.dto.learn.DailyTaskVO;
 import com.kidslearn.api.dto.learn.LevelResultVO;
+import com.kidslearn.api.dto.learn.PracticeModeVO;
+import com.kidslearn.api.dto.learn.SmartReviewQuizVO;
 import com.kidslearn.api.dto.learn.SubmitAnswerDTO;
 import com.kidslearn.api.dto.learn.SubmitVideoProgressDTO;
 import com.kidslearn.api.entity.*;
@@ -53,6 +55,7 @@ public class LearnServiceImpl implements LearnService {
     private final RealtimeEventPublisher realtimeEventPublisher;
     private final PetService petService;
     private final AiService aiService;
+    private final PracticeModeMapper practiceModeMapper;
 
     @Override
     public DailyTaskVO getDailyTasks(Long userId) {
@@ -321,7 +324,6 @@ public class LearnServiceImpl implements LearnService {
             map.put("courseDesc", c.getCourseDesc());
             map.put("coverUrl", c.getCoverUrl());
             map.put("totalLevels", c.getTotalLevels());
-            map.put("difficulty", c.getDifficulty());
             map.put("isElite", c.getIsElite());
             map.put("videoCount", courseVideoMapper.selectCount(
                 new LambdaQueryWrapper<CourseVideo>()
@@ -460,14 +462,29 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public List<Map<String, Object>> getQuestions(Long levelId) {
-        List<Question> questions = questionMapper.selectList(
-            new LambdaQueryWrapper<Question>()
-                .eq(Question::getCourseLevelId, levelId)
-                .orderByAsc(Question::getSortOrder)
-        );
-        Random random = new Random();
+        CourseLevel level = courseLevelMapper.selectById(levelId);
+        int totalLimit = level != null && level.getTotalQuestions() != null ? level.getTotalQuestions() : 10;
 
-        return QuestionRandomizer.shuffledCopy(questions, random).stream().map(q -> {
+        // Phase 12+: 基于年级和学科从大题库中随机抽取试题
+        LambdaQueryWrapper<Question> queryWrapper = new LambdaQueryWrapper<>();
+        if (level != null) {
+            Course course = courseMapper.selectById(level.getCourseId());
+            if (course != null) {
+                queryWrapper.eq(Question::getSubjectId, course.getSubjectId());
+            }
+            if (level.getGradeLevelId() != null) {
+                queryWrapper.eq(Question::getGradeLevelId, level.getGradeLevelId());
+            }
+        }
+
+        List<Question> questions = questionMapper.selectList(queryWrapper);
+        Random random = new Random();
+        List<Question> shuffled = QuestionRandomizer.shuffledCopy(questions, random);
+        if (shuffled.size() > totalLimit) {
+            shuffled = shuffled.subList(0, totalLimit);
+        }
+
+        return shuffled.stream().map(q -> {
             Map<String, Object> map = new HashMap<>();
             map.put("id", q.getId());
             map.put("questionType", q.getQuestionType());
@@ -475,7 +492,6 @@ public class LearnServiceImpl implements LearnService {
             map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
             map.put("questionSpeechText", RichContentUtil.toSpeechText(q.getQuestionContent()));
             map.put("questionAudioUrl", RichContentUtil.toSpeechAudioUrl(q.getQuestionContent()));
-            map.put("difficulty", q.getDifficulty());
             map.put("score", q.getScore());
             map.put("timeLimit", q.getTimeLimit());
             map.put("analysis", q.getAnalysis());
@@ -794,6 +810,8 @@ public class LearnServiceImpl implements LearnService {
             existing.setCorrectAnswer(correctAnswer);
             existing.setLastWrongTime(LocalDateTime.now());
             existing.setIsMastered(0);
+            existing.setContinuousCorrectCount(0);
+            existing.setMasteryLevel(0);
             wrongTopicMapper.updateById(existing);
         } else {
             WrongTopic wt = new WrongTopic();
@@ -804,6 +822,8 @@ public class LearnServiceImpl implements LearnService {
             wt.setTimes(1);
             wt.setLastWrongTime(LocalDateTime.now());
             wt.setIsMastered(0);
+            wt.setContinuousCorrectCount(0);
+            wt.setMasteryLevel(0);
             wrongTopicMapper.insert(wt);
         }
     }
@@ -864,21 +884,17 @@ public class LearnServiceImpl implements LearnService {
             map.put("userAnswer", wt.getWrongAnswer());
             map.put("correctAnswer", wt.getCorrectAnswer());
             map.put("wrongCount", wt.getTimes());
+            map.put("masteryLevel", wt.getMasteryLevel());
+            map.put("continuousCorrectCount", wt.getContinuousCorrectCount());
             // lookup question content
             Question q = questionMapper.selectById(wt.getQuestionId());
             if (q != null) {
                 map.put("questionContent", q.getQuestionContent());
                 map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
                 map.put("analysisText", RichContentUtil.toPlainText(q.getAnalysis()));
-                map.put("levelId", q.getCourseLevelId());
-                CourseLevel level = courseLevelMapper.selectById(q.getCourseLevelId());
-                if (level != null) {
-                    map.put("levelName", level.getLevelName());
-                    Course course = courseMapper.selectById(level.getCourseId());
-                    if (course != null) {
-                        Subject subject = subjectMapper.selectById(course.getSubjectId());
-                        if (subject != null) map.put("subjectName", subject.getSubjectName());
-                    }
+                if (q.getSubjectId() != null) {
+                    Subject subject = subjectMapper.selectById(q.getSubjectId());
+                    if (subject != null) map.put("subjectName", subject.getSubjectName());
                 }
             }
             return map;
@@ -1060,19 +1076,11 @@ public class LearnServiceImpl implements LearnService {
         );
 
         Map<Long, Long> questionToSubject = new HashMap<>();
-        Map<Long, Long> questionToLevel = new HashMap<>();
         for (WrongTopic wt : wrongTopics) {
             if (!questionToSubject.containsKey(wt.getQuestionId())) {
                 Question q = questionMapper.selectById(wt.getQuestionId());
                 if (q != null) {
-                    questionToLevel.put(wt.getQuestionId(), q.getCourseLevelId());
-                    CourseLevel level = courseLevelMapper.selectById(q.getCourseLevelId());
-                    if (level != null) {
-                        Course course = courseMapper.selectById(level.getCourseId());
-                        if (course != null) {
-                            questionToSubject.put(wt.getQuestionId(), course.getSubjectId());
-                        }
-                    }
+                    questionToSubject.put(wt.getQuestionId(), q.getSubjectId());
                 }
             }
         }
@@ -1134,31 +1142,6 @@ public class LearnServiceImpl implements LearnService {
             map.put("wrongCount", wrongCount);
             map.put("accuracy", accuracy);
 
-            Map<Long, Integer> wrongCountByLevel = new HashMap<>();
-            for (WrongTopic wt : wrongTopics) {
-                Long levelId = questionToLevel.get(wt.getQuestionId());
-                Long sId = questionToSubject.get(wt.getQuestionId());
-                if (levelId != null && sId != null && sId.equals(subject.getId())) {
-                    wrongCountByLevel.merge(levelId, 1, Integer::sum);
-                }
-            }
-
-            if (!wrongCountByLevel.isEmpty()) {
-                Long recommendedLevelId = wrongCountByLevel.entrySet().stream()
-                    .max(Map.Entry.comparingByValue())
-                    .map(Map.Entry::getKey).orElse(null);
-                if (recommendedLevelId != null) {
-                    CourseLevel recLevel = courseLevelMapper.selectById(recommendedLevelId);
-                    if (recLevel != null) {
-                        Course recCourse = courseMapper.selectById(recLevel.getCourseId());
-                        map.put("recommendedCourseId", recLevel.getCourseId());
-                        map.put("recommendedCourseName", recCourse != null ? recCourse.getCourseName() : "");
-                        map.put("recommendedLevelId", recommendedLevelId);
-                        map.put("recommendedLevelName", recLevel.getLevelName());
-                    }
-                }
-            }
-
             result.add(map);
         }
 
@@ -1189,13 +1172,7 @@ public class LearnServiceImpl implements LearnService {
         for (WrongTopic wt : wrongTopics) {
             if (subjectId != null) {
                 Question q = questionMapper.selectById(wt.getQuestionId());
-                if (q != null) {
-                    CourseLevel level = courseLevelMapper.selectById(q.getCourseLevelId());
-                    if (level != null) {
-                        Course course = courseMapper.selectById(level.getCourseId());
-                        if (course == null || !course.getSubjectId().equals(subjectId)) continue;
-                    }
-                }
+                if (q == null || !q.getSubjectId().equals(subjectId)) continue;
             }
             wrongQuestionIds.add(wt.getQuestionId());
         }
@@ -1207,41 +1184,16 @@ public class LearnServiceImpl implements LearnService {
             if (q != null) selectedQuestions.add(q);
         }
 
-        int recommendedDifficulty = 2;
-        if (!wrongTopics.isEmpty()) {
-            double avgWrongTimes = wrongTopics.stream()
-                .mapToInt(WrongTopic::getTimes).average().orElse(1);
-            if (avgWrongTimes >= 3) recommendedDifficulty = 1;
-            else if (avgWrongTimes <= 1) recommendedDifficulty = 3;
-        }
-
         int needMore = 5 - selectedQuestions.size();
         if (needMore > 0) {
             Set<Long> existingIds = selectedQuestions.stream().map(Question::getId).collect(Collectors.toSet());
             wrongQuestionIds.forEach(existingIds::add);
 
             LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>()
-                .notIn(!existingIds.isEmpty(), Question::getId, existingIds)
-                .eq(recommendedDifficulty > 0, Question::getDifficulty, recommendedDifficulty);
+                .notIn(!existingIds.isEmpty(), Question::getId, existingIds);
 
-            if (subjectId != null || !selectedQuestions.isEmpty()) {
-                Set<Long> courseIds = new HashSet<>();
-                if (subjectId != null) {
-                    courseIds.addAll(courseMapper.selectList(
-                        new LambdaQueryWrapper<Course>().eq(Course::getSubjectId, subjectId)
-                    ).stream().map(Course::getId).collect(Collectors.toSet()));
-                } else {
-                    for (Question sq : selectedQuestions) {
-                        CourseLevel level = courseLevelMapper.selectById(sq.getCourseLevelId());
-                        if (level != null) courseIds.add(level.getCourseId());
-                    }
-                }
-                if (!courseIds.isEmpty()) {
-                    Set<Long> levelIds = courseLevelMapper.selectList(
-                        new LambdaQueryWrapper<CourseLevel>().in(CourseLevel::getCourseId, courseIds)
-                    ).stream().map(CourseLevel::getId).collect(Collectors.toSet());
-                    wrapper.in(Question::getCourseLevelId, levelIds);
-                }
+            if (subjectId != null) {
+                wrapper.eq(Question::getSubjectId, subjectId);
             }
 
             wrapper.last("LIMIT " + needMore * 3);
@@ -1260,7 +1212,6 @@ public class LearnServiceImpl implements LearnService {
             map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
             map.put("questionSpeechText", RichContentUtil.toSpeechText(q.getQuestionContent()));
             map.put("questionAudioUrl", RichContentUtil.toSpeechAudioUrl(q.getQuestionContent()));
-            map.put("difficulty", q.getDifficulty());
             map.put("score", q.getScore());
             map.put("timeLimit", q.getTimeLimit());
             map.put("analysis", q.getAnalysis());
@@ -1378,22 +1329,21 @@ public class LearnServiceImpl implements LearnService {
     // ===== 新手测评 =====
     @Override
     public List<Map<String, Object>> getAssessmentQuestions(Long userId) {
-        // 从各难度中随机抽取共10题：4简单 + 3中等 + 3困难
-        List<Question> selected = new ArrayList<>();
-        Random random = new Random();
+        User user = userMapper.selectById(userId);
+        ChildProfile profile = childProfileMapper.selectOne(new LambdaQueryWrapper<ChildProfile>().eq(ChildProfile::getUserId, userId));
+        Long gradeLevelId = profile != null && profile.getGradeLevel() != null ? profile.getGradeLevel().longValue() : null;
 
-        int[] difficulties = {1, 2, 3};
-        int[] counts = {4, 3, 3};
-        for (int i = 0; i < difficulties.length; i++) {
-            List<Question> pool = questionMapper.selectList(
-                new LambdaQueryWrapper<Question>()
-                    .eq(Question::getDifficulty, difficulties[i])
-                    .eq(Question::getQuestionType, 1)
-            );
-            Collections.shuffle(pool, random);
-            selected.addAll(pool.subList(0, Math.min(counts[i], pool.size())));
+        LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<>();
+        if (gradeLevelId != null) {
+            wrapper.eq(Question::getGradeLevelId, gradeLevelId);
         }
-        Collections.shuffle(selected, random);
+        wrapper.orderByAsc(Question::getId).last("LIMIT 50");
+
+        List<Question> pool = questionMapper.selectList(wrapper);
+        Random random = new Random();
+        Collections.shuffle(pool, random);
+
+        List<Question> selected = pool.subList(0, Math.min(10, pool.size()));
 
         return selected.stream().map(q -> {
             Map<String, Object> map = new HashMap<>();
@@ -1403,7 +1353,6 @@ public class LearnServiceImpl implements LearnService {
             map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
             map.put("questionSpeechText", RichContentUtil.toSpeechText(q.getQuestionContent()));
             map.put("questionAudioUrl", RichContentUtil.toSpeechAudioUrl(q.getQuestionContent()));
-            map.put("difficulty", q.getDifficulty());
             map.put("score", q.getScore());
             map.put("timeLimit", q.getTimeLimit());
 
@@ -1415,5 +1364,132 @@ public class LearnServiceImpl implements LearnService {
             map.put("options", QuestionRandomizer.toRandomizedOptions(options, random));
             return map;
         }).collect(Collectors.toList());
+    }
+
+    // --- Phase 12: 专项练习与智能错题本 ---
+
+    @Override
+    public List<PracticeModeVO> getPracticeModes(Long userId, Long subjectId) {
+        // 由于取消了 practice_mode 表，我们直接返回基于“大题库全量刷题”模式的模拟数据
+        // 前端也可以不再调用这个接口，而是直接跳转到 Practice Quiz。如果保留这个接口，就返回固定的一条“全题库练习”
+        List<PracticeModeVO> modes = new ArrayList<>();
+        PracticeModeVO vo = new PracticeModeVO();
+        vo.setId(subjectId != null ? subjectId : 1L);
+        vo.setName("综合练习");
+        vo.setDescription("涵盖所选学科所有知识点的大量题目练习");
+        vo.setIcon("📚");
+        vo.setType("ENDLESS");
+        vo.setTimeLimitSeconds(null);
+        modes.add(vo);
+        return modes;
+    }
+
+    @Override
+    public Map<String, Object> startPractice(Long userId, Long practiceModeId) {
+        // 这里的 practiceModeId 其实传进来的是 subjectId，因为上面的模拟数据把 id 设置为了 subjectId
+        Long subjectId = practiceModeId;
+
+        User user = userMapper.selectById(userId);
+        ChildProfile profile = childProfileMapper.selectOne(new LambdaQueryWrapper<ChildProfile>().eq(ChildProfile::getUserId, userId));
+        Long gradeLevelId = profile != null && profile.getGradeLevel() != null ? profile.getGradeLevel().longValue() : null;
+
+        LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>();
+        wrapper.eq(Question::getSubjectId, subjectId);
+        if (gradeLevelId != null) {
+            wrapper.eq(Question::getGradeLevelId, gradeLevelId);
+        }
+
+        List<Question> questions = questionMapper.selectList(wrapper);
+        if (questions.isEmpty()) {
+            throw new BusinessException("该学科年级下暂无题目");
+        }
+
+        Collections.shuffle(questions);
+
+        List<Map<String, Object>> formattedQuestions = questions.stream()
+            .map(this::formatQuestion)
+            .collect(Collectors.toList());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("practiceSessionId", System.currentTimeMillis());
+        result.put("modeId", subjectId);
+        result.put("modeName", "专项练习");
+        result.put("type", "ENDLESS");
+        result.put("timeLimit", 0);
+        result.put("questions", formattedQuestions);
+        return result;
+    }
+
+    private Map<String, Object> formatQuestion(Question q) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", q.getId());
+        map.put("questionType", q.getQuestionType());
+        map.put("questionContent", q.getQuestionContent());
+        map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
+
+        List<QuestionOption> options = questionOptionMapper.selectList(
+            new LambdaQueryWrapper<QuestionOption>()
+                .eq(QuestionOption::getQuestionId, q.getId())
+                .orderByAsc(QuestionOption::getSortOrder)
+        );
+        map.put("options", QuestionRandomizer.toRandomizedOptions(options, new Random()));
+        return map;
+    }
+
+    @Override
+    public Map<String, Object> submitPracticeAnswer(Long userId, Long practiceSessionId, SubmitAnswerDTO dto) {
+        // 复用 submitAnswer 逻辑，获取对错
+        return submitAnswer(userId, dto);
+    }
+
+    @Override
+    public SmartReviewQuizVO getSmartReviewQuiz(Long userId, Long subjectId, Integer questionCount) {
+        LambdaQueryWrapper<WrongTopic> wrapper = new LambdaQueryWrapper<WrongTopic>()
+            .eq(WrongTopic::getUserId, userId)
+            .eq(WrongTopic::getIsMastered, 0)
+            .orderByAsc(WrongTopic::getContinuousCorrectCount) // 优先复习掌握度低的
+            .orderByAsc(WrongTopic::getLastReviewTime) // 优先复习很久没复习的
+            .last("LIMIT " + questionCount);
+
+        // 暂时不按学科筛，简化实现
+        List<WrongTopic> topics = wrongTopicMapper.selectList(wrapper);
+
+        SmartReviewQuizVO vo = new SmartReviewQuizVO();
+        vo.setTotalQuestions(topics.size());
+        vo.setEstimatedMinutes((topics.size() * 2));
+        vo.setQuestionIds(topics.stream().map(WrongTopic::getQuestionId).collect(Collectors.toList()));
+        return vo;
+    }
+
+    @Override
+    public Map<String, Object> updateWrongTopicMastery(Long userId, Long wrongTopicId, boolean isCorrect) {
+        WrongTopic wt = wrongTopicMapper.selectById(wrongTopicId);
+        if (wt == null || !wt.getUserId().equals(userId)) {
+            throw new BusinessException("错题记录不存在");
+        }
+
+        wt.setLastReviewTime(LocalDateTime.now());
+        if (isCorrect) {
+            wt.setContinuousCorrectCount((wt.getContinuousCorrectCount() == null ? 0 : wt.getContinuousCorrectCount()) + 1);
+            if (wt.getContinuousCorrectCount() >= 3) {
+                wt.setIsMastered(1);
+                wt.setMasteryLevel(2); // 已掌握
+            } else {
+                wt.setMasteryLevel(1); // 练习中
+            }
+        } else {
+            wt.setContinuousCorrectCount(0);
+            wt.setMasteryLevel(0); // 未掌握
+            wt.setTimes(wt.getTimes() + 1);
+            wt.setLastWrongTime(LocalDateTime.now());
+        }
+
+        wrongTopicMapper.updateById(wt);
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("mastered", wt.getIsMastered() == 1);
+        res.put("continuousCorrectCount", wt.getContinuousCorrectCount());
+        res.put("masteryLevel", wt.getMasteryLevel());
+        return res;
     }
 }

@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 @TableName("course_level")
 public class CourseLevel extends BaseEntity {
     private Long courseId;
+    private Long gradeLevelId; // 新增: 关卡的年级属性 (从 course 推导或单独配置)
     private Integer levelNum;
     private String levelName;
     private String levelDesc;

@@ -17,7 +17,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -147,17 +146,19 @@ public class AdminContentController {
         return R.ok();
     }
 
-    // ==================== 题目管理 ====================
+    // ==================== 题库管理 ====================
 
     @Operation(summary = "题目列表")
     @GetMapping("/question/list")
     public R<PageResult<Question>> questionList(
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer pageSize,
-            @RequestParam(required = false) Long courseLevelId,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) Long gradeLevelId,
             @RequestParam(required = false) Integer questionType) {
         LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>()
-            .eq(courseLevelId != null, Question::getCourseLevelId, courseLevelId)
+            .eq(subjectId != null, Question::getSubjectId, subjectId)
+            .eq(gradeLevelId != null, Question::getGradeLevelId, gradeLevelId)
             .eq(questionType != null, Question::getQuestionType, questionType)
             .orderByAsc(Question::getSortOrder);
         Page<Question> p = questionMapper.selectPage(new Page<>(page, pageSize), wrapper);
@@ -170,10 +171,10 @@ public class AdminContentController {
         Long id = body.get("id") != null ? Long.valueOf(body.get("id").toString()) : null;
         Question question = new Question();
         question.setId(id);
-        question.setCourseLevelId(Long.valueOf(body.getOrDefault("courseLevelId", 0).toString()));
+        question.setSubjectId(Long.valueOf(body.getOrDefault("subjectId", 0).toString()));
+        question.setGradeLevelId(Long.valueOf(body.getOrDefault("gradeLevelId", 0).toString()));
         question.setQuestionType(Integer.valueOf(body.getOrDefault("questionType", 1).toString()));
         question.setQuestionContent(body.getOrDefault("questionContent", "").toString());
-        question.setDifficulty(Integer.valueOf(body.getOrDefault("difficulty", 1).toString()));
         question.setScore(Integer.valueOf(body.getOrDefault("score", 10).toString()));
         question.setTimeLimit(Integer.valueOf(body.getOrDefault("timeLimit", 0).toString()));
         question.setAnalysis(body.getOrDefault("analysis", "").toString());

@@ -19,12 +19,19 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/index.vue'),
         meta: { title: '首页概览' },
       },
-      // 内容管理
+      // 题库管理
+      {
+        path: 'question-bank',
+        name: 'QuestionBank',
+        component: () => import('@/views/content/QuestionBank.vue'),
+        meta: { title: '题库管理' },
+      },
+      // 内容管理 (闯关管理)
       {
         path: 'content',
         name: 'ContentExplorer',
         component: () => import('@/views/content/ContentExplorer.vue'),
-        meta: { title: '内容管理' },
+        meta: { title: '闯关管理' },
       },
       // 游戏化管理
       {

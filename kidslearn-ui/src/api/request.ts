@@ -51,6 +51,11 @@ export function uploadQuestionImage(file: File) {
   return post('/admin/file/upload-image', form, { headers: { 'Content-Type': 'multipart/form-data' } })
 }
 
+// ==================== 专项练习模式管理 (Phase 12) ====================
+export function getPracticeModeList(params: any) { return get('/admin/practice/list', params) }
+export function savePracticeMode(data: any) { return post('/admin/practice/save', data) }
+export function deletePracticeMode(id: number) { return del(`/admin/practice/${id}`) }
+
 // ==================== 宠物管理 ====================
 export function getPetList(params: any) { return get('/admin/pet/list', params) }
 export function savePet(data: any) { return post('/admin/pet/save', data) }
