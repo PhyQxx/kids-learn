@@ -1,10 +1,7 @@
 <template>
   <view class="home-content">
     <!-- Loading -->
-    <view v-if="loading" class="loading-state">
-      <tn-loading size="60" />
-      <text class="text-sm text-light" style="margin-top: 12px;">加载中...</text>
-    </view>
+    <FunLoadingState v-if="loading" title="正在准备星球任务" mascot="🚀" />
 
     <template v-else>
       <!-- 任务横幅 -->
@@ -119,7 +116,7 @@
       <view class="quick-grid">
         <view class="quick-card card card-hover pet-quick" @tap="goPet">
           <view class="quick-pet-info">
-            <text class="pet-emoji animate-bounce">🐱</text>
+            <text class="pet-emoji animate-bounce">{{ petStore.currentImageUrl }}</text>
             <view class="pet-text-area">
               <text class="pet-name text-bold">{{ petStore.name }}</text>
               <text class="pet-status-text text-xs text-light">{{ petStore.moodText }} · Lv.{{ petStore.level }}</text>
@@ -178,6 +175,7 @@ import { getMyProgress } from '@/api/achievement'
 import { createHomeDataRequests } from '@/utils/homeData.mjs'
 import { getAutoCheckinDecision } from '@/utils/promptFlow.mjs'
 import CheckinPopup from '@/components/common/CheckinPopup.vue'
+import FunLoadingState from '@/components/common/FunLoadingState.vue'
 
 defineEmits(['go-subject', 'go-learn'])
 
@@ -292,7 +290,7 @@ async function loadData() {
     // 成就数
     if (results[4].status === 'fulfilled' && results[4].value) {
       const prog = results[4].value
-      achievementCount.value = prog.completedCount || prog.length || 0
+      achievementCount.value = prog.completedAchievements || 0
     }
   } catch (e) {
     console.log('HomeContent: 使用模拟数据', e)

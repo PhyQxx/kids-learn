@@ -83,6 +83,7 @@
         </view>
       </view>
     </view>
+    <GlobalLoadingOverlay />
   </view>
 </template>
 
@@ -91,6 +92,8 @@ import { ref } from 'vue'
 import { register as registerApi } from '@/api/auth'
 import { useUserStore } from '@/store/user'
 import { useRealtimeStore } from '@/store/realtime'
+import { showLoading, hideLoading } from '@/utils/loading'
+import GlobalLoadingOverlay from '@/components/common/GlobalLoadingOverlay.vue'
 
 const nickname = ref('')
 const phone = ref('')
@@ -141,7 +144,7 @@ async function doRegister() {
   if (!password.value || password.value.length < 6) { errorMsg.value = '密码至少6位'; return }
 
   errorMsg.value = ''
-  uni.showLoading({ title: '注册中...' })
+  showLoading('星球注册中...', '🚀')
   try {
     const res = await registerApi({
       username: username.value,
@@ -157,13 +160,13 @@ async function doRegister() {
       userStore.setUserInfo(res.userInfo)
     }
     useRealtimeStore().connect()
-    uni.hideLoading()
+    hideLoading()
     uni.showToast({ title: '注册成功！', icon: 'success' })
     setTimeout(() => {
       uni.reLaunch({ url: '/pages/onboarding/index' })
     }, 1500)
   } catch (e) {
-    uni.hideLoading()
+    hideLoading()
     errorMsg.value = e?.msg || '注册失败，请重试'
   }
 }

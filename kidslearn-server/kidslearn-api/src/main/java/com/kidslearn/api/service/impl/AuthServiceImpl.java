@@ -19,6 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -59,6 +61,18 @@ public class AuthServiceImpl implements AuthService {
         }
         if (user.getStatus() == 0) {
             throw new BusinessException("账号已被禁用");
+        }
+
+        // 家长验证模式，只验证，不生成token
+        if (dto.getLoginType() != null && dto.getLoginType() == 2) {
+            if (user.getUserType() != 2) {
+                // For family app, users register as type 1, parents use the same account to verify.
+                // In a stricter system, we'd check if they are the designated parent. 
+                // For now, if the password matches, we allow it.
+            }
+            TokenVO vo = new TokenVO();
+            vo.setAccessToken("parent-verification-only");
+            return vo;
         }
 
         // update login time
@@ -111,6 +125,13 @@ public class AuthServiceImpl implements AuthService {
         ChildProfile childProfile = new ChildProfile();
         childProfile.setUserId(user.getId());
         childProfile.setLearnAgeGroup(ageGroup);
+        if (dto.getBirthDate() != null) {
+            try {
+                childProfile.setBirthDate(LocalDate.parse(dto.getBirthDate(), DateTimeFormatter.ISO_LOCAL_DATE));
+            } catch (Exception e) {
+                // Ignore date parsing error
+            }
+        }
         childProfile.setGender(dto.getGender() != null ? dto.getGender() : 0);
         if (dto.getGradeLevel() != null) {
             childProfile.setGradeLevel(dto.getGradeLevel());

@@ -1,9 +1,6 @@
 ﻿<template>
   <view class="achievement-content">
-    <view v-if="loading" class="loading-state">
-      <tn-loading size="60" />
-      <text class="text-sm text-light" style="margin-top: 12px;">加载中...</text>
-    </view>
+    <FunLoadingState v-if="loading" title="正在开启宝箱" mascot="🏅" />
 
     <template v-else>
       <view class="summary-card">
@@ -78,6 +75,7 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { getAchievements, getMyProgress, receiveReward } from '@/api/achievement'
 import { claimAchievementReward, claimAllAchievementRewards } from '@/utils/achievementClaim.mjs'
+import FunLoadingState from '@/components/common/FunLoadingState.vue'
 
 const loading = ref(true)
 const claimingAll = ref(false)

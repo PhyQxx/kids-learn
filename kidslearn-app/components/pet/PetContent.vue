@@ -1,10 +1,7 @@
 <template>
   <view class="pet-content">
     <!-- Loading -->
-    <view v-if="loading" class="loading-state">
-      <tn-loading size="60" />
-      <text class="text-sm text-light" style="margin-top: 12px;">呼唤宠物中...</text>
-    </view>
+    <FunLoadingState v-if="loading" title="召唤宠物中" mascot="🐱" />
 
     <template v-else>
     <view class="pet-layout">
@@ -215,6 +212,7 @@ import { usePetStore } from '@/store/pet'
 import { useUserStore } from '@/store/user'
 import { getPetStatus, getInventory, getDecorationInventory, feedPet as feedPetApi, playPet as playPetApi, bathPet as bathPetApi, getAvailablePets, selectPet } from '@/api/pet'
 import { normalizeInventoryItems, normalizeDecorations } from '@/utils/petFeature.mjs'
+import FunLoadingState from '@/components/common/FunLoadingState.vue'
 
 const petStore = usePetStore()
 const userStore = useUserStore()

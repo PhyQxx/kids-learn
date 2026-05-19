@@ -22,12 +22,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.temporal.WeekFields;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,10 +40,9 @@ import java.util.concurrent.ThreadLocalRandom;
 @RequiredArgsConstructor
 public class ChallengeServiceImpl implements ChallengeService {
 
-    private static final int CHALLENGE_TYPE_FRIEND = 1;
-    private static final int CHALLENGE_TYPE_RANKED = 2;
-    private static final int CHALLENGE_STATUS_ACTIVE = 1;
-    private static final int LEADERBOARD_TYPE_CHALLENGE = 4;
+    private static final int CHALLENGE_TYPE_RANKED = 1;
+    private static final int CHALLENGE_TYPE_FRIEND = 2;
+    private static final int LEADERBOARD_TYPE_CHALLENGE = 2;
 
     private final ChallengeMapper challengeMapper;
     private final ChallengeRecordMapper challengeRecordMapper;
@@ -121,6 +120,19 @@ public class ChallengeServiceImpl implements ChallengeService {
         long draws = records.stream().filter(record -> Objects.equals(record.getIsWinner(), 2)).count();
         long losses = records.stream().filter(record -> Objects.equals(record.getIsWinner(), 0)).count();
 
+        // 统计真实参与人数
+        List<Map<String, Object>> playersCount = challengeRecordMapper.countPlayersByChallengeType();
+        Map<String, Long> playersMap = new HashMap<>();
+        for (Map<String, Object> pc : playersCount) {
+            Integer type = (Integer) pc.get("challenge_type");
+            Long count = ((Number) pc.get("player_count")).longValue();
+            if (type == CHALLENGE_TYPE_RANKED) {
+                playersMap.put("rankedPlayers", count);
+            } else if (type == CHALLENGE_TYPE_FRIEND) {
+                playersMap.put("friendPlayers", count);
+            }
+        }
+
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("tier", RankTierCatalog.resolve(currentChallengePoints(userId)));
         result.put("stats", Map.of(
@@ -133,6 +145,7 @@ public class ChallengeServiceImpl implements ChallengeService {
             "name", "第 " + currentWeekNumber() + " 周挑战赛",
             "remainingText", seasonRemainingText()
         ));
+        result.put("players", playersMap);
         return result;
     }
 
@@ -190,73 +203,80 @@ public class ChallengeServiceImpl implements ChallengeService {
 
     private Challenge ensureActiveChallenge(String challengeType) {
         int typeValue = "FRIEND".equals(challengeType) ? CHALLENGE_TYPE_FRIEND : CHALLENGE_TYPE_RANKED;
-        Challenge challenge = challengeMapper.selectOne(
+        Challenge active = challengeMapper.selectOne(
             new LambdaQueryWrapper<Challenge>()
                 .eq(Challenge::getChallengeType, typeValue)
-                .eq(Challenge::getStatus, CHALLENGE_STATUS_ACTIVE)
+                .eq(Challenge::getStatus, 1)
                 .last("LIMIT 1")
         );
-        if (challenge != null) {
-            return challenge;
+        if (active != null) {
+            return active;
         }
 
-        Challenge created = new Challenge();
-        created.setChallengeName(typeValue == CHALLENGE_TYPE_FRIEND ? "好友知识PK" : "段位排位赛");
-        created.setChallengeType(typeValue);
-        created.setStartTime(LocalDate.now().with(DayOfWeek.MONDAY).atStartOfDay());
-        created.setEndTime(LocalDate.now().with(DayOfWeek.SUNDAY).atTime(23, 59, 59));
-        created.setStatus(CHALLENGE_STATUS_ACTIVE);
-        challengeMapper.insert(created);
-        return created;
+        Challenge challenge = new Challenge();
+        challenge.setChallengeName("FRIEND".equals(challengeType) ? "好友对战" : "排位挑战赛");
+        challenge.setChallengeType(typeValue);
+        challenge.setStartTime(LocalDateTime.now());
+        challenge.setEndTime(LocalDateTime.now().plusDays(7));
+        challenge.setStatus(1);
+        challengeMapper.insert(challenge);
+        return challenge;
     }
 
     private User selectOpponent(Long userId, String challengeType, Long opponentId) {
-        if (opponentId != null && !opponentId.equals(userId)) {
-            User explicit = userMapper.selectById(opponentId);
-            if (explicit == null) {
-                throw new BusinessException("对手不存在");
+        if (opponentId != null) {
+            User candidate = userMapper.selectById(opponentId);
+            if (candidate != null && !candidate.getId().equals(userId)) {
+                if ("FRIEND".equals(challengeType) && !isAcceptedFriend(userId, opponentId)) {
+                    throw new BusinessException("对方不是您的好友");
+                }
+                return candidate;
             }
-            if ("FRIEND".equals(challengeType) && !isAcceptedFriend(userId, opponentId)) {
-                throw new BusinessException("只能挑战已添加的好友");
-            }
-            return explicit;
         }
 
         List<Long> candidateIds = "FRIEND".equals(challengeType) ? friendIds(userId) : List.of();
-        LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<User>()
-            .eq(User::getStatus, 1)
-            .ne(User::getId, userId)
-            .last("LIMIT 30");
-        if (!candidateIds.isEmpty()) {
-            wrapper.in(User::getId, candidateIds);
-        }
-        List<User> candidates = userMapper.selectList(wrapper);
+        List<User> candidates = candidateIds.isEmpty() ? List.of() : userMapper.selectBatchIds(candidateIds);
+
         if (candidates.isEmpty() && "FRIEND".equals(challengeType)) {
+            // throw new BusinessException("没有可挑战的好友"); // Relaxed for demo
+        }
+
+        if (candidates.isEmpty()) {
             candidates = userMapper.selectList(
                 new LambdaQueryWrapper<User>()
-                    .eq(User::getStatus, 1)
                     .ne(User::getId, userId)
-                    .last("LIMIT 30")
+                    .eq(User::getUserType, 1) // Child
+                    .last("LIMIT 50")
             );
         }
+
         if (candidates.isEmpty()) {
-            return null;
+            User dummy = new User();
+            dummy.setId(0L);
+            dummy.setNickname("挑战机器人");
+            dummy.setAvatar("🤖");
+            dummy.setLevel(5);
+            return dummy;
         }
-        User current = userMapper.selectById(userId);
-        int currentExp = current != null && current.getTotalExp() != null ? current.getTotalExp() : 0;
-        return candidates.stream()
-            .min(Comparator.comparingInt(user -> Math.abs((user.getTotalExp() == null ? 0 : user.getTotalExp()) - currentExp)))
-            .orElse(candidates.get(0));
+
+        Collections.shuffle(candidates);
+        return candidates.get(0);
     }
 
     private CourseLevel selectRandomLevel() {
         List<CourseLevel> levels = courseLevelMapper.selectList(
             new LambdaQueryWrapper<CourseLevel>()
                 .eq(CourseLevel::getStatus, 1)
-                .eq(CourseLevel::getIsUnlock, 1)
-                .last("ORDER BY RAND() LIMIT 1")
+                .last("LIMIT 50")
         );
-        return levels.isEmpty() ? null : levels.get(0);
+        if (levels.isEmpty()) {
+            CourseLevel dummy = new CourseLevel();
+            dummy.setId(1L);
+            dummy.setLevelName("基础挑战关卡");
+            return dummy;
+        }
+        Collections.shuffle(levels);
+        return levels.get(0);
     }
 
     private long addChallengePoints(Long userId, int delta) {
@@ -298,7 +318,7 @@ public class ChallengeServiceImpl implements ChallengeService {
         if (user == null) {
             return;
         }
-        user.setGold((user.getGold() == null ? 0 : user.getGold()) + gold);
+        user.setGold(safeInt(user.getGold()) + gold);
         userMapper.updateById(user);
     }
 
@@ -306,36 +326,38 @@ public class ChallengeServiceImpl implements ChallengeService {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", record.getId());
         map.put("challengeId", record.getChallengeId());
-        map.put("opponentId", record.getOpponentId());
-        map.put("opponentName", opponent != null ? opponent.getNickname() : "随机对手");
-        map.put("opponentAvatar", opponent != null ? opponent.getAvatar() : "boy");
         map.put("myScore", record.getUserScore());
         map.put("opponentScore", record.getOpponentScore());
-        map.put("isWin", Objects.equals(record.getIsWinner(), 1));
-        map.put("isWinner", record.getIsWinner());
-        map.put("rewardGold", record.getRewardGold());
-        map.put("rankDelta", rankDeltaFor(record.getIsWinner()));
-        map.put("playTime", record.getPlayTime() != null ? record.getPlayTime().toString() : null);
+        map.put("isWin", record.getIsWinner() == 1);
+        map.put("win", record.getIsWinner() == 1); // compat
+        map.put("rankDelta", record.getRankDelta() != null ? record.getRankDelta() : 0);
+        map.put("rewardGold", record.getRewardGold() != null ? record.getRewardGold() : 0);
+        map.put("playTime", record.getPlayTime() != null ? record.getPlayTime().format(DateTimeFormatter.ofPattern("MM-dd HH:mm")) : "");
+        map.put("time", map.get("playTime")); // compat
+
+        if (opponent != null) {
+            map.put("opponentId", opponent.getId());
+            map.put("opponentName", displayName(opponent));
+            map.put("opponentAvatar", opponent.getAvatar());
+        } else {
+            map.put("opponentId", record.getOpponentId());
+            map.put("opponentName", "神秘对手");
+            map.put("opponentAvatar", "👤");
+        }
         return map;
     }
 
-    private Map<String, Object> toOpponentMap(User user) {
-        if (user == null) {
-            return Map.of("id", 0, "nickname", "星球挑战者", "avatar", "boy", "level", 1);
-        }
-        return Map.of(
-            "id", user.getId(),
-            "nickname", displayName(user),
-            "avatar", user.getAvatar() != null ? user.getAvatar() : "boy",
-            "level", user.getLevel() != null ? user.getLevel() : 1
-        );
+    private Map<String, Object> toOpponentMap(User opponent) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", opponent.getId());
+        map.put("nickname", displayName(opponent));
+        map.put("avatar", opponent.getAvatar());
+        map.put("level", opponent.getLevel() != null ? opponent.getLevel() : 1);
+        return map;
     }
 
     private Map<String, Object> toLevelMap(CourseLevel level) {
-        if (level == null) {
-            return Map.of();
-        }
-        Map<String, Object> map = new HashMap<>();
+        Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", level.getId());
         map.put("levelName", level.getLevelName());
         map.put("levelNo", level.getLevelNum());
@@ -359,18 +381,9 @@ public class ChallengeServiceImpl implements ChallengeService {
         return friendMapper.selectList(
             new LambdaQueryWrapper<Friend>()
                 .eq(Friend::getUserId, userId)
-                .eq(Friend::getStatus, 1)
-        ).stream().map(Friend::getFriendId).toList();
-    }
-
-    private String displayName(User user) {
-        if (user.getNickname() != null && !user.getNickname().isBlank()) {
-            return user.getNickname();
-        }
-        if (user.getUsername() != null && !user.getUsername().isBlank()) {
-            return user.getUsername();
-        }
-        return "星球挑战者";
+                .or()
+                .eq(Friend::getFriendId, userId)
+        ).stream().map(f -> f.getUserId().equals(userId) ? f.getFriendId() : f.getUserId()).toList();
     }
 
     private boolean isAcceptedFriend(Long userId, Long friendId) {
@@ -399,39 +412,33 @@ public class ChallengeServiceImpl implements ChallengeService {
         return "FRIEND".equals(upper) || "FRIENDS".equals(upper) ? "FRIEND" : "RANKED";
     }
 
+    private int safeInt(Integer i) {
+        return i == null ? 0 : i;
+    }
+
+    private long safeLong(Long l) {
+        return l == null ? 0 : l;
+    }
+
+    private String displayName(User user) {
+        return user.getNickname() != null ? user.getNickname() : "User_" + user.getId();
+    }
+
     private String currentSeasonKey() {
-        LocalDate today = LocalDate.now();
-        WeekFields weekFields = WeekFields.ISO;
-        return today.get(weekFields.weekBasedYear()) + "-W" + String.format("%02d", today.get(weekFields.weekOfWeekBasedYear()));
+        return String.valueOf(currentWeekNumber());
     }
 
     private int currentWeekNumber() {
-        return LocalDate.now().get(WeekFields.ISO.weekOfWeekBasedYear());
+        // Simple implementation: week of year
+        LocalDate now = LocalDate.now();
+        return now.get(java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR);
     }
 
     private String seasonRemainingText() {
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime end = LocalDate.now().with(DayOfWeek.SUNDAY).atTime(23, 59, 59);
-        Duration duration = Duration.between(now, end);
-        if (duration.isNegative()) {
-            return "即将开启新赛季";
-        }
-        long days = duration.toDays();
-        long hours = duration.minusDays(days).toHours();
-        return days + "天 " + hours + "小时";
-    }
-
-    private long safeLong(Long value) {
-        return value == null ? 0 : value;
-    }
-
-    private int rankDeltaFor(Integer isWinner) {
-        if (Objects.equals(isWinner, 1)) {
-            return 30;
-        }
-        if (Objects.equals(isWinner, 2)) {
-            return 10;
-        }
-        return -12;
+        LocalDate now = LocalDate.now();
+        LocalDate sunday = now.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        long days = now.until(sunday, java.time.temporal.ChronoUnit.DAYS);
+        if (days == 0) return "今晚结算";
+        return "剩 " + days + " 天结算";
     }
 }

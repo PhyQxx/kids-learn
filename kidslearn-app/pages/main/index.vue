@@ -86,6 +86,8 @@
     :current-grade="userStore.userInfo?.gradeLevelId"
     @confirm="handleGradeConfirm"
   />
+
+  <GlobalLoadingOverlay />
 </template>
 
 <script setup>
@@ -102,6 +104,7 @@ import RankingContent from '@/components/ranking/RankingContent.vue'
 import AchievementContent from '@/components/achievement/AchievementContent.vue'
 import ParentContent from '@/components/parent/ParentContent.vue'
 import GradeSelectPopup from '@/components/GradeSelectPopup.vue'
+import GlobalLoadingOverlay from '@/components/common/GlobalLoadingOverlay.vue'
 
 const userStore = useUserStore()
 const learnStore = useLearnStore()
@@ -120,17 +123,27 @@ function switchTab(key) {
     uni.navigateTo({ url: '/pages/mine/vip' })
     return
   }
-  // 如果点击的是当前 tab，检查是否在子页面
-  if (activeTab.value === key) {
-    // 如果当前在子页面（URL 不是 main/index），返回到主页
-    const pages = getCurrentPages()
-    const currentPage = pages[pages.length - 1]
-    const route = currentPage?.route || ''
-    if (!route.includes('main/index')) {
-      uni.reLaunch({ url: '/pages/main/index?tab=' + key })
-    }
+  // 挑战赛作为新页面打开
+  if (key === 'challenge') {
+    activeTab.value = 'challenge'
+    uni.navigateTo({ url: '/pages/challenge/index' })
     return
   }
+
+  // 如果已经在 main/index 页面，直接切换 activeTab
+  const pages = getCurrentPages()
+  const currentPage = pages[pages.length - 1]
+  const route = currentPage?.route || ''
+  
+  if (route.includes('main/index')) {
+    if (activeTab.value === key) return
+    activeTab.value = key
+    if (!loadedTabs.has(key)) loadedTabs.add(key)
+    // 更新 URL 参数但不重新加载页面（uni-app H5支持，小程序/App可能需要其他方式或直接用状态）
+    // 在这里我们优先保证内部状态切换
+    return
+  }
+
   // 切换到不同 tab，reLaunch 带上目标 tab
   uni.reLaunch({ url: '/pages/main/index?tab=' + key })
 }
@@ -167,6 +180,7 @@ const navItems = computed(() => {
     { key: 'home', icon: '🏠', label: '首页' },
     { key: 'learn', icon: '📚', label: '学习中心' },
     { key: 'pet', icon: '🐱', label: '我的宠物' },
+    { key: 'challenge', icon: '⚔️', label: 'PK挑战' },
     { key: 'ranking', icon: '🏆', label: '排行榜' },
     { key: 'achievement', icon: '🏅', label: '成就' }
   ]

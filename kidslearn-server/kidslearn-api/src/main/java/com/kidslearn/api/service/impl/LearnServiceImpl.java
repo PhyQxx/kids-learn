@@ -1,13 +1,7 @@
 package com.kidslearn.api.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.kidslearn.api.dto.learn.DailyTaskVO;
-import com.kidslearn.api.dto.learn.LevelResultVO;
-import com.kidslearn.api.dto.learn.PracticeModeVO;
-import com.kidslearn.api.dto.learn.SmartReviewQuizVO;
-import com.kidslearn.api.dto.learn.SubmitAnswerDTO;
-import com.kidslearn.api.dto.learn.SubmitVideoProgressDTO;
+import com.kidslearn.api.dto.learn.*;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
 import com.kidslearn.api.realtime.RealtimeEventPublisher;
@@ -16,7 +10,6 @@ import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.LearnService;
 import com.kidslearn.api.service.PetService;
 import com.kidslearn.common.exception.BusinessException;
-import com.kidslearn.common.result.PageResult;
 import com.kidslearn.common.util.RichContentUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -333,7 +326,7 @@ public class LearnServiceImpl implements LearnService {
     private int extractMinStars(String unlockCondition) {
         try {
             String minStarsPart = unlockCondition.substring(unlockCondition.indexOf("minStars") + 9);
-            int minStars = Integer.parseInt(minStarsPart.split("[,}[")[0]);
+            int minStars = Integer.parseInt(minStarsPart.split("[,}\\[\\]]")[0]);
             return minStars;
         } catch (Exception e) {
             return 1;

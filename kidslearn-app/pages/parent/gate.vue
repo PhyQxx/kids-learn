@@ -82,11 +82,7 @@ async function verify() {
 
   try {
     const res = await login({ username: phone.value, password: password.value, loginType: 2 })
-    // 家长登录成功
-    userStore.setToken(res.accessToken)
-    if (res.userInfo) {
-      userStore.setUserInfo(res.userInfo)
-    }
+    // 家长验证成功，不再覆盖当前孩子的token和userInfo
     uni.hideLoading()
     showSuccess.value = true
     setTimeout(() => {

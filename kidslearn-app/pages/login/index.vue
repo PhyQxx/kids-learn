@@ -1,31 +1,31 @@
 <template>
-  <view class="login-page">
-    <view class="login-header">
-      <text class="logo-emoji">🌟</text>
-      <text class="app-title">趣学星球</text>
-      <text class="app-desc">让孩子在趣味中学习成长</text>
-    </view>
+  <view class="login-container">
+    <view class="login-box">
+      <view class="logo-area">
+        <text class="logo-emoji">🚀</text>
+        <text class="logo-text">KidsLearn</text>
+      </view>
 
-    <!-- 登录表单 -->
-    <view class="login-form">
-      <view class="form-group">
-        <text class="form-label">账号</text>
-        <input class="form-input" v-model="loginForm.username" placeholder="请输入账号" placeholder-class="input-placeholder" />
+      <view class="form-area">
+        <view class="input-group">
+          <text class="input-icon">👤</text>
+          <input class="input-field" v-model="loginForm.username" placeholder="请输入账号" placeholder-class="ph-color" />
+        </view>
+        <view class="input-group">
+          <text class="input-icon">🔒</text>
+          <input class="input-field" v-model="loginForm.password" type="password" placeholder="请输入密码" placeholder-class="ph-color" />
+        </view>
+        <view v-if="loginError" class="error-msg">{{ loginError }}</view>
       </view>
-      <view class="form-group">
-        <text class="form-label">密码</text>
-        <input class="form-input" v-model="loginForm.password" placeholder="请输入密码" placeholder-class="input-placeholder" type="password" />
+
+      <view class="btn-area">
+        <button class="primary-btn" @tap="handleLogin">登 录</button>
       </view>
-      <view v-if="loginError" class="error-text">
-        <text class="text-xs">{{ loginError }}</text>
-      </view>
-      <view class="btn-login" @click="handleLogin">
-        <text class="text-white text-md text-bold">登 录</text>
-      </view>
-      <view class="form-footer">
-        <text class="text-sm" style="color: rgba(255,255,255,0.7);" @click="goRegister">没有账号？去注册</text>
+      <view class="link-area">
+        <text class="link-text" @tap="goRegister">没有账号？去注册</text>
       </view>
     </view>
+    <GlobalLoadingOverlay />
   </view>
 </template>
 
@@ -34,6 +34,8 @@ import { login } from '@/api/auth'
 import { useUserStore } from '@/store/user'
 import { useRealtimeStore } from '@/store/realtime'
 import { getPostAuthRedirectUrl } from '@/utils/onboardingFlow.mjs'
+import { showLoading, hideLoading } from '@/utils/loading'
+import GlobalLoadingOverlay from '@/components/common/GlobalLoadingOverlay.vue'
 
 export default {
   data() {
@@ -48,160 +50,123 @@ export default {
       if (!username) { this.loginError = '请输入账号'; return }
       if (!password) { this.loginError = '请输入密码'; return }
       this.loginError = ''
-      uni.showLoading({ title: '登录中...' })
+      showLoading('正在进入星球...', '🚀')
       try {
         const res = await login({ username, password, loginType: 1 })
         const userStore = useUserStore()
-        userStore.setToken(res.accessToken)
+        userStore.setToken(res.accessToken, res.refreshToken)
         if (res.userInfo) {
           userStore.setUserInfo(res.userInfo)
         }
         useRealtimeStore().connect()
-        uni.hideLoading()
+        hideLoading()
         uni.reLaunch({ url: getPostAuthRedirectUrl(res.userInfo) })
       } catch (e) {
-        uni.hideLoading()
-        this.loginError = e?.msg || '登录失败，请检查账号密码'
+        hideLoading()
+        this.loginError = e.msg || '登录失败，请检查账号密码'
       }
     },
     goRegister() {
       uni.navigateTo({ url: '/pages/login/register' })
-    },
-  },
+    }
+  }
 }
 </script>
 
-<style lang="scss" scoped>
-.login-page {
+<style scoped>
+.login-container {
   min-height: 100vh;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
-  padding: 0 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  padding: 20px;
+}
+.login-box {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  padding: 40px 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+.logo-area {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  margin-bottom: 40px;
 }
-
-.login-header {
-  text-align: center;
-  margin-bottom: 80rpx;
-}
-
 .logo-emoji {
-  font-size: 120rpx;
-  display: block;
+  font-size: 64px;
+  margin-bottom: 10px;
 }
-
-.app-title {
-  font-size: 48rpx;
+.logo-text {
+  font-size: 28px;
   font-weight: 800;
-  color: #fff;
-  display: block;
-  margin-top: 16rpx;
-}
-
-.app-desc {
-  font-size: 26rpx;
-  color: rgba(255, 255, 255, 0.8);
-  margin-top: 8rpx;
-}
-
-.age-cards {
-  width: 100%;
-}
-
-.age-card {
-  display: flex;
-  align-items: center;
-  background: #fff;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.1);
-}
-
-.age-card:active {
-  opacity: 0.9;
-  transform: scale(0.98);
-}
-
-.age-icon {
-  font-size: 56rpx;
-  margin-right: 24rpx;
-}
-
-.age-name {
-  font-size: 32rpx;
-  font-weight: 700;
-  display: block;
-}
-
-.age-desc {
-  font-size: 24rpx;
-  color: #999;
-  margin-top: 4rpx;
-}
-
-.age-arrow {
-  margin-left: auto;
-  font-size: 36rpx;
-  color: #ccc;
-}
-
-/* 登录表单 */
-.login-form {
-  width: 100%;
-  background: #fff;
-  border-radius: 24rpx;
-  padding: 48rpx 40rpx;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.1);
-}
-
-.form-group {
-  margin-bottom: 28rpx;
-}
-
-.form-label {
-  font-size: 28rpx;
-  font-weight: 600;
   color: #333;
-  display: block;
-  margin-bottom: 12rpx;
+  letter-spacing: 2px;
 }
-
-.form-input {
-  width: 100%;
-  height: 88rpx;
-  background: #F5F5F5;
-  border-radius: 16rpx;
-  padding: 0 28rpx;
-  font-size: 28rpx;
+.form-area {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 30px;
 }
-
-.btn-login {
-  width: 100%;
-  height: 88rpx;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
-  border-radius: 16rpx;
+.input-group {
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin-top: 16rpx;
-  box-shadow: 0 8rpx 20rpx rgba(255, 107, 107, 0.3);
+  background: #f5f7fa;
+  border-radius: 16px;
+  padding: 12px 20px;
 }
-
-.btn-login:active {
-  opacity: 0.9;
-  transform: scale(0.98);
+.input-icon {
+  font-size: 20px;
+  margin-right: 12px;
 }
-
-.error-text {
-  margin: 12rpx 0;
-  color: #FF4757;
+.input-field {
+  flex: 1;
+  font-size: 16px;
+  height: 24px;
+  min-height: 24px;
+  border: none;
+  background: transparent;
+  outline: none;
 }
-
-.form-footer {
+.ph-color {
+  color: #a0aab5;
+}
+.error-msg {
+  color: #ff4d4f;
+  font-size: 14px;
   text-align: center;
-  margin-top: 24rpx;
+  margin-top: -10px;
+}
+.btn-area {
+  margin-bottom: 20px;
+}
+.primary-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #FF6B6B, #FF8E8B);
+  color: white;
+  font-size: 18px;
+  font-weight: bold;
+  border: none;
+  border-radius: 16px;
+  padding: 14px 0;
+  line-height: 1.5;
+}
+.primary-btn::after {
+  border: none;
+}
+.primary-btn:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+.link-area {
+  text-align: center;
+}
+.link-text {
+  color: #666;
+  font-size: 14px;
 }
 </style>

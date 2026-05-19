@@ -1,10 +1,7 @@
 <template>
   <view class="ranking-content">
     <!-- Loading -->
-    <view v-if="loading" class="loading-state">
-      <tn-loading size="60" />
-      <text class="text-sm text-light" style="margin-top: 12px;">加载中...</text>
-    </view>
+    <FunLoadingState v-if="loading" title="正在核对排行榜" mascot="🏆" />
 
     <template v-else>
     <!-- 领奖台 -->
@@ -111,6 +108,7 @@
 import { ref, watch, onMounted } from 'vue'
 import { getRanking } from '@/api/ranking'
 import { normalizeRankingList } from '@/utils/challengeData.mjs'
+import FunLoadingState from '@/components/common/FunLoadingState.vue'
 
 const loading = ref(true)
 const activeTab = ref(0)

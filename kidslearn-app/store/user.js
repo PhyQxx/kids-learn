@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(uni.getStorageSync('token') || '')
+  const refreshTokenStr = ref(uni.getStorageSync('refreshToken') || '')
   const userInfo = ref(JSON.parse(uni.getStorageSync('userInfo') || 'null'))
   const isParentMode = ref(false)
   const sidebarCollapsed = ref(false)
@@ -15,9 +16,13 @@ export const useUserStore = defineStore('user', () => {
   const themeClass = computed(() => `theme-${ageGroup.value}`)
   const onboardingStep = computed(() => userInfo.value?.onboardingStep ?? 0)
 
-  function setToken(val) {
+  function setToken(val, rVal) {
     token.value = val
     uni.setStorageSync('token', val)
+    if (rVal) {
+      refreshTokenStr.value = rVal
+      uni.setStorageSync('refreshToken', rVal)
+    }
   }
 
   function setUserInfo(info) {
@@ -43,17 +48,19 @@ export const useUserStore = defineStore('user', () => {
   function logout() {
     uni.closeSocket({ complete: () => {} })
     token.value = ''
+    refreshTokenStr.value = ''
     userInfo.value = null
     isParentMode.value = false
     ageGroup.value = 'lively'
     uni.removeStorageSync('token')
+    uni.removeStorageSync('refreshToken')
     uni.removeStorageSync('userInfo')
     uni.removeStorageSync('ageGroup')
     uni.reLaunch({ url: '/pages/login/index' })
   }
 
   return {
-    token, userInfo, isParentMode, sidebarCollapsed, ageGroup,
+    token, refreshToken: refreshTokenStr, userInfo, isParentMode, sidebarCollapsed, ageGroup,
     isLoggedIn, nickname, level, gold, themeClass, onboardingStep,
     setToken, setUserInfo, setParentMode, toggleSidebar, setAgeGroup, logout
   }

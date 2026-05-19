@@ -101,6 +101,7 @@ const navKeyByPath = {
   '/pages/pet/index': 'pet',
   '/pages/ranking/index': 'ranking',
   '/pages/achievement/index': 'achievement',
+  '/pages/challenge/index': 'challenge',
   '/pages/parent/index': 'parent',
   '/pages/parent/monitor': 'parent',
   '/pages/parent/report': 'parent',
@@ -134,6 +135,7 @@ const navItems = computed(() => {
     { key: 'home', icon: '🏠', label: '首页', tab: 'home' },
     { key: 'learn', icon: '📚', label: '学习中心', tab: 'learn' },
     { key: 'pet', icon: '🐱', label: '我的宠物', tab: 'pet' },
+    { key: 'challenge', icon: '⚔️', label: 'PK挑战', path: '/pages/challenge/index' },
     { key: 'ranking', icon: '🏆', label: '排行榜', tab: 'ranking' },
     { key: 'achievement', icon: '🏅', label: '成就', tab: 'achievement' }
   ]

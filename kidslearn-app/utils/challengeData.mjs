@@ -2,6 +2,7 @@ export function normalizeChallengeDashboard(payload = {}) {
   const tier = payload.tier || {}
   const stats = payload.stats || {}
   const season = payload.season || {}
+  const players = payload.players || {}
   const total = Number(stats.total || 0)
   const wins = Number(stats.wins || 0)
 
@@ -23,6 +24,10 @@ export function normalizeChallengeDashboard(payload = {}) {
     season: {
       name: season.name || 'Current Season',
       remainingText: season.remainingText || ''
+    },
+    players: {
+      ranked: Number(players.rankedPlayers || 0),
+      friend: Number(players.friendPlayers || 0)
     }
   }
 }
@@ -41,23 +46,28 @@ export function normalizeChallengeRecords(records = []) {
 }
 
 export function normalizeRankingList(rows = []) {
-  const normalized = Array.isArray(rows) ? rows.map((row, index) => normalizeRankingRow(row, index)) : []
+  let normalized = Array.isArray(rows) ? rows.map((row, index) => normalizeRankingRow(row, index)) : []
+
   return {
     podium: normalized.slice(0, 3),
-    list: normalized.slice(3),
+    list: normalized, // The list should contain all users
     me: normalized.find(row => row.isMe) || defaultMe()
   }
 }
 
 function normalizeRankingRow(row, index) {
   const score = Number(row.score || 0)
+  // 如果用户没有头像，根据索引分配一个合适的默认动物或人物头像
+  const defaultAvatars = ['👦', '👧', '🦁', '🐰', '🦊', '🐼', '🐯', '🐻'];
+  const avatar = row.avatar || defaultAvatars[index % defaultAvatars.length];
+  
   return {
     id: row.id || index,
     rank: Number(row.rank || index + 1),
-    name: row.nickname || row.name || 'Unknown',
-    avatar: row.avatar || 'boy',
-    level: Number(row.level || 0),
-    city: row.city || '',
+    name: row.nickname || row.name || '学习新星',
+    avatar: avatar,
+    level: Number(row.level || Math.max(1, Math.floor(score / 100))),
+    city: row.city || '未知',
     score,
     stars: Math.min(Math.floor(score / 500), 5),
     isMe: Boolean(row.isMe)
@@ -65,7 +75,7 @@ function normalizeRankingRow(row, index) {
 }
 
 function defaultMe() {
-  return { rank: '-', name: 'Me', avatar: 'boy', level: 0, city: '', score: 0, stars: 0, isMe: true }
+  return { rank: '-', name: '我', avatar: '👦', level: 1, city: '未知', score: 0, stars: 0, isMe: true }
 }
 
 function clampPercent(value) {

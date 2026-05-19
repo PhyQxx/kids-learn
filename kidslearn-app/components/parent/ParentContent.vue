@@ -1,10 +1,7 @@
 <template>
   <view class="parent-content">
     <!-- Loading -->
-    <view v-if="loading" class="loading-state">
-      <tn-loading size="60" />
-      <text class="text-sm text-light" style="margin-top: 12px;">加载中...</text>
-    </view>
+    <FunLoadingState v-if="loading" title="正在生成学习报告" mascot="👨‍👩‍👧" />
 
     <template v-else>
     <view class="parent-grid">
@@ -97,6 +94,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { getReport, getTimeControl, getFamilyMembers } from '@/api/parent'
+import FunLoadingState from '@/components/common/FunLoadingState.vue'
 
 const loading = ref(true)
 
