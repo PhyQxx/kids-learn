@@ -144,7 +144,6 @@ async function doRegister() {
   if (!password.value || password.value.length < 6) { errorMsg.value = '密码至少6位'; return }
 
   errorMsg.value = ''
-  showLoading('星球注册中...', '🚀')
   try {
     const res = await registerApi({
       username: username.value,
@@ -153,20 +152,22 @@ async function doRegister() {
       loginType: 1,
       phone: phone.value,
       gradeLevel: selectedGrade.value
+    }, { 
+      showLoading: '星球注册中...', 
+      loadingMascot: '🚀' 
     })
+    
     const userStore = useUserStore()
     userStore.setToken(res.accessToken)
     if (res.userInfo) {
       userStore.setUserInfo(res.userInfo)
     }
     useRealtimeStore().connect()
-    hideLoading()
     uni.showToast({ title: '注册成功！', icon: 'success' })
     setTimeout(() => {
       uni.reLaunch({ url: '/pages/onboarding/index' })
     }, 1500)
   } catch (e) {
-    hideLoading()
     errorMsg.value = e?.msg || '注册失败，请重试'
   }
 }

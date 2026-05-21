@@ -37,13 +37,8 @@
               <text class="text-xs text-light">正确率</text>
             </view>
           </view>
-          <!-- 柱状图 -->
-          <view class="bar-chart">
-            <view v-for="(bar, i) in weeklyData" :key="i" class="bar-item">
-              <view class="bar" :style="{ height: bar.value + '%', background: bar.today ? 'var(--teal)' : '#E0F0F0' }"></view>
-              <text class="text-xs text-light">{{ bar.label }}</text>
-            </view>
-          </view>
+          <!-- 能力雷达图 -->
+          <RadarChart :values="radarValues" :labels="radarLabels" />
         </view>
       </view>
 
@@ -92,14 +87,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { getReport, getTimeControl, getFamilyMembers } from '@/api/parent'
 import FunLoadingState from '@/components/common/FunLoadingState.vue'
+import RadarChart from './RadarChart.vue'
 
 const loading = ref(true)
 
 const childInfo = ref({ name: '小明', status: '学习中 · 数学' })
 const report = ref({ learnMinutes: 0, completedLevels: 0, accuracy: 0 })
+const subjectStatsData = ref([])
+
+const radarLabels = computed(() => {
+  if (subjectStatsData.value.length > 0) return subjectStatsData.value.map(s => s.name)
+  return ['语文', '数学', '英语', '逻辑', '科学']
+})
+const radarValues = computed(() => {
+  if (subjectStatsData.value.length > 0) return subjectStatsData.value.map(s => s.percent || 0)
+  return [85, 72, 60, 90, 45] // Mock fallback
+})
 
 const weeklyData = ref([
   { label: '周一', value: 40, today: false },
@@ -149,6 +155,9 @@ async function loadData() {
         learnMinutes: stats.totalTime || 0,
         completedLevels: stats.totalQuestions || 0,
         accuracy: stats.accuracy || 0
+      }
+      if (data.subjectStats && Array.isArray(data.subjectStats)) {
+        subjectStatsData.value = data.subjectStats
       }
       if (data.dailyList && Array.isArray(data.dailyList)) {
         const days = ['周一', '周二', '周三', '周四', '周五', '周六', '今天']

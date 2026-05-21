@@ -42,9 +42,15 @@
         </view>
       </view>
 
+      <!-- 核心能力雷达图 -->
+      <view class="radar-section card">
+        <text class="text-md text-bold" style="margin-bottom: 12px;">🎯 核心能力分析</text>
+        <RadarChart :values="radarValues" :labels="radarLabels" />
+      </view>
+
       <!-- 学科进度 -->
       <view class="subject-card card">
-        <text class="text-md text-bold" style="margin-bottom: 12px;">📈 学科进度</text>
+        <text class="text-md text-bold" style="margin-bottom: 12px;">📈 学科详细进度</text>
         <view v-for="s in subjectProgress" :key="s.id" class="subject-row">
           <text class="subject-icon">{{ s.icon }}</text>
           <text class="text-sm" style="width: 50px;">{{ s.name }}</text>
@@ -59,8 +65,9 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
+import RadarChart from '@/components/parent/RadarChart.vue'
 import { getReport } from '@/api/parent'
 
 const period = ref('week')
@@ -83,6 +90,9 @@ const weeklyData = ref([
 ])
 
 const subjectProgress = ref([])
+
+const radarLabels = computed(() => subjectProgress.value.map(s => s.name))
+const radarValues = computed(() => subjectProgress.value.map(s => s.progress))
 
 async function loadData() {
   try {
@@ -204,6 +214,12 @@ watch(period, () => loadData())
   max-width: 28px;
   border-radius: 4px 4px 0 0;
   min-height: 4px;
+}
+
+.radar-section {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .subject-card { padding: 16px 20px; }

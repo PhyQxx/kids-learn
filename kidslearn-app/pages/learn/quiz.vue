@@ -225,14 +225,14 @@
           <text class="feedback-text text-title text-bold text-white">✅ 正确！</text>
           <text v-if="petExpGained" class="pet-exp-badge animate-pop-in">🐾 +{{ petExpGained }}</text>
         </view>
-        <!-- 金币飞入粒子 -->
+        <!-- 金币/星星飞入粒子 -->
         <view class="coin-particles" v-if="coinParticles.length">
           <text
             v-for="p in coinParticles"
             :key="p.id"
             class="coin-particle animate-coin-scatter"
             :style="p.style"
-          >🪙</text>
+          >{{ p.emoji }}</text>
         </view>
         <!-- 得分飞入 -->
         <view class="score-fly-up positive">
@@ -607,15 +607,16 @@ function showPetExpGain(exp) {
   setTimeout(() => { showPetExp.value = false }, 1500)
 }
 
-// 生成答对时的金币飞入粒子
-function generateCoinParticles(count = 6) {
+// 生成答对时的粒子
+function generateCoinParticles(count = 8, isStar = true) {
   const particles = []
   for (let i = 0; i < count; i++) {
     const angle = (360 / count) * i
-    const tx = Math.cos(angle * Math.PI / 180) * (40 + Math.random() * 30)
-    const ty = Math.sin(angle * Math.PI / 180) * (40 + Math.random() * 30) - 20
+    const tx = Math.cos(angle * Math.PI / 180) * (60 + Math.random() * 40)
+    const ty = Math.sin(angle * Math.PI / 180) * (60 + Math.random() * 40) - 20
     particles.push({
       id: i,
+      emoji: isStar ? '⭐' : '🪙',
       style: {
         '--coin-tx': `${tx}px`,
         '--coin-ty': `${ty}px`,
@@ -746,11 +747,18 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
         correctCount.value++
         totalScore.value += (q.score || 10)
         showCorrect.value = true
+        // 增加震动反馈
+        uni.vibrateShort()
+        // 同时播放 UI 音效和语音反馈
+        soundManager.play('success')
         playFeedbackAudio('correct')
-        generateCoinParticles(6)
+        generateCoinParticles(8) // 增加粒子数量
         if (res?.petExp) showPetExpGain(res.petExp)
       } else {
         showWrong.value = true
+        // 增加较明显的震动反馈
+        uni.vibrateLong()
+        soundManager.play('fail')
         playFeedbackAudio('wrong')
         // Mark correct answer in options
         if (res?.correctAnswer) {

@@ -1,15 +1,35 @@
 import { refreshToken as doRefreshToken } from './auth'
 import { useUserStore } from '@/store/user'
+import { showLoading as startLoading, hideLoading as stopLoading } from '@/utils/loading'
 
 // API 请求封装
-export const BASE_URL = 'http://192.168.12.164:19084/api/v1'
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.12.164:19084/api/v1'
 
 let isRefreshing = false
 let requestsToRetry = []
+let loadingCount = 0
 
 const request = (options) => {
   return new Promise((resolve, reject) => {
     const token = uni.getStorageSync('token')
+    
+    // 自动加载处理
+    if (options.showLoading) {
+      loadingCount++
+      const loadingTitle = typeof options.showLoading === 'string' ? options.showLoading : '加载中'
+      startLoading(loadingTitle, options.loadingMascot || '🌍')
+    }
+
+    const clearLoading = () => {
+      if (options.showLoading) {
+        loadingCount--
+        if (loadingCount <= 0) {
+          loadingCount = 0
+          stopLoading()
+        }
+      }
+    }
+
     uni.request({
       url: BASE_URL + (options.url.startsWith('/') ? options.url : '/' + options.url),
       method: options.method || 'GET',
@@ -22,11 +42,13 @@ const request = (options) => {
       success: async (res) => {
         if (res.statusCode === 200) {
           if (res.data.code === 200) {
+            clearLoading()
             resolve(res.data.data)
           } else if (res.data.code === 401) {
             // Token过期，尝试无感刷新
             if (options.url.includes('/auth/refresh-token')) {
               // 刷新token的请求本身都401了，直接去登录
+              clearLoading()
               useUserStore().logout()
               reject(res.data)
               return
@@ -45,7 +67,7 @@ const request = (options) => {
                   options.header = options.header || {}
                   options.header['Authorization'] = `Bearer ${refreshRes.accessToken}`
                   
-                  // 执行当前请求
+                  // 注意：这里由于重新调用了 request，clearLoading 会在后续调用中执行，所以这里不需要额外处理 clearLoading
                   request(options).then(resolve).catch(reject)
                   
                   // 执行队列中的请求
@@ -58,6 +80,7 @@ const request = (options) => {
                 console.error('无感刷新失败，跳转登录', e)
                 requestsToRetry.forEach(cb => cb(null))
                 requestsToRetry = []
+                clearLoading()
                 useUserStore().logout()
                 reject(res.data)
               } finally {
@@ -71,20 +94,24 @@ const request = (options) => {
                   options.header['Authorization'] = `Bearer ${newToken}`
                   request(options).then(resolve).catch(reject)
                 } else {
+                  clearLoading()
                   reject(res.data)
                 }
               })
             }
           } else {
+            clearLoading()
             uni.showToast({ title: res.data.msg || '请求失败', icon: 'none' })
             reject(res.data)
           }
         } else {
+          clearLoading()
           uni.showToast({ title: '网络错误', icon: 'none' })
           reject(res)
         }
       },
       fail: (err) => {
+        clearLoading()
         uni.showToast({ title: '网络连接失败', icon: 'none' })
         reject(err)
       }
@@ -93,9 +120,9 @@ const request = (options) => {
 }
 
 // 快捷方法
-export const get = (url, data) => request({ url, method: 'GET', data })
-export const post = (url, data) => request({ url, method: 'POST', data })
-export const put = (url, data) => request({ url, method: 'PUT', data })
-export const del = (url, data) => request({ url, method: 'DELETE', data })
+export const get = (url, data, options = {}) => request({ url, method: 'GET', data, ...options })
+export const post = (url, data, options = {}) => request({ url, method: 'POST', data, ...options })
+export const put = (url, data, options = {}) => request({ url, method: 'PUT', data, ...options })
+export const del = (url, data, options = {}) => request({ url, method: 'DELETE', data, ...options })
 
 export default request

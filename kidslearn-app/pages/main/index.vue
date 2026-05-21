@@ -96,6 +96,7 @@ import { onShow, onLoad } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { useLearnStore } from '@/store/learn'
 import { getUserInfo, updateChildProfile } from '@/api/user'
+import { soundManager } from '@/utils/sound'
 
 import HomeContent from '@/components/home/HomeContent.vue'
 import LearnContent from '@/components/learn/LearnContent.vue'
@@ -119,6 +120,7 @@ provide('gradePopupVisible', showGradePopup)
 
 // 标记首次加载
 function switchTab(key) {
+  soundManager.play('tap')
   if (key === 'vip') {
     uni.navigateTo({ url: '/pages/mine/vip' })
     return

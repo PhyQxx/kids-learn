@@ -50,19 +50,22 @@ export default {
       if (!username) { this.loginError = '请输入账号'; return }
       if (!password) { this.loginError = '请输入密码'; return }
       this.loginError = ''
-      showLoading('正在进入星球...', '🚀')
+      
       try {
-        const res = await login({ username, password, loginType: 1 })
+        // 使用拦截器自动处理加载状态
+        const res = await login({ username, password, loginType: 1 }, { 
+          showLoading: '正在进入星球...', 
+          loadingMascot: '🚀' 
+        })
+        
         const userStore = useUserStore()
         userStore.setToken(res.accessToken, res.refreshToken)
         if (res.userInfo) {
           userStore.setUserInfo(res.userInfo)
         }
         useRealtimeStore().connect()
-        hideLoading()
         uni.reLaunch({ url: getPostAuthRedirectUrl(res.userInfo) })
       } catch (e) {
-        hideLoading()
         this.loginError = e.msg || '登录失败，请检查账号密码'
       }
     },

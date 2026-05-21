@@ -96,24 +96,51 @@
     </view>
 
     <!-- 匹配弹窗 -->
-    <tn-popup v-model="matching" mode="center" width="80%" border-radius="24">
-      <view class="matching-popup">
-        <view class="radar-scan">
-          <text class="radar-icon animate-spin">📡</text>
-        </view>
-        <text class="text-lg text-bold" style="margin: 20px 0 8px;">正在匹配实力相当的对手...</text>
-        <text class="text-sm text-light">预计需要 3 秒</text>
-        <tn-button style="margin-top: 30px;" shape="round" plain @click="cancelMatch">取消匹配</tn-button>
+    <tn-popup v-model="matching" mode="center" width="85%" border-radius="32" :close-on-click-overlay="false">
+      <view class="matching-popup" :class="matchState">
+        <!-- 寻找对手阶段 -->
+        <template v-if="matchState === 'searching'">
+          <view class="radar-scan">
+            <text class="radar-icon animate-spin">📡</text>
+          </view>
+          <text class="text-lg text-bold" style="margin: 24px 0 8px;">寻找实力相当的对手...</text>
+          <view class="candidate-names">
+            <text class="candidate-text animate-fade-in-out">{{ currentCandidate }}</text>
+          </view>
+          <tn-button style="margin-top: 30px;" shape="round" plain @click="cancelMatch">取消匹配</tn-button>
+        </template>
+
+        <!-- VS 阶段 -->
+        <template v-else-if="matchState === 'vs'">
+          <view class="vs-container">
+            <view class="vs-clash">
+              <view class="vs-avatar left animate-slide-in-left">
+                <text class="avatar-emoji">👦</text>
+                <text class="avatar-name">{{ userStore.userInfo?.nickname || '我' }}</text>
+              </view>
+              <view class="vs-text animate-pop-in">VS</view>
+              <view class="vs-avatar right animate-slide-in-right">
+                <text class="avatar-emoji">{{ matchedOpponent?.opponent?.avatar || '🦁' }}</text>
+                <text class="avatar-name">{{ matchedOpponent?.opponent?.nickname || '神秘对手' }}</text>
+              </view>
+            </view>
+            <view class="vs-ready-text animate-pulse">准备进入战场...</view>
+          </view>
+        </template>
       </view>
     </tn-popup>
   </AppLayout>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { createChallenge, getChallengeDashboard, getChallengeRecords } from '@/api/challenge'
 import { normalizeChallengeDashboard, normalizeChallengeRecords } from '@/utils/challengeData.mjs'
+import { useUserStore } from '@/store/user'
+import { soundManager } from '@/utils/sound'
+
+const userStore = useUserStore()
 
 const challenges = ref([
   { id: 1, type: 'FRIEND', name: '好友对战', icon: '👥', tag: '好友', tagBg: '#E8F0FE', tagColor: '#4A90D9', color: '#4A90D9', desc: '匹配好友或同水平对手', reward: 20 },
@@ -123,8 +150,14 @@ const challenges = ref([
 ])
 
 const matching = ref(false)
+const matchState = ref('idle') // idle, searching, vs
+const matchedOpponent = ref(null)
+const currentCandidate = ref('宇宙探索者')
 const dashboard = ref(normalizeChallengeDashboard())
 const history = ref([])
+
+const candidates = ['数学小达人', '英语狂热者', '逻辑之王', '小小科学家', '诗词才子', '星际旅行者', '知识冒险家']
+let candidateTimer = null
 
 function getPlayerCount(type) {
   if (type === 'FRIEND') {
@@ -156,29 +189,55 @@ async function loadRecords() {
 let matchTimer = null
 async function startChallenge(type) {
   matching.value = true
+  matchState.value = 'searching'
+  soundManager.play('tap')
+  
+  // 模拟滚动候选人
+  let candidateIdx = 0
+  candidateTimer = setInterval(() => {
+    candidateIdx = (candidateIdx + 1) % candidates.length
+    currentCandidate.value = candidates[candidateIdx]
+  }, 200)
+
   matchTimer = setTimeout(async () => {
     try {
       const result = await createChallenge({ type, opponentId: null })
-      matching.value = false
+      clearInterval(candidateTimer)
+      
       if (result && result.challengeId) {
-        const levelId = result.level?.id || 1
-        const opponentId = result.opponent?.id || ''
-        uni.navigateTo({
-          url: `/pages/learn/quiz?levelId=${levelId}&challengeId=${result.challengeId}&opponentId=${opponentId}`
-        })
+        matchedOpponent.value = result
+        matchState.value = 'vs'
+        soundManager.play('popup') // 匹配成功音效
+        
+        // 展示 VS 动画 1.5 秒后进入
+        setTimeout(() => {
+          matching.value = false
+          matchState.value = 'idle'
+          const levelId = result.level?.id || 1
+          const opponentId = result.opponent?.id || ''
+          uni.navigateTo({
+            url: `/pages/learn/quiz?levelId=${levelId}&challengeId=${result.challengeId}&opponentId=${opponentId}`
+          })
+        }, 2000)
       } else {
-        uni.showToast({ title: '创建挑战失败', icon: 'none' })
+        matching.value = false
+        matchState.value = 'idle'
+        uni.showToast({ title: '暂时没有找到对手，请重试', icon: 'none' })
       }
     } catch (e) {
+      clearInterval(candidateTimer)
       matching.value = false
+      matchState.value = 'idle'
       uni.showToast({ title: e.message || '匹配失败', icon: 'none' })
     }
-  }, 2000)
+  }, 2500)
 }
 
 function cancelMatch() {
   if (matchTimer) clearTimeout(matchTimer)
+  if (candidateTimer) clearInterval(candidateTimer)
   matching.value = false
+  matchState.value = 'idle'
 }
 
 function getTierIcon(tierName) {
@@ -192,6 +251,11 @@ function getTierIcon(tierName) {
 onMounted(() => {
   loadDashboard()
   loadRecords()
+})
+
+onUnmounted(() => {
+  if (candidateTimer) clearInterval(candidateTimer)
+  if (matchTimer) clearTimeout(matchTimer)
 })
 </script>
 
@@ -376,20 +440,23 @@ onMounted(() => {
   text-align: center;
 }
 
-/* 匹配弹窗 */
+/* 匹配弹窗内容 */
 .matching-popup {
   padding: 40px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  min-height: 320px;
+  justify-content: center;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .radar-scan {
-  width: 100px;
-  height: 100px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
-  background: rgba(74, 144, 217, 0.1);
-  border: 2px solid $primary;
+  background: rgba(74, 144, 217, 0.08);
+  border: 3px solid rgba($primary, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -406,15 +473,113 @@ onMounted(() => {
   }
 }
 
-.radar-icon {
-  font-size: 48px;
+.radar-icon { font-size: 52px; }
+
+.candidate-names {
+  height: 28px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.candidate-text {
+  font-size: 15px;
+  color: $primary;
+  font-weight: 800;
+  display: block;
 }
 
+/* VS 容器 */
+.vs-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.vs-clash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.vs-avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.avatar-emoji {
+  font-size: 56px;
+  width: 80px;
+  height: 80px;
+  background: #F8F9FA;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 3px solid #FFF;
+}
+
+.avatar-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #2C3E50;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vs-text {
+  font-size: 42px;
+  font-weight: 900;
+  font-style: italic;
+  color: #FF6B6B;
+  text-shadow: 0 4px 0 #E74C3C, 0 8px 15px rgba(231, 76, 60, 0.4);
+  padding: 0 10px;
+}
+
+.vs-ready-text {
+  font-size: 16px;
+  font-weight: 800;
+  color: $text-secondary;
+  letter-spacing: 1px;
+}
+
+/* 动画 */
 @keyframes ping {
   75%, 100% {
-    transform: scale(1.5);
+    transform: scale(1.6);
     opacity: 0;
   }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+.animate-slide-in-right {
+  animation: slideInRight 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+.animate-fade-in-out {
+  animation: fadeInOut 0.2s ease infinite alternate;
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideInRight {
+  from { transform: translateX(100px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes fadeInOut {
+  from { opacity: 0.6; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @media (max-width: 640px) {
@@ -424,5 +589,7 @@ onMounted(() => {
   .challenge-card {
     border-left-width: 4px;
   }
+  .vs-text { font-size: 32px; }
+  .avatar-emoji { width: 64px; height: 64px; font-size: 42px; }
 }
 </style>

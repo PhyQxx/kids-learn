@@ -15,5 +15,6 @@ public class ChallengeRecord extends BaseEntity {
     private Integer opponentScore;
     private Integer isWinner;
     private Integer rewardGold;
+    private Integer rankDelta;
     private LocalDateTime playTime;
 }

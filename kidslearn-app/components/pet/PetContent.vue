@@ -213,6 +213,7 @@ import { useUserStore } from '@/store/user'
 import { getPetStatus, getInventory, getDecorationInventory, feedPet as feedPetApi, playPet as playPetApi, bathPet as bathPetApi, getAvailablePets, selectPet } from '@/api/pet'
 import { normalizeInventoryItems, normalizeDecorations } from '@/utils/petFeature.mjs'
 import FunLoadingState from '@/components/common/FunLoadingState.vue'
+import { soundManager } from '@/utils/sound'
 
 const petStore = usePetStore()
 const userStore = useUserStore()
@@ -283,21 +284,27 @@ function selectFood(item) {
 }
 
 async function handleBath() {
+  soundManager.play('tap')
   try {
     const res = await bathPetApi()
+    soundManager.play('success')
     uni.showToast({ title: res.message || '洗澡啦~ 🛁', icon: 'none' })
     loadData()
   } catch (e) {
+    soundManager.play('fail')
     uni.showToast({ title: e.message || '操作失败', icon: 'none' })
   }
 }
 
 async function handlePlay() {
+  soundManager.play('tap')
   try {
     const res = await playPetApi()
+    soundManager.play('success')
     uni.showToast({ title: res.message || '玩耍中~ 🎾', icon: 'none' })
     loadData()
   } catch (e) {
+    soundManager.play('fail')
     uni.showToast({ title: e.message || '操作失败', icon: 'none' })
   }
 }
@@ -334,10 +341,13 @@ async function confirmFeed() {
   const food = foodItems.value.find(f => f.id === selectedFood.value)
   if (food && food.count > 0) {
     showFeedModal.value = false
+    soundManager.play('tap')
     try {
       const res = await feedPetApi(food.id)
+      soundManager.play('success')
       uni.showToast({ title: res.message || '喂食成功！', icon: 'none' })
     } catch (e) {
+      soundManager.play('fail')
       uni.showToast({ title: e.message || '喂食失败', icon: 'none' })
     }
     selectedFood.value = null

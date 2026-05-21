@@ -55,14 +55,14 @@ public class CodeGenerator {
                         .service("service")
                         .serviceImpl("service.impl")
                         .controller("controller")
-                        .pathConfig(Collections.singletonMap(OutputFile.xml, MAPPER_XML_DIR))
+                        .pathInfo(Collections.singletonMap(OutputFile.xml, MAPPER_XML_DIR))
                 )
                 .strategyConfig(builder -> builder
                         .addInclude(tables)
                         .addTablePrefix("")
                         .entityBuilder()
                         .superClass("com.kidslearn.common.entity.BaseEntity")
-                        .superEntityColumns("id", "create_time", "update_time")
+                        .addSuperEntityColumns("id", "create_time", "update_time")
                         .idType(IdType.AUTO)
                         .enableLombok()
                         .logicDeleteColumnName("deleted")
@@ -76,10 +76,6 @@ public class CodeGenerator {
                         .serviceBuilder()
                         .formatServiceFileName("%sService")
                         .formatServiceImplFileName("%sServiceImpl")
-                )
-                .columnConfig(builder -> builder
-                        .columnType("tinyint", DbColumnType.INTEGER)
-                        .columnType("bigint", DbColumnType.LONG)
                 )
                 .execute();
     }

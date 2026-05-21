@@ -875,11 +875,8 @@ public class LearnServiceImpl implements LearnService {
                 .ge(DailyCheckin::getCheckinDate, today.minusDays(6))
                 .orderByAsc(DailyCheckin::getCheckinDate));
         int streak = 0;
-        LocalDate d = today;
-        if (todayRecord != null) {
-            streak = 1;
-            d = today.minusDays(1);
-        }
+        if (todayRecord != null) streak = 1;
+        LocalDate d = today.minusDays(1);
         while (true) {
             LocalDate checkDate = d;
             boolean found = recentList.stream().anyMatch(r -> r.getCheckinDate().equals(checkDate));
