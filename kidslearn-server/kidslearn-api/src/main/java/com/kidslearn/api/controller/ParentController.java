@@ -61,55 +61,49 @@ public class ParentController {
                 .lt(DailyStats::getStatDate, endOfMonth)
         );
 
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalDays", monthStats.size());
-        stats.put("totalTime", monthStats.stream().mapToInt(DailyStats::getLearnMinutes).sum());
-        stats.put("totalQuestions",
-            learningRecordMapper.selectCount(
-                new LambdaQueryWrapper<LearningRecord>()
-                    .eq(LearningRecord::getUserId, userId)
-                    .ge(LearningRecord::getCreateTime, startOfMonth.atStartOfDay())
-                    .lt(LearningRecord::getCreateTime, endOfMonth.atStartOfDay())
-            )
-        );
-        long correctCount = learningRecordMapper.selectCount(
+        // All month learning records for detailed stats
+        List<LearningRecord> allMonthRecords = learningRecordMapper.selectList(
             new LambdaQueryWrapper<LearningRecord>()
                 .eq(LearningRecord::getUserId, userId)
-                .eq(LearningRecord::getIsPass, 1)
                 .ge(LearningRecord::getCreateTime, startOfMonth.atStartOfDay())
                 .lt(LearningRecord::getCreateTime, endOfMonth.atStartOfDay())
         );
-        long totalCount = (Long) stats.get("totalQuestions");
-        stats.put("accuracy", totalCount > 0 ? Math.round(correctCount * 100.0 / totalCount) : 0);
+
+        Map<String, Object> stats = new HashMap<>();
+        stats.put("totalDays", monthStats.size());
+        stats.put("totalTime", monthStats.stream().mapToInt(DailyStats::getLearnMinutes).sum());
+        stats.put("completedLevels", monthStats.stream()
+            .mapToInt(ds -> ds.getCompletedLevels() != null ? ds.getCompletedLevels() : 0).sum());
+        stats.put("totalQuestions", (long) allMonthRecords.size());
+        long correctCount = allMonthRecords.stream()
+            .filter(r -> Integer.valueOf(1).equals(r.getIsPass())).count();
+        stats.put("accuracy", allMonthRecords.size() > 0
+            ? Math.round(correctCount * 100.0 / allMonthRecords.size()) : 0);
         result.put("stats", stats);
 
-        // Subject distribution
+        // Subject distribution with real time
         List<Subject> subjects = subjectMapper.selectList(null);
         List<Map<String, Object>> subjectStats = new ArrayList<>();
+        int totalSubjectTime = 0;
         for (Subject s : subjects) {
             Set<Long> levelIds = courseLevelMapper.selectList(
                 new LambdaQueryWrapper<CourseLevel>().eq(CourseLevel::getSubjectId, s.getId())
             ).stream().map(CourseLevel::getId).collect(Collectors.toSet());
-
-            int time = monthStats.stream()
-                .filter(ds -> true) // simplified
-                .mapToInt(DailyStats::getLearnMinutes).sum();
-            // approximate by counting records for this subject's levels
-            long subjectRecordCount = !levelIds.isEmpty() ? learningRecordMapper.selectCount(
-                new LambdaQueryWrapper<LearningRecord>()
-                    .eq(LearningRecord::getUserId, userId)
-                    .in(LearningRecord::getCourseLevelId, levelIds)
-                    .ge(LearningRecord::getCreateTime, startOfMonth.atStartOfDay())
-                    .lt(LearningRecord::getCreateTime, endOfMonth.atStartOfDay())
-            ) : 0;
-            int subjectTime = (int) subjectRecordCount * 2; // rough estimate: 2 min per record
-
+            if (levelIds.isEmpty()) continue;
+            int subjectTime = allMonthRecords.stream()
+                .filter(r -> levelIds.contains(r.getCourseLevelId()))
+                .mapToInt(r -> r.getAnswerTime() != null ? Math.max(1, r.getAnswerTime() / 60) : 1)
+                .sum();
+            totalSubjectTime += subjectTime;
             Map<String, Object> sm = new HashMap<>();
             sm.put("name", s.getSubjectName());
             sm.put("time", subjectTime);
-            sm.put("percent", stats.get("totalTime") instanceof Integer && (int) stats.get("totalTime") > 0
-                ? Math.round(subjectTime * 100.0 / (int) stats.get("totalTime")) : 0);
+            sm.put("percent", 0);
             subjectStats.add(sm);
+        }
+        for (Map<String, Object> sm : subjectStats) {
+            int t = (int) sm.get("time");
+            sm.put("percent", totalSubjectTime > 0 ? Math.round(t * 100.0 / totalSubjectTime) : 0);
         }
         result.put("subjectStats", subjectStats);
 
@@ -122,6 +116,54 @@ public class ParentController {
             return dm;
         }).collect(Collectors.toList());
         result.put("dailyList", dailyList);
+
+        // === Today Stats ===
+        LocalDate today = LocalDate.now();
+        LocalDateTime todayStart = today.atStartOfDay();
+        DailyStats todayDailyStats = dailyStatsMapper.selectOne(
+            new LambdaQueryWrapper<DailyStats>()
+                .eq(DailyStats::getUserId, userId)
+                .eq(DailyStats::getStatDate, today)
+        );
+        List<LearningRecord> todayRecords = learningRecordMapper.selectList(
+            new LambdaQueryWrapper<LearningRecord>()
+                .eq(LearningRecord::getUserId, userId)
+                .ge(LearningRecord::getPlayTime, todayStart)
+                .orderByAsc(LearningRecord::getPlayTime)
+        );
+        int todayTotalQ = 0;
+        int todayCorrectQ = 0;
+        for (LearningRecord r : todayRecords) {
+            CourseLevel lv = courseLevelMapper.selectById(r.getCourseLevelId());
+            int q = lv != null && lv.getTotalQuestions() != null ? lv.getTotalQuestions() : 0;
+            todayTotalQ += q;
+            todayCorrectQ += Math.max(0, q - (r.getWrongCount() != null ? r.getWrongCount() : 0));
+        }
+        Map<String, Object> todayMap = new HashMap<>();
+        todayMap.put("learnMinutes", todayDailyStats != null && todayDailyStats.getLearnMinutes() != null
+            ? todayDailyStats.getLearnMinutes() : 0);
+        todayMap.put("completedLevels", todayDailyStats != null && todayDailyStats.getCompletedLevels() != null
+            ? todayDailyStats.getCompletedLevels() : 0);
+        todayMap.put("accuracy", todayTotalQ > 0 ? Math.round(todayCorrectQ * 100.0 / todayTotalQ) : 0);
+        result.put("today", todayMap);
+
+        // === Today Records ===
+        List<Map<String, Object>> todayRecordList = new ArrayList<>();
+        for (LearningRecord r : todayRecords) {
+            CourseLevel lv = courseLevelMapper.selectById(r.getCourseLevelId());
+            Subject subj = lv != null && lv.getSubjectId() != null ? subjectMapper.selectById(lv.getSubjectId()) : null;
+            Map<String, Object> rec = new HashMap<>();
+            rec.put("id", r.getId());
+            rec.put("subjectName", subj != null ? subj.getSubjectName() : "未知");
+            rec.put("levelName", lv != null ? lv.getLevelName() : "");
+            rec.put("playTime", r.getPlayTime() != null
+                ? r.getPlayTime().format(DateTimeFormatter.ofPattern("HH:mm")) : "");
+            rec.put("durationMinutes", r.getAnswerTime() != null ? Math.max(1, r.getAnswerTime() / 60) : 1);
+            rec.put("isPass", Integer.valueOf(1).equals(r.getIsPass()));
+            rec.put("score", r.getScore() != null ? r.getScore() : 0);
+            todayRecordList.add(rec);
+        }
+        result.put("todayRecords", todayRecordList);
 
         return R.ok(result);
     }

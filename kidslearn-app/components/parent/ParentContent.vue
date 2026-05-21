@@ -57,7 +57,7 @@
           </view>
           <view class="control-row">
             <text class="text-sm">休息提醒</text>
-            <text class="text-sm text-bold text-success">已开启</text>
+            <text class="text-sm text-bold" :class="timeControl.restReminder ? 'text-success' : 'text-light'">{{ timeControl.restReminder ? '已开启' : '已关闭' }}</text>
           </view>
           <tn-button type="primary" size="sm" shape="round" @click="goTimeControl" style="margin-top: 8px; align-self: flex-start;">修改设置</tn-button>
         </view>
@@ -88,13 +88,20 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { getReport, getTimeControl, getFamilyMembers } from '@/api/parent'
+import { getReport, getTimeControl } from '@/api/parent'
+import { useUserStore } from '@/store/user'
 import FunLoadingState from '@/components/common/FunLoadingState.vue'
 import RadarChart from './RadarChart.vue'
 
+const userStore = useUserStore()
 const loading = ref(true)
 
-const childInfo = ref({ name: '小明', status: '学习中 · 数学' })
+const childStatus = ref('加载中...')
+const childInfo = computed(() => ({
+  name: userStore.nickname,
+  status: childStatus.value
+}))
+
 const report = ref({ learnMinutes: 0, completedLevels: 0, accuracy: 0 })
 const subjectStatsData = ref([])
 
@@ -104,39 +111,21 @@ const radarLabels = computed(() => {
 })
 const radarValues = computed(() => {
   if (subjectStatsData.value.length > 0) return subjectStatsData.value.map(s => s.percent || 0)
-  return [85, 72, 60, 90, 45] // Mock fallback
+  return [0, 0, 0, 0, 0]
 })
-
-const weeklyData = ref([
-  { label: '周一', value: 40, today: false },
-  { label: '周二', value: 65, today: false },
-  { label: '周三', value: 50, today: false },
-  { label: '周四', value: 70, today: false },
-  { label: '周五', value: 30, today: false },
-  { label: '周六', value: 80, today: false },
-  { label: '今天', value: 55, today: true }
-])
 
 const timeControl = ref({
   dailyLimit: 60,
   forbiddenStart: '21:00',
-  forbiddenEnd: '07:00'
+  forbiddenEnd: '07:00',
+  restReminder: true
 })
 
-const usageRecords = ref([
-  { id: 1, icon: '📚', app: '学习 - 数学', time: '14:00-14:20', duration: '20分钟' },
-  { id: 2, icon: '🐱', app: '宠物互动', time: '14:20-14:25', duration: '5分钟' },
-  { id: 3, icon: '📚', app: '学习 - 语文', time: '14:25-14:40', duration: '15分钟' }
-])
+const usageRecords = ref([])
 
-function applyMockData() {
-  report.value = { learnMinutes: 35, completedLevels: 3, accuracy: 85 }
-  timeControl.value = { dailyLimit: 60, forbiddenStart: '21:00', forbiddenEnd: '07:00' }
-  usageRecords.value = [
-    { id: 1, icon: '📚', app: '学习 - 数学', time: '14:00-14:20', duration: '20分钟' },
-    { id: 2, icon: '🐱', app: '宠物互动', time: '14:20-14:25', duration: '5分钟' },
-    { id: 3, icon: '📚', app: '学习 - 语文', time: '14:25-14:40', duration: '15分钟' }
-  ]
+function getSubjectIcon(name) {
+  const icons = { '语文': '📖', '数学': '🔢', '英语': '🔤', '逻辑': '🧩', '科学': '🔬' }
+  return icons[name] || '📚'
 }
 
 async function loadData() {
@@ -147,40 +136,53 @@ async function loadData() {
       getTimeControl()
     ])
 
-    // 学习报告
     if (results[0].status === 'fulfilled' && results[0].value) {
       const data = results[0].value
-      const stats = data.stats || data
+
+      // Today stats
+      const today = data.today || {}
       report.value = {
-        learnMinutes: stats.totalTime || 0,
-        completedLevels: stats.totalQuestions || 0,
-        accuracy: stats.accuracy || 0
+        learnMinutes: today.learnMinutes || 0,
+        completedLevels: today.completedLevels || 0,
+        accuracy: today.accuracy || 0
       }
+
+      // Subject stats for radar
       if (data.subjectStats && Array.isArray(data.subjectStats)) {
         subjectStatsData.value = data.subjectStats
       }
-      if (data.dailyList && Array.isArray(data.dailyList)) {
-        const days = ['周一', '周二', '周三', '周四', '周五', '周六', '今天']
-        weeklyData.value = data.dailyList.slice(-7).map((d, i) => ({
-          label: days[i] || d.date,
-          value: Math.min((d.time || 0) * 100 / 60, 100),
-          today: i === data.dailyList.slice(-7).length - 1
+
+      // Today usage records
+      if (data.todayRecords && Array.isArray(data.todayRecords)) {
+        usageRecords.value = data.todayRecords.map(r => ({
+          id: r.id,
+          icon: getSubjectIcon(r.subjectName),
+          app: `${r.subjectName}${r.levelName ? ' · ' + r.levelName : ''}`,
+          time: r.playTime,
+          duration: `${r.durationMinutes}分钟`
         }))
+      }
+
+      // Child status
+      if (data.todayRecords && data.todayRecords.length > 0) {
+        const latest = data.todayRecords[data.todayRecords.length - 1]
+        childStatus.value = `学习中 · ${latest.subjectName}`
+      } else {
+        childStatus.value = '今日未学习'
       }
     }
 
-    // 时间控制
     if (results[1].status === 'fulfilled' && results[1].value) {
       const data = results[1].value
       timeControl.value = {
         dailyLimit: data.dailyLimitMinutes || 60,
         forbiddenStart: data.allowedEndTime || '21:00',
-        forbiddenEnd: data.allowedStartTime || '07:00'
+        forbiddenEnd: data.allowedStartTime || '07:00',
+        restReminder: data.restReminder !== undefined ? data.restReminder : true
       }
     }
   } catch (e) {
-    console.log('ParentContent: 使用模拟数据', e)
-    applyMockData()
+    console.log('ParentContent: 加载失败', e)
   } finally {
     loading.value = false
   }
