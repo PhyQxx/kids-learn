@@ -12,6 +12,7 @@ import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -51,7 +52,7 @@ public class LearnController {
         return R.ok(learnService.getLevels(userId, subjectId));
     }
 
-    @Operation(summary = "鑾峰彇瑙嗛璇剧▼鍒楄〃")
+    @Operation(summary = "获取视频课程列表")
     @GetMapping("/videos")
     public R<List<Map<String, Object>>> getCourseVideos(
             HttpServletRequest request,
@@ -60,11 +61,11 @@ public class LearnController {
         return R.ok(learnService.getCourseVideos(userId, courseId));
     }
 
-    @Operation(summary = "涓婃姤瑙嗛瀛︿範杩涘害")
+    @Operation(summary = "上报视频学习进度")
     @PostMapping("/video-progress")
     public R<Map<String, Object>> submitVideoProgress(
             HttpServletRequest request,
-            @RequestBody SubmitVideoProgressDTO dto) {
+            @Valid @RequestBody SubmitVideoProgressDTO dto) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(learnService.submitVideoProgress(userId, dto));
     }
@@ -80,7 +81,7 @@ public class LearnController {
 
     @Operation(summary = "提交答案")
     @PostMapping("/submit-answer")
-    public R<Map<String, Object>> submitAnswer(HttpServletRequest request, @RequestBody SubmitAnswerDTO dto) {
+    public R<Map<String, Object>> submitAnswer(HttpServletRequest request, @Valid @RequestBody SubmitAnswerDTO dto) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(learnService.submitAnswer(userId, dto));
     }
@@ -201,7 +202,7 @@ public class LearnController {
     public R<Map<String, Object>> submitPracticeAnswer(
             HttpServletRequest request,
             @RequestParam Long practiceSessionId,
-            @RequestBody SubmitAnswerDTO dto) {
+            @Valid @RequestBody SubmitAnswerDTO dto) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(learnService.submitPracticeAnswer(userId, practiceSessionId, dto));
     }

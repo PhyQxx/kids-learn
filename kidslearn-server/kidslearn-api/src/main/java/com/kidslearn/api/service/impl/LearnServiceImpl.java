@@ -507,8 +507,11 @@ public class LearnServiceImpl implements LearnService {
             vo.setExp(expReward);
 
             User user = userMapper.selectById(userId);
-            user.setGold(user.getGold() + goldReward);
-            user.setTotalExp(user.getTotalExp() + expReward);
+            if (user == null) {
+                throw new BusinessException("用户不存在");
+            }
+            user.setGold((user.getGold() != null ? user.getGold() : 0) + goldReward);
+            user.setTotalExp((user.getTotalExp() != null ? user.getTotalExp() : 0) + expReward);
             user.setLevel(calculateLevel(user.getTotalExp()));
             userMapper.updateById(user);
             realtimeEventPublisher.publishBalance(userId, user.getGold(), user.getDiamond());

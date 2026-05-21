@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { register as registerApi } from '@/api/auth'
 import { useUserStore } from '@/store/user'
 import { useRealtimeStore } from '@/store/realtime'
@@ -104,6 +104,11 @@ const selectedGrade = ref(4)
 const codeSent = ref(false)
 const countdown = ref(60)
 const errorMsg = ref('')
+let smsTimer = null
+
+onBeforeUnmount(() => {
+  if (smsTimer) { clearInterval(smsTimer); smsTimer = null }
+})
 
 const gradeOptions = [
   { value: 1, label: '小班' }, { value: 2, label: '中班' }, { value: 3, label: '大班' },
@@ -126,10 +131,11 @@ function sendCode() {
     return
   }
   codeSent.value = true
-  const timer = setInterval(() => {
+  smsTimer = setInterval(() => {
     countdown.value--
     if (countdown.value <= 0) {
-      clearInterval(timer)
+      clearInterval(smsTimer)
+      smsTimer = null
       codeSent.value = false
       countdown.value = 60
     }

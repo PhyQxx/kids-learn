@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
 import { useUserStore } from '@/store/user'
 import { login } from '@/api/auth'
 
@@ -71,6 +71,11 @@ const codeSent = ref(false)
 const countdown = ref(60)
 const errorMsg = ref('')
 const showSuccess = ref(false)
+let smsTimer = null
+
+onBeforeUnmount(() => {
+  if (smsTimer) { clearInterval(smsTimer); smsTimer = null }
+})
 
 async function verify() {
   if (!phone.value) { errorMsg.value = '请输入手机号'; return }
@@ -98,10 +103,11 @@ async function verify() {
 function sendCode() {
   if (codeSent.value) return
   codeSent.value = true
-  const timer = setInterval(() => {
+  smsTimer = setInterval(() => {
     countdown.value--
     if (countdown.value <= 0) {
-      clearInterval(timer)
+      clearInterval(smsTimer)
+      smsTimer = null
       codeSent.value = false
       countdown.value = 60
     }

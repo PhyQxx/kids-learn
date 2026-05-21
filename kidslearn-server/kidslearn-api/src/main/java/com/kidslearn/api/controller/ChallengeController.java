@@ -7,6 +7,7 @@ import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,7 +33,7 @@ public class ChallengeController {
     @PostMapping("/create")
     public R<Map<String, Object>> createChallenge(
             HttpServletRequest request,
-            @RequestBody(required = false) CreateChallengeDTO dto) {
+            @Valid @RequestBody(required = false) CreateChallengeDTO dto) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(challengeService.createChallenge(userId, dto));
     }
@@ -41,7 +42,7 @@ public class ChallengeController {
     @PostMapping("/submit")
     public R<Map<String, Object>> submitChallengeResult(
             HttpServletRequest request,
-            @RequestBody SubmitChallengeDTO dto) {
+            @Valid @RequestBody SubmitChallengeDTO dto) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(challengeService.submitChallengeResult(userId, dto));
     }

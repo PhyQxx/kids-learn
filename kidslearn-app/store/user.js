@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useLearnStore } from './learn'
+import { usePetStore } from './pet'
+import { useRealtimeStore } from './realtime'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(uni.getStorageSync('token') || '')
@@ -47,6 +50,15 @@ export const useUserStore = defineStore('user', () => {
 
   function logout() {
     uni.closeSocket({ complete: () => {} })
+    // Clear other stores
+    const learnStore = useLearnStore()
+    const petStore = usePetStore()
+    const realtimeStore = useRealtimeStore()
+    learnStore.clearLearningContext()
+    learnStore.setDailyTasks([])
+    petStore.setPetInfo(null)
+    realtimeStore.close()
+    // Clear user state
     token.value = ''
     refreshTokenStr.value = ''
     userInfo.value = null

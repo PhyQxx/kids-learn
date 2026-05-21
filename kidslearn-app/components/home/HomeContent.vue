@@ -306,6 +306,8 @@ async function loadData() {
   }
 }
 
+let isFirstShow = true
+
 onMounted(() => {
   loadData()
   fetchCheckinStatus()
@@ -316,6 +318,10 @@ onMounted(() => {
 
 // 返回时刷新数据
 onShow(() => {
+  if (isFirstShow) {
+    isFirstShow = false
+    return
+  }
   loadData()
   fetchCheckinStatus()
 })

@@ -15,6 +15,7 @@ import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
@@ -66,7 +67,7 @@ public class UserController {
 
     @Operation(summary = "更新学习档案")
     @PutMapping("/child-profile")
-    public R<Void> updateChildProfile(HttpServletRequest request, @RequestBody UpdateChildProfileDTO dto) {
+    public R<Void> updateChildProfile(HttpServletRequest request, @Valid @RequestBody UpdateChildProfileDTO dto) {
         Long userId = (Long) request.getAttribute("userId");
         ChildProfile profile = childProfileMapper.selectOne(
             new LambdaQueryWrapper<ChildProfile>().eq(ChildProfile::getUserId, userId)

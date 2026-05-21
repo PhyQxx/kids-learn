@@ -12,6 +12,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @Tag(name = "认证接口")
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -34,7 +36,11 @@ public class AuthController {
 
     @Operation(summary = "刷新Token")
     @PostMapping("/refresh-token")
-    public R<TokenVO> refreshToken(@RequestParam String refreshToken) {
+    public R<TokenVO> refreshToken(@RequestBody Map<String, String> body) {
+        String refreshToken = body.get("refreshToken");
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return R.fail("refreshToken不能为空");
+        }
         return R.ok(authService.refreshToken(refreshToken));
     }
 

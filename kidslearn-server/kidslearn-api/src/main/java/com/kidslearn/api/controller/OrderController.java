@@ -7,6 +7,7 @@ import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,14 +24,14 @@ public class OrderController {
 
     @Operation(summary = "创建会员订单")
     @PostMapping("/create")
-    public R<Map<String, Object>> createOrder(HttpServletRequest request, @RequestBody CreateOrderDTO dto) {
+    public R<Map<String, Object>> createOrder(HttpServletRequest request, @Valid @RequestBody CreateOrderDTO dto) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(orderService.createOrder(userId, dto.getPlanType(), dto.getPayChannel()));
     }
 
     @Operation(summary = "支付回调")
     @PostMapping("/pay-callback")
-    public R<Map<String, Object>> payCallback(@RequestBody PaymentCallbackDTO dto) {
+    public R<Map<String, Object>> payCallback(@Valid @RequestBody PaymentCallbackDTO dto) {
         return R.ok(orderService.handlePaymentCallback(dto.getOrderNo(), dto.getPayStatus()));
     }
 
