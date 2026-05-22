@@ -81,7 +81,7 @@
       <view class="settings-group card">
         <view class="setting-item" @tap="checkUpdate">
           <text class="text-sm">检查更新</text>
-          <text class="text-xs text-light">v1.0.0</text>
+          <text class="text-xs text-light">v{{ appVersion }}</text>
         </view>
         <view class="setting-item" @tap="showAgreement">
           <text class="text-sm">用户协议</text>
@@ -95,6 +95,11 @@
 
       <!-- 清除缓存 -->
       <tn-button shape="round" block @click="clearCache">清除缓存</tn-button>
+
+      <!-- 退出登录 -->
+      <view style="margin-top: 12px;">
+        <tn-button shape="round" block type="danger" @click="handleLogout">退出登录</tn-button>
+      </view>
     </view>
   </AppLayout>
 
@@ -114,6 +119,8 @@ import GradeSelectPopup from '@/components/GradeSelectPopup.vue'
 import { useUserStore } from '@/store/user'
 import { useLearnStore } from '@/store/learn'
 import { getUserInfo, updateChildProfile } from '@/api/user'
+import doCheckUpdate from '@/utils/update.mjs'
+import manifest from '@/manifest.json'
 
 const userStore = useUserStore()
 const learnStore = useLearnStore()
@@ -175,7 +182,20 @@ getUserInfo().then(info => {
 function editPhone() { uni.showToast({ title: '修改手机号', icon: 'none' }) }
 function editPassword() { uni.showToast({ title: '修改密码', icon: 'none' }) }
 function editProfile() { uni.showToast({ title: '修改孩子资料', icon: 'none' }) }
-function checkUpdate() { uni.showToast({ title: '已是最新版本', icon: 'none' }) }
+const appVersion = manifest.versionName || '1.0.0'
+
+function checkUpdate() {
+  // #ifdef APP-PLUS
+  doCheckUpdate({ showToast: true })
+  // #endif
+  // #ifndef APP-PLUS
+  uni.showModal({
+    title: '更新提示',
+    content: '当前平台不支持应用内更新',
+    showCancel: false
+  })
+  // #endif
+}
 function showAgreement() { uni.showToast({ title: '用户协议', icon: 'none' }) }
 function showPrivacy() { uni.showToast({ title: '隐私政策', icon: 'none' }) }
 function clearCache() {
@@ -183,6 +203,21 @@ function clearCache() {
     title: '确认清除',
     content: '清除缓存不会影响登录状态',
     success: (res) => { if (res.confirm) uni.showToast({ title: '已清除', icon: 'success' }) }
+  })
+}
+
+function handleLogout() {
+  uni.showModal({
+    title: '退出确认',
+    content: '确定要退出登录吗？',
+    cancelText: '点错了',
+    confirmText: '确定退出',
+    confirmColor: '#FF6B6B',
+    success: (res) => {
+      if (res.confirm) {
+        userStore.logout()
+      }
+    }
   })
 }
 </script>

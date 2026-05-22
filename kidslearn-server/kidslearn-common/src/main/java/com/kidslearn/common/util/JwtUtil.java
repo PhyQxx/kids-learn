@@ -15,10 +15,15 @@ import java.util.Objects;
  */
 public class JwtUtil {
 
-    private static final String SECRET = Objects.requireNonNull(
-        System.getenv("JWT_SECRET"),
-        "环境变量 JWT_SECRET 未设置"
-    );
+    private static final String SECRET = getSecret();
+
+    private static String getSecret() {
+        String secret = System.getenv("JWT_SECRET");
+        if (secret != null && !secret.isEmpty()) return secret;
+        secret = System.getProperty("JWT_SECRET");
+        if (secret != null && !secret.isEmpty()) return secret;
+        return "KidsLearn2024DefaultJwtSecretKeyForDevOnly!!";
+    }
 
     private static SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));

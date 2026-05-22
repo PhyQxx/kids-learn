@@ -56,6 +56,7 @@
           <el-menu-item index="/system/config">系统配置</el-menu-item>
           <el-menu-item index="/system/log">操作日志</el-menu-item>
           <el-menu-item index="/system/dict">字典管理</el-menu-item>
+          <el-menu-item index="/system/version">版本管理</el-menu-item>
         </el-sub-menu>
       </el-menu>
     </el-aside>

@@ -118,3 +118,8 @@ export function deleteDictType(id: number) { return del(`/admin/dict/type/${id}`
 export function getDictDataList(params: any) { return get('/admin/dict/data/list', params) }
 export function saveDictData(data: any) { return post('/admin/dict/data/save', data) }
 export function deleteDictData(id: number) { return del(`/admin/dict/data/${id}`) }
+
+// ==================== 版本管理 ====================
+export function getVersionList(params: any) { return get('/admin/version/list', params) }
+export function saveVersion(data: any) { return post('/admin/version/save', data) }
+export function deleteVersion(id: number) { return del(`/admin/version/${id}`) }

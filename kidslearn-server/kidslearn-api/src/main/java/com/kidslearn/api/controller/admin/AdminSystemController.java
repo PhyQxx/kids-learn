@@ -28,6 +28,7 @@ public class AdminSystemController {
     private final OperationLogMapper operationLogMapper;
     private final CourseLevelMapper courseLevelMapper;
     private final OrderMapper orderMapper;
+    private final AppVersionMapper appVersionMapper;
 
     // ==================== Dashboard ====================
 
@@ -171,5 +172,32 @@ public class AdminSystemController {
             .orderByDesc(OperationLog::getCreateTime);
         Page<OperationLog> p = operationLogMapper.selectPage(new Page<>(page, pageSize), wrapper);
         return R.ok(new PageResult<>(p.getRecords(), p.getTotal(), page, pageSize));
+    }
+
+    // ==================== 版本管理 ====================
+
+    @GetMapping("/version/list")
+    public R<PageResult<AppVersion>> versionList(
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
+        Page<AppVersion> p = appVersionMapper.selectPage(new Page<>(page, pageSize),
+            new LambdaQueryWrapper<AppVersion>().orderByDesc(AppVersion::getVersionCode));
+        return R.ok(new PageResult<>(p.getRecords(), p.getTotal(), page, pageSize));
+    }
+
+    @PostMapping("/version/save")
+    public R<Void> versionSave(@RequestBody AppVersion version) {
+        if (version.getId() == null) {
+            appVersionMapper.insert(version);
+        } else {
+            appVersionMapper.updateById(version);
+        }
+        return R.ok();
+    }
+
+    @DeleteMapping("/version/{id}")
+    public R<Void> versionDelete(@PathVariable Long id) {
+        appVersionMapper.deleteById(id);
+        return R.ok();
     }
 }

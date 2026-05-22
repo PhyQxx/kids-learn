@@ -27,12 +27,12 @@ export default {
   data() {
     return {
       menus: [
-        { icon: '📋', label: '学习记录', url: '' },
-        { icon: '📖', label: '错题本', url: '' },
+        { icon: '📋', label: '学习记录', url: '/pages/mine/records' },
+        { icon: '📖', label: '错题本', url: '/pages/mine/wrong' },
         { icon: '👥', label: '好友列表', url: '' },
-        { icon: '👑', label: 'VIP会员', url: '' },
+        { icon: '👑', label: 'VIP会员', url: '/pages/mine/vip' },
         { icon: '👨‍👩‍👧', label: '家长中心', url: '/pages/parent/index' },
-        { icon: '⚙️', label: '设置', url: '' },
+        { icon: '⚙️', label: '设置', url: '/pages/mine/settings' },
       ],
     }
   },

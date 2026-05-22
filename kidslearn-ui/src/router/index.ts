@@ -102,6 +102,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/system/dict.vue'),
         meta: { title: '字典管理' },
       },
+      {
+        path: 'system/version',
+        name: 'SystemVersion',
+        component: () => import('@/views/system/version.vue'),
+        meta: { title: '版本管理' },
+      },
     ],
   },
 ]

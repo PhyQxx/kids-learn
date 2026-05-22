@@ -16,6 +16,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
  */
 @Component
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class AuthInterceptor implements HandlerInterceptor {
 
     private final StringRedisTemplate redisTemplate;
@@ -29,34 +30,58 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
-            sendError(response, R.unauthorized());
+            log.warn("认证失败: Token缺失或格式错误, path: {}", request.getRequestURI());
+            sendError(response, R.unauthorized(), HttpServletResponse.SC_UNAUTHORIZED);
             return false;
         }
 
         token = token.substring(7);
         try {
             if (JwtUtil.isTokenExpired(token)) {
-                sendError(response, R.unauthorized());
+                log.warn("认证失败: Token已过期");
+                sendError(response, R.unauthorized(), HttpServletResponse.SC_UNAUTHORIZED);
                 return false;
             }
             Long userId = JwtUtil.getUserId(token);
+            String userType = JwtUtil.getUserType(token);
+            
+            // 校验Redis中的Token
             String cachedToken = redisTemplate.opsForValue().get(RedisConstants.USER_TOKEN + userId);
-            if (!token.equals(cachedToken)) {
-                sendError(response, R.unauthorized());
+            if (cachedToken == null) {
+                log.warn("认证失败: Redis中Token不存在, userId: {}", userId);
+                sendError(response, R.unauthorized(), HttpServletResponse.SC_UNAUTHORIZED);
                 return false;
             }
+            if (!token.equals(cachedToken)) {
+                log.warn("认证失败: Token不匹配, 可能在其他地方登录, userId: {}", userId);
+                sendError(response, R.unauthorized(), HttpServletResponse.SC_UNAUTHORIZED);
+                return false;
+            }
+
+            // 管理后台权限校验
+            if (request.getRequestURI().startsWith("/api/v1/admin")) {
+                if (!"ADMIN".equals(userType)) {
+                    log.warn("权限不足: 非管理员尝试访问管理接口, userId: {}, userType: {}, path: {}", 
+                        userId, userType, request.getRequestURI());
+                    sendError(response, R.fail("权限不足"), HttpServletResponse.SC_FORBIDDEN);
+                    return false;
+                }
+            }
+
             request.setAttribute("userId", userId);
+            request.setAttribute("userType", userType);
             request.setAttribute("token", token);
             return true;
         } catch (Exception e) {
-            sendError(response, R.unauthorized());
+            log.error("认证过程发生异常: {}", e.getMessage());
+            sendError(response, R.unauthorized(), HttpServletResponse.SC_UNAUTHORIZED);
             return false;
         }
     }
 
-    private void sendError(HttpServletResponse response, R<?> r) throws Exception {
+    private void sendError(HttpServletResponse response, R<?> r, int status) throws Exception {
         response.setContentType("application/json;charset=UTF-8");
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setStatus(status);
         response.getWriter().write(objectMapper.writeValueAsString(r));
     }
 }
