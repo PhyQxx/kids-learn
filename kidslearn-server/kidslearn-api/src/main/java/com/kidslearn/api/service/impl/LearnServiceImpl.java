@@ -893,6 +893,10 @@ public class LearnServiceImpl implements LearnService {
         } else {
             nextRewardDay = 1;
         }
+        // Include today in streak count when not yet checked in
+        if (todayRecord == null) {
+            streak++;
+        }
 
         Map<String, Object> result = new HashMap<>();
         result.put("checkedIn", todayRecord != null);

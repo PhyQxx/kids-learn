@@ -93,7 +93,6 @@ async function doCheckin() {
     const res = await postCheckin()
     if (res) {
       checkedIn.value = true
-      streak.value = (streak.value || 0) + 1
       weekDays.value = weekDays.value.map(d =>
         d.isToday ? { ...d, done: true } : d
       )

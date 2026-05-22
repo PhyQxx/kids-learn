@@ -3,7 +3,7 @@ import { useUserStore } from '@/store/user'
 import { showLoading as startLoading, hideLoading as stopLoading } from '@/utils/loading'
 
 // API 请求封装
-export const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://192.168.12.164:19084/api/v1'
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 let isRefreshing = false
 let requestsToRetry = []

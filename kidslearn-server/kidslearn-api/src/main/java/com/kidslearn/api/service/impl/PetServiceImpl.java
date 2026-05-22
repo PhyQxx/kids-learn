@@ -1,6 +1,7 @@
 package com.kidslearn.api.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
 import com.kidslearn.api.realtime.RealtimeEventPublisher;
@@ -282,8 +283,13 @@ public class PetServiceImpl implements PetService {
         int currentGold = user.getGold() != null ? user.getGold() : 0;
         if (currentGold < totalCost) throw new BusinessException("金币不足");
 
+        // Atomic update to prevent race condition
+        int updated = userMapper.update(null, new UpdateWrapper<User>()
+            .eq("id", userId)
+            .ge("gold", totalCost)
+            .setSql("gold = gold - " + totalCost));
+        if (updated == 0) throw new BusinessException("金币不足");
         user.setGold(currentGold - totalCost);
-        userMapper.updateById(user);
 
         PetItemInventory inventory = inventoryMapper.selectOne(
             new LambdaQueryWrapper<PetItemInventory>()
@@ -365,13 +371,24 @@ public class PetServiceImpl implements PetService {
         if (deco.getPriceGold() > 0) {
             int currentGold = user.getGold() != null ? user.getGold() : 0;
             if (currentGold < deco.getPriceGold()) throw new BusinessException("金币不足");
+            int updated = userMapper.update(null, new UpdateWrapper<User>()
+                .eq("id", userId)
+                .ge("gold", deco.getPriceGold())
+                .setSql("gold = gold - " + deco.getPriceGold()));
+            if (updated == 0) throw new BusinessException("金币不足");
             user.setGold(currentGold - deco.getPriceGold());
         } else if (deco.getPriceDiamond() > 0) {
             int currentDiamond = user.getDiamond() != null ? user.getDiamond() : 0;
             if (currentDiamond < deco.getPriceDiamond()) throw new BusinessException("钻石不足");
+            int updated = userMapper.update(null, new UpdateWrapper<User>()
+                .eq("id", userId)
+                .ge("diamond", deco.getPriceDiamond())
+                .setSql("diamond = diamond - " + deco.getPriceDiamond()));
+            if (updated == 0) throw new BusinessException("钻石不足");
             user.setDiamond(currentDiamond - deco.getPriceDiamond());
+        } else {
+            userMapper.updateById(user);
         }
-        userMapper.updateById(user);
 
         UserDecorationInventory inv = decoInventoryMapper.selectOne(
             new LambdaQueryWrapper<UserDecorationInventory>()

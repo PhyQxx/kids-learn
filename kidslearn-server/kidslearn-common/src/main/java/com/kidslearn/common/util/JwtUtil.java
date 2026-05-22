@@ -8,13 +8,17 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * JWT 工具类
  */
 public class JwtUtil {
 
-    private static final String SECRET = "kidslearn-secret-key-for-jwt-token-generation-must-be-at-least-256-bits";
+    private static final String SECRET = Objects.requireNonNull(
+        System.getenv("JWT_SECRET"),
+        "环境变量 JWT_SECRET 未设置"
+    );
 
     private static SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
