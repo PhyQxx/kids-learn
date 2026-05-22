@@ -1,6 +1,7 @@
 import { refreshToken as doRefreshToken } from './auth'
 import { useUserStore } from '@/store/user'
 import { showLoading as startLoading, hideLoading as stopLoading } from '@/utils/loading'
+import { handleUnauthorizedResponse } from '@/utils/requestAuth.mjs'
 
 // API 请求封装
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
@@ -40,6 +41,13 @@ const request = (options) => {
         ...options.header
       },
       success: async (res) => {
+        if (res.statusCode === 401) {
+          clearLoading()
+          handleUnauthorizedResponse(res, useUserStore())
+          reject(res.data || res)
+          return
+        }
+
         if (res.statusCode === 200) {
           if (res.data.code === 200) {
             clearLoading()

@@ -16,15 +16,21 @@ request.interceptors.request.use((config) => {
   return config
 })
 
+function redirectToLogin() {
+  const userStore = useUserStore()
+  userStore.logout()
+  if (router.currentRoute.value.path !== '/login') {
+    router.replace('/login')
+  }
+}
+
 request.interceptors.response.use(
   (response) => {
     const res = response.data
     if (res.code !== 200) {
       ElMessage.error(res.msg || '请求失败')
       if (res.code === 401) {
-        const userStore = useUserStore()
-        userStore.logout()
-        router.push('/login')
+        redirectToLogin()
       }
       return Promise.reject(new Error(res.msg))
     }
@@ -32,7 +38,12 @@ request.interceptors.response.use(
     return res as any
   },
   (error) => {
-    ElMessage.error(error.message || '网络异常')
+    if (error?.response?.status === 401) {
+      redirectToLogin()
+      ElMessage.error(error.response.data?.msg || '登录已过期，请重新登录')
+    } else {
+      ElMessage.error(error.message || '网络异常')
+    }
     return Promise.reject(error)
   }
 )
