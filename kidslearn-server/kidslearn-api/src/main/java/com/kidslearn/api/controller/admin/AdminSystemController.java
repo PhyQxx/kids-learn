@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.service.AdminDashboardStatsService;
 import com.kidslearn.common.result.PageResult;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,7 +13,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -26,22 +26,15 @@ public class AdminSystemController {
     private final AdminRoleMapper adminRoleMapper;
     private final AppConfigMapper appConfigMapper;
     private final OperationLogMapper operationLogMapper;
-    private final CourseLevelMapper courseLevelMapper;
-    private final OrderMapper orderMapper;
     private final AppVersionMapper appVersionMapper;
+    private final AdminDashboardStatsService adminDashboardStatsService;
 
     // ==================== Dashboard ====================
 
     @Operation(summary = "首页统计")
     @GetMapping("/dashboard/stats")
     public R<Map<String, Object>> dashboardStats() {
-        Map<String, Object> stats = new HashMap<>();
-        stats.put("totalUsers", userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getUserType, 1)));
-        stats.put("todayActiveUsers", 0L); // placeholder, requires Redis tracking
-        stats.put("totalLevels", courseLevelMapper.selectCount(new LambdaQueryWrapper<>()));
-        stats.put("totalOrders", orderMapper.selectCount(new LambdaQueryWrapper<>()));
-        stats.put("todayRevenue", 0L);
-        return R.ok(stats);
+        return R.ok(adminDashboardStatsService.getStats());
     }
 
     // ==================== 用户管理 ====================

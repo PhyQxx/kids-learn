@@ -14,7 +14,7 @@
       <el-table-column prop="nickname" label="昵称" />
       <el-table-column prop="userType" label="类型" width="80">
         <template #default="{ row }">
-          <el-tag :type="row.userType === 3 ? 'warning' : row.userType === 2 ? '' : 'success'" size="small">
+          <el-tag :type="row.userType === 3 ? 'warning' : row.userType === 2 ? 'info' : 'success'" size="small">
             {{ userTypeLabel(row.userType) }}
           </el-tag>
         </template>

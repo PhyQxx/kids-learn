@@ -1,17 +1,16 @@
 <template>
   <el-container class="admin-layout">
-    <el-aside :width="isCollapse ? '64px' : '220px'" class="aside">
-      <div class="logo">
-        <span class="logo-emoji">🌟</span>
+    <el-aside :width="isCollapse ? '72px' : '232px'" class="aside">
+      <div class="logo" :class="{ collapsed: isCollapse }">
+        <span class="logo-mark">K</span>
         <span v-show="!isCollapse" class="logo-title">趣学星球</span>
       </div>
+
       <el-menu
         :default-active="route.path"
         :collapse="isCollapse"
         router
-        background-color="#fff"
-        text-color="#333"
-        active-text-color="#FF6B6B"
+        class="side-menu"
       >
         <el-menu-item index="/dashboard">
           <el-icon><Odometer /></el-icon>
@@ -63,15 +62,24 @@
 
     <el-container>
       <el-header class="header">
-        <el-icon class="collapse-btn" @click="isCollapse = !isCollapse">
-          <Expand v-if="isCollapse" />
-          <Fold v-else />
-        </el-icon>
+        <div class="header-left">
+          <el-button class="collapse-btn" text circle @click="isCollapse = !isCollapse">
+            <el-icon>
+              <Expand v-if="isCollapse" />
+              <Fold v-else />
+            </el-icon>
+          </el-button>
+          <div>
+            <div class="page-title">{{ route.meta.title || '控制台' }}</div>
+            <div class="page-subtitle">儿童游戏化学习平台管理后台</div>
+          </div>
+        </div>
+
         <div class="header-right">
           <el-dropdown @command="handleCommand">
             <span class="user-info">
-              <el-avatar :size="32" style="background-color: #FF6B6B">A</el-avatar>
-              <span style="margin-left: 8px">{{ userStore.userInfo?.realName || '管理员' }}</span>
+              <el-avatar :size="34" class="admin-avatar">A</el-avatar>
+              <span>{{ userStore.userInfo?.realName || '管理员' }}</span>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
@@ -110,49 +118,97 @@ function handleCommand(command: string) {
 <style scoped>
 .admin-layout {
   height: 100vh;
+  background: var(--admin-bg);
 }
 
 .aside {
-  border-right: 1px solid #f0f0f0;
+  background: var(--admin-surface);
+  border-right: 1px solid var(--admin-border);
+  box-shadow: 4px 0 18px rgba(31, 41, 55, 0.04);
   overflow-y: auto;
-  transition: width 0.3s;
+  transition: width 0.24s ease;
 }
 
 .logo {
-  height: 60px;
+  height: 68px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-bottom: 1px solid #f0f0f0;
+  gap: 10px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--admin-border);
 }
 
-.logo-emoji {
-  font-size: 28px;
+.logo.collapsed {
+  justify-content: center;
+  padding: 0;
+}
+
+.logo-mark {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--primary), var(--teal));
 }
 
 .logo-title {
   font-size: 18px;
   font-weight: 800;
-  color: #FF6B6B;
+  color: var(--admin-text);
+  letter-spacing: 0;
+}
+
+.side-menu {
+  border-right: 0;
+  padding: 10px 8px 16px;
+}
+
+.side-menu:not(.el-menu--collapse) {
+  width: 100%;
 }
 
 .header {
+  height: 68px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fff;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--admin-border);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
 }
 
 .collapse-btn {
-  font-size: 20px;
-  cursor: pointer;
-  color: #666;
+  color: var(--admin-muted);
 }
 
 .collapse-btn:hover {
-  color: #FF6B6B;
+  color: var(--primary);
+  background: rgba(255, 107, 107, 0.08);
+}
+
+.page-title {
+  color: var(--admin-text);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.page-subtitle {
+  margin-top: 3px;
+  color: var(--admin-muted);
+  font-size: 12px;
 }
 
 .header-right {
@@ -163,11 +219,20 @@ function handleCommand(command: string) {
 .user-info {
   display: flex;
   align-items: center;
+  gap: 9px;
+  color: var(--admin-text);
   cursor: pointer;
 }
 
+.admin-avatar {
+  background: var(--primary);
+  font-weight: 700;
+}
+
 .main {
-  background: var(--bg);
+  min-width: 0;
+  padding: 24px;
+  background: var(--admin-bg);
   overflow-y: auto;
 }
 </style>

@@ -5,7 +5,7 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { resolve } from 'path'
 
-export default defineConfig({
+export default defineConfig(() => ({
   plugins: [
     vue(),
     AutoImport({
@@ -27,9 +27,9 @@ export default defineConfig({
     port: 9084,
     proxy: {
       '/api': {
-        target: 'http://localhost:19084',
+        target: process.env.VITE_API_TARGET || 'http://localhost:19084',
         changeOrigin: true,
       },
     },
   },
-})
+}))

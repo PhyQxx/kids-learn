@@ -19,21 +19,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/index.vue'),
         meta: { title: '首页概览' },
       },
-      // 题库管理
       {
         path: 'question-bank',
         name: 'QuestionBank',
         component: () => import('@/views/content/QuestionBank.vue'),
         meta: { title: '题库管理' },
       },
-      // 内容管理 (闯关管理)
       {
         path: 'content',
         name: 'ContentExplorer',
         component: () => import('@/views/content/ContentExplorer.vue'),
         meta: { title: '闯关管理' },
       },
-      // 游戏化管理
       {
         path: 'pet/list',
         name: 'PetList',
@@ -52,7 +49,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/pet/decoration.vue'),
         meta: { title: '装饰管理' },
       },
-      // 成就管理
       {
         path: 'achievement/list',
         name: 'AchievementList',
@@ -71,7 +67,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/achievement/title.vue'),
         meta: { title: '称号管理' },
       },
-      // 系统管理
       {
         path: 'system/user',
         name: 'SystemUser',
@@ -117,7 +112,6 @@ const router = createRouter({
   routes,
 })
 
-// 路由守卫
 router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('admin_token')
   if (to.path !== '/login' && !token) {

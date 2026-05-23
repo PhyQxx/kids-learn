@@ -298,7 +298,8 @@ function defaultOptionsForType(type: number): QuestionOptionForm[] {
   return []
 }
 
-function onQuestionTypeChange(newType: number) {
+function onQuestionTypeChange(newType: string | number | boolean | undefined) {
+  if (typeof newType !== 'number') return
   // If switching types while creating/editing, we reset options to default for that type.
   // Warning: this overwrites current options.
   ElMessageBox.confirm('切换题型会重置下方的选项列表，确认切换吗？', '提示', { type: 'warning' })

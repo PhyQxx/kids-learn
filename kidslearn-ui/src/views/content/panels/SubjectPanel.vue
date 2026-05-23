@@ -97,7 +97,7 @@ async function fetchData() {
   } finally { loading.value = false }
 }
 
-function onAgeGroupChange(val: string) {
+function onAgeGroupChange(val: string | number) {
   emit('update:ageGroup', val ? Number(val) : null)
 }
 

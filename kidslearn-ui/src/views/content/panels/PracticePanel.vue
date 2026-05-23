@@ -14,7 +14,7 @@
       <el-table-column prop="name" label="练习名称" width="150" />
       <el-table-column prop="type" label="类型" width="100">
         <template #default="{ row }">
-          <el-tag :type="row.type === 'TIMED' ? 'warning' : ''">{{ row.type === 'TIMED' ? '限时挑战' : '无尽模式' }}</el-tag>
+          <el-tag :type="row.type === 'TIMED' ? 'warning' : undefined">{{ row.type === 'TIMED' ? '限时挑战' : '无尽模式' }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="description" label="描述" show-overflow-tooltip />
@@ -121,7 +121,7 @@ async function handleSave() {
   if (!props.subject) return
   saving.value = true
   try {
-    const data = { ...form, id: editingId.value, subjectId: props.subject.id }
+    const data: any = { ...form, id: editingId.value, subjectId: props.subject.id }
     if (data.type !== 'TIMED') {
       data.timeLimitSeconds = null
     }
