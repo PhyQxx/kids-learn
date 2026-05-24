@@ -12,7 +12,7 @@ public class User extends BaseEntity {
     private String password;
     private String nickname;
     private String avatar;
-    private Integer userType;   // 1孩子 2家长 3管理员
+    private Integer userType;   // 1普通用户 3管理员；历史数据中2也按普通用户处理
     private Integer status;
     private String realName;
     private Long roleId;

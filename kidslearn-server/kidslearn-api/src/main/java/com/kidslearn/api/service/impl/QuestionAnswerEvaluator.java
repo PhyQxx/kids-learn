@@ -21,6 +21,7 @@ final class QuestionAnswerEvaluator {
     private static final int TYPE_FILL = 3;
     private static final int TYPE_ORDER = 4;
     private static final int TYPE_MATCH = 5;
+    private static final int TYPE_VOICE = 6;
 
     private QuestionAnswerEvaluator() {}
 
@@ -30,6 +31,7 @@ final class QuestionAnswerEvaluator {
             case TYPE_ORDER -> evaluateOrder(options, answer);
             case TYPE_MATCH -> evaluateMatch(options, answer);
             case TYPE_FILL -> evaluateFill(options, answer);
+            case TYPE_VOICE -> evaluateVoice(options, answer);
             default -> evaluateSingle(options, answer); // SINGLE 和 TRUE_FALSE 的判断逻辑一致
         };
     }
@@ -96,15 +98,21 @@ final class QuestionAnswerEvaluator {
     private static Evaluation evaluateMatch(List<QuestionOption> options, String answer) {
         // 连线题：左侧(Label) 和 右侧(Content) 配对
         String correctAnswer = options.stream()
-            .map(option -> option.getOptionLabel() + "=" + option.getOptionLabel()) // Wait, previously it was label=label ?? That was a bug!
+            .map(option -> safe(option.getOptionLabel()) + "=" + safe(option.getOptionLabel()))
             .collect(Collectors.joining("|"));
             
-        // Fix the matching logic: optionLabel=optionContent
-        String fixedCorrectAnswer = options.stream()
-            .map(option -> safe(option.getOptionLabel()) + "=" + safe(option.getOptionContent()))
-            .collect(Collectors.joining("|"));
-            
-        return new Evaluation(normalizePairs(fixedCorrectAnswer).equals(normalizePairs(answer)), fixedCorrectAnswer);
+        return new Evaluation(normalizePairs(correctAnswer).equals(normalizePairs(answer)), correctAnswer);
+    }
+
+    private static Evaluation evaluateVoice(List<QuestionOption> options, String answer) {
+        String correctAnswer = options.stream()
+            .filter(option -> option.getIsCorrect() != null && option.getIsCorrect() == 1)
+            .findFirst()
+            .map(QuestionOption::getOptionContent)
+            .map(RichContentUtil::toPlainText)
+            .orElse("");
+
+        return new Evaluation(normalizeSpeech(correctAnswer).equals(normalizeSpeech(answer)), correctAnswer);
     }
 
     private static List<QuestionOption> sortedOptions(List<QuestionOption> options) {
@@ -132,6 +140,12 @@ final class QuestionAnswerEvaluator {
                     .sorted()
                     .collect(Collectors.joining("|"));
             });
+    }
+
+    private static String normalizeSpeech(String value) {
+        return safe(value)
+            .toLowerCase()
+            .replaceAll("[\\s\\p{Punct}\\p{IsPunctuation}]+", "");
     }
 
     private static String safe(String value) {

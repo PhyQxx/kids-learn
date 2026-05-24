@@ -83,7 +83,7 @@ const props = defineProps({
   title: { type: String, default: '' },
   showBack: { type: Boolean, default: false },
   showTopbar: { type: Boolean, default: true },
-  theme: { type: String, default: 'kids' }, // kids | learn | parent | dark
+  theme: { type: String, default: 'kids' }, // kids | learn | dark
   activeNav: { type: String, default: '' }
 })
 
@@ -102,11 +102,6 @@ const navKeyByPath = {
   '/pages/ranking/index': 'ranking',
   '/pages/achievement/index': 'achievement',
   '/pages/challenge/index': 'challenge',
-  '/pages/parent/index': 'parent',
-  '/pages/parent/monitor': 'parent',
-  '/pages/parent/report': 'parent',
-  '/pages/parent/time-control': 'parent',
-  '/pages/parent/family': 'parent',
   '/pages/mine/vip': 'vip'
 }
 
@@ -125,12 +120,6 @@ const currentNavKey = computed(() => {
 
 // 导航项
 const navItems = computed(() => {
-  if (userStore.isParentMode) {
-    return [
-      { key: 'parent', icon: '👨‍👩‍👧', label: '家长中心', path: '/pages/parent/index' },
-      { key: 'vip', icon: '👑', label: 'VIP会员', path: '/pages/mine/vip' }
-    ]
-  }
   return [
     { key: 'home', icon: '🏠', label: '首页', tab: 'home' },
     { key: 'learn', icon: '📚', label: '学习中心', tab: 'learn' },
@@ -358,12 +347,6 @@ function goBack() {
   .nav-label { color: $learn-blue; }
 }
 
-/* 家长主题青色激活 */
-.theme-parent .nav-item.active {
-  background: #E8F8F8;
-  .nav-label { color: $teal; }
-}
-
 /* VIP暗色主题 */
 .theme-dark {
   .sidebar {
@@ -425,10 +408,6 @@ function goBack() {
   font-size: 24px;
 }
 
-.theme-parent .user-avatar {
-  background: linear-gradient(135deg, $teal, $teal-dark);
-}
-
 .theme-dark .user-avatar {
   background: linear-gradient(135deg, $gold, #FFA500);
 }
@@ -471,11 +450,6 @@ function goBack() {
   justify-content: space-between;
   background: rgba(255, 255, 255, 0.82);
   border-bottom: 1px solid rgba(73, 98, 128, 0.06);
-}
-
-.theme-parent .topbar {
-  background: linear-gradient(135deg, $teal, $teal-dark);
-  .topbar-title { color: $white; }
 }
 
 .theme-dark .topbar {

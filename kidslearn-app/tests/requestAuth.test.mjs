@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { handleUnauthorizedResponse } from '../utils/requestAuth.mjs'
+import { handleUnauthorizedResponse, shouldAttemptTokenRefresh } from '../utils/requestAuth.mjs'
 
 test('handles HTTP 401 responses by logging out', () => {
   let loggedOut = false
@@ -36,4 +36,18 @@ test('ignores non-401 responses', () => {
 
   assert.equal(handled, false)
   assert.equal(loggedOut, false)
+})
+
+test('attempts token refresh for protected HTTP 401 responses', () => {
+  assert.equal(
+    shouldAttemptTokenRefresh({ statusCode: 401, data: { msg: 'Unauthorized' } }, '/learn/dashboard'),
+    true
+  )
+})
+
+test('does not attempt token refresh for refresh-token failures', () => {
+  assert.equal(
+    shouldAttemptTokenRefresh({ statusCode: 401, data: { msg: 'Unauthorized' } }, '/auth/refresh-token'),
+    false
+  )
 })

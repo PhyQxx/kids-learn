@@ -3,6 +3,7 @@ package com.kidslearn.api.controller.admin;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kidslearn.api.entity.GradeLevel;
 import com.kidslearn.api.mapper.GradeLevelMapper;
+import com.kidslearn.api.service.impl.AdminOperationLogService;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +19,7 @@ import java.util.List;
 public class AdminGradeLevelController {
 
     private final GradeLevelMapper gradeLevelMapper;
+    private final AdminOperationLogService adminOperationLogService;
 
     @Operation(summary = "年级列表")
     @GetMapping("/list")
@@ -43,6 +45,7 @@ public class AdminGradeLevelController {
     @DeleteMapping("/{id}")
     public R<Void> delete(@PathVariable Long id) {
         gradeLevelMapper.deleteById(id);
+        adminOperationLogService.write("grade-level", "delete", "grade-level", id, "delete grade level");
         return R.ok();
     }
 }

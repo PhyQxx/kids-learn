@@ -50,7 +50,7 @@ export function normalizeRankingList(rows = []) {
 
   return {
     podium: normalized.slice(0, 3),
-    list: normalized, // The list should contain all users
+    list: normalized.slice(3),
     me: normalized.find(row => row.isMe) || defaultMe()
   }
 }

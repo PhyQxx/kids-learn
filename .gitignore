@@ -35,6 +35,7 @@ Thumbs.db
 *.bak
 *.swp
 *~
+*.log
 .gstack/
 /.claude/settings.local.json
 /.codex-pet-runs/hina/decoded/base.png

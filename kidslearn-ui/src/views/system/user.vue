@@ -14,7 +14,7 @@
       <el-table-column prop="nickname" label="昵称" />
       <el-table-column prop="userType" label="类型" width="80">
         <template #default="{ row }">
-          <el-tag :type="row.userType === 3 ? 'warning' : row.userType === 2 ? 'info' : 'success'" size="small">
+          <el-tag :type="row.userType === 3 ? 'warning' : 'success'" size="small">
             {{ userTypeLabel(row.userType) }}
           </el-tag>
         </template>
@@ -51,8 +51,7 @@
         </el-form-item>
         <el-form-item label="用户类型">
           <el-select v-model="form.userType" style="width:100%">
-            <el-option label="孩子" :value="1" />
-            <el-option label="家长" :value="2" />
+            <el-option label="普通用户" :value="1" />
             <el-option label="管理员" :value="3" />
           </el-select>
         </el-form-item>
@@ -100,8 +99,7 @@ const form = reactive({
 
 function userTypeLabel(type: number) {
   if (type === 3) return '管理员'
-  if (type === 2) return '家长'
-  return '孩子'
+  return '普通用户'
 }
 
 async function fetchData() {
@@ -119,7 +117,7 @@ function openDialog(row?: any) {
       username: row.username,
       password: '',
       nickname: row.nickname || '',
-      userType: row.userType,
+      userType: row.userType === 3 ? 3 : 1,
       realName: row.realName || '',
       status: row.status,
     })

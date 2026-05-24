@@ -6,10 +6,15 @@ import lombok.Data;
 
 @Data
 public class PaymentCallbackDTO {
-    @NotBlank(message = "订单号不能为空")
+    @NotBlank(message = "orderNo is required")
     private String orderNo;
 
-    @NotNull(message = "支付状态不能为空")
+    @NotNull(message = "payStatus is required")
     private Integer payStatus;
-}
 
+    @NotNull(message = "timestamp is required")
+    private Long timestamp;
+
+    @NotBlank(message = "signature is required")
+    private String signature;
+}

@@ -9,6 +9,7 @@
     <el-table :data="tableData" stripe v-loading="loading">
       <el-table-column prop="roleName" label="角色名称" />
       <el-table-column prop="roleCode" label="角色代码" />
+      <el-table-column prop="permissions" label="权限码" min-width="220" show-overflow-tooltip />
       <el-table-column prop="description" label="描述" />
       <el-table-column label="操作" width="180">
         <template #default="{ row }">
@@ -18,10 +19,32 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑角色' : '新增角色'" width="500">
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑角色' : '新增角色'" width="640">
       <el-form :model="form" label-width="80px">
         <el-form-item label="角色名称"><el-input v-model="form.roleName" /></el-form-item>
         <el-form-item label="角色代码"><el-input v-model="form.roleCode" /></el-form-item>
+        <el-form-item label="权限码">
+          <div class="permission-editor">
+            <el-space wrap>
+              <el-tooltip
+                v-for="preset in ROLE_PERMISSION_PRESETS"
+                :key="preset.key"
+                :content="preset.description"
+                placement="top"
+              >
+                <el-button size="small" @click="applyPermissionPreset(preset.permissions)">
+                  {{ preset.name }}
+                </el-button>
+              </el-tooltip>
+            </el-space>
+            <el-input
+              v-model="form.permissions"
+              type="textarea"
+              :rows="5"
+              placeholder="每行一个权限码，如 admin:dashboard:read、admin:content:*、admin:*"
+            />
+          </div>
+        </el-form-item>
         <el-form-item label="描述"><el-input v-model="form.description" type="textarea" :rows="2" /></el-form-item>
       </el-form>
       <template #footer>
@@ -36,6 +59,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getRoleList, saveRole, deleteRole } from '@/api/request'
+import { ROLE_PERMISSION_PRESETS, mergePermissionCodes } from '@/utils/adminPermissions'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -43,7 +67,7 @@ const tableData = ref<any[]>([])
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 
-const form = reactive({ roleName: '', roleCode: '', description: '' })
+const form = reactive({ roleName: '', roleCode: '', permissions: '', description: '' })
 
 async function fetchData() {
   loading.value = true
@@ -55,8 +79,12 @@ async function fetchData() {
 
 function openDialog(row?: any) {
   if (row) { editingId.value = row.id; Object.assign(form, row) }
-  else { editingId.value = null; Object.assign(form, { roleName: '', roleCode: '', description: '' }) }
+  else { editingId.value = null; Object.assign(form, { roleName: '', roleCode: '', permissions: '', description: '' }) }
   dialogVisible.value = true
+}
+
+function applyPermissionPreset(permissions: string[]) {
+  form.permissions = mergePermissionCodes(form.permissions, permissions)
 }
 
 async function handleSave() {
@@ -76,3 +104,12 @@ async function handleDelete(id: number) {
 
 onMounted(() => fetchData())
 </script>
+
+<style scoped>
+.permission-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+</style>

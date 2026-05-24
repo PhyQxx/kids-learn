@@ -62,7 +62,7 @@ public class AdminDashboardStatsService {
         LocalDateTime startTime = start.atStartOfDay();
         LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
 
-        long totalUsers = userMapper.selectCount(new LambdaQueryWrapper<User>().eq(User::getUserType, 1));
+        long totalUsers = userMapper.selectCount(new LambdaQueryWrapper<User>().ne(User::getUserType, 3));
         long todayActiveUsers = dailyStatsMapper.selectCount(new LambdaQueryWrapper<DailyStats>().eq(DailyStats::getStatDate, today));
         long totalLevels = courseLevelMapper.selectCount(new LambdaQueryWrapper<>());
         long enabledLevels = courseLevelMapper.selectCount(new LambdaQueryWrapper<CourseLevel>().eq(CourseLevel::getStatus, 1));
@@ -84,6 +84,7 @@ public class AdminDashboardStatsService {
 
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("totalUsers", totalUsers);
+        stats.put("normalUsers", totalUsers);
         stats.put("todayActiveUsers", todayActiveUsers);
         stats.put("totalLevels", totalLevels);
         stats.put("totalQuestions", totalQuestions);

@@ -1,7 +1,6 @@
 package com.kidslearn.api.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import cn.hutool.crypto.digest.DigestUtil;
 import com.kidslearn.api.dto.auth.LoginDTO;
 import com.kidslearn.api.dto.auth.RegisterDTO;
 import com.kidslearn.api.dto.auth.TokenVO;
@@ -35,6 +34,7 @@ public class AuthServiceImpl implements AuthService {
     private final PetMapper petMapper;
     private final UserPetMapper userPetMapper;
     private final StringRedisTemplate redisTemplate;
+    private final PasswordHashService passwordHashService;
 
     @Override
     public TokenVO login(LoginDTO dto) {
@@ -45,37 +45,17 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException("用户名或密码错误");
         }
         String rawPassword = dto.getPassword();
-        String storedPassword = user.getPassword();
-        boolean matched;
-        if (storedPassword.startsWith("{MD5}")) {
-            matched = storedPassword.substring(5).equalsIgnoreCase(DigestUtil.md5Hex(rawPassword));
-        } else if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("{bcrypt}")) {
-            // BCrypt format - not available without spring-security-crypto
-            // Simple comparison as fallback (should add spring-security-crypto in production)
-            matched = storedPassword.equals(rawPassword);
-        } else {
-            matched = DigestUtil.md5Hex(rawPassword).equalsIgnoreCase(storedPassword);
-        }
-        if (!matched) {
+        if (!passwordHashService.matches(rawPassword, user.getPassword())) {
             throw new BusinessException("用户名或密码错误");
         }
         if (user.getStatus() == 0) {
             throw new BusinessException("账号已被禁用");
         }
 
-        // 家长验证模式，只验证，不生成token
-        if (dto.getLoginType() != null && dto.getLoginType() == 2) {
-            if (user.getUserType() != 2) {
-                // For family app, users register as type 1, parents use the same account to verify.
-                // In a stricter system, we'd check if they are the designated parent. 
-                // For now, if the password matches, we allow it.
-            }
-            TokenVO vo = new TokenVO();
-            vo.setAccessToken("parent-verification-only");
-            return vo;
-        }
-
         // update login time
+        if (passwordHashService.needsUpgrade(user.getPassword())) {
+            user.setPassword(passwordHashService.hash(rawPassword));
+        }
         user.setLastLoginTime(LocalDateTime.now());
         userMapper.updateById(user);
 
@@ -110,7 +90,7 @@ public class AuthServiceImpl implements AuthService {
         // create user (always family account)
         User user = new User();
         user.setUsername(dto.getUsername());
-        user.setPassword(DigestUtil.md5Hex(dto.getPassword()));
+        user.setPassword(passwordHashService.hash(dto.getPassword()));
         user.setNickname(dto.getNickname() != null ? dto.getNickname() : dto.getUsername());
         user.setUserType(1);
         user.setStatus(1);
@@ -189,7 +169,7 @@ public class AuthServiceImpl implements AuthService {
         if (user.getUserType() == 3) {
             userType = "ADMIN";
         } else {
-            userType = "CHILD";  // family accounts all use CHILD type
+            userType = "USER";
         }
         String accessToken = JwtUtil.generateToken(user.getId(), userType, RedisConstants.TOKEN_EXPIRE);
         String refreshToken = JwtUtil.generateToken(user.getId(), userType, RedisConstants.REFRESH_TOKEN_EXPIRE);
@@ -207,6 +187,7 @@ public class AuthServiceImpl implements AuthService {
         UserVO userInfo = new UserVO();
         BeanUtils.copyProperties(user, userInfo);
         userInfo.setUserId(user.getId());
+        userInfo.setUserType(user.getUserType() == 3 ? 3 : 1);
         // populate gradeLevel from child profile
         ChildProfile childProfile = childProfileMapper.selectOne(
             new LambdaQueryWrapper<ChildProfile>().eq(ChildProfile::getUserId, user.getId())

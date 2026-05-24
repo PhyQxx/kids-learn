@@ -41,7 +41,7 @@ export function richContentToSpeechText(value) {
   return content.blocks
     .map((block) => {
       if (block.type === 'paragraph') return block.text.trim()
-      return block.alt?.trim() || ''
+      return ''
     })
     .filter(Boolean)
     .join(' ')

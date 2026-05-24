@@ -8,7 +8,6 @@ export const useUserStore = defineStore('user', () => {
   const token = ref(uni.getStorageSync('token') || '')
   const refreshTokenStr = ref(uni.getStorageSync('refreshToken') || '')
   const userInfo = ref(JSON.parse(uni.getStorageSync('userInfo') || 'null'))
-  const isParentMode = ref(false)
   const sidebarCollapsed = ref(false)
   const ageGroup = ref(uni.getStorageSync('ageGroup') || 'lively') // 'macaron' | 'lively' | 'fresh'
 
@@ -31,10 +30,6 @@ export const useUserStore = defineStore('user', () => {
   function setUserInfo(info) {
     userInfo.value = info
     uni.setStorageSync('userInfo', JSON.stringify(info))
-  }
-
-  function setParentMode(val) {
-    isParentMode.value = val
   }
 
   function toggleSidebar() {
@@ -62,7 +57,6 @@ export const useUserStore = defineStore('user', () => {
     token.value = ''
     refreshTokenStr.value = ''
     userInfo.value = null
-    isParentMode.value = false
     ageGroup.value = 'lively'
     uni.removeStorageSync('token')
     uni.removeStorageSync('refreshToken')
@@ -72,8 +66,8 @@ export const useUserStore = defineStore('user', () => {
   }
 
   return {
-    token, refreshToken: refreshTokenStr, userInfo, isParentMode, sidebarCollapsed, ageGroup,
+    token, refreshToken: refreshTokenStr, userInfo, sidebarCollapsed, ageGroup,
     isLoggedIn, nickname, level, gold, themeClass, onboardingStep,
-    setToken, setUserInfo, setParentMode, toggleSidebar, setAgeGroup, logout
+    setToken, setUserInfo, toggleSidebar, setAgeGroup, logout
   }
 })

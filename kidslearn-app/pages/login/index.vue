@@ -53,7 +53,7 @@ export default {
       
       try {
         // 使用拦截器自动处理加载状态
-        const res = await login({ username, password, loginType: 1 }, { 
+        const res = await login({ username, password }, {
           showLoading: '正在进入星球...', 
           loadingMascot: '🚀' 
         })

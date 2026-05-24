@@ -1,6 +1,7 @@
 package com.kidslearn.api.interceptor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kidslearn.api.service.impl.AdminPermissionService;
 import com.kidslearn.common.constants.RedisConstants;
 import com.kidslearn.common.result.R;
 import com.kidslearn.common.util.JwtUtil;
@@ -21,6 +22,7 @@ public class AuthInterceptor implements HandlerInterceptor {
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final AdminPermissionService adminPermissionService;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -63,6 +65,12 @@ public class AuthInterceptor implements HandlerInterceptor {
                 if (!"ADMIN".equals(userType)) {
                     log.warn("权限不足: 非管理员尝试访问管理接口, userId: {}, userType: {}, path: {}", 
                         userId, userType, request.getRequestURI());
+                    sendError(response, R.fail("权限不足"), HttpServletResponse.SC_FORBIDDEN);
+                    return false;
+                }
+                if (!adminPermissionService.hasPermission(userId, request.getMethod(), request.getRequestURI())) {
+                    log.warn("权限不足: 管理员角色无操作权限, userId: {}, method: {}, path: {}",
+                        userId, request.getMethod(), request.getRequestURI());
                     sendError(response, R.fail("权限不足"), HttpServletResponse.SC_FORBIDDEN);
                     return false;
                 }

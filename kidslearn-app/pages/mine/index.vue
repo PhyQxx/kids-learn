@@ -31,7 +31,6 @@ export default {
         { icon: '📖', label: '错题本', url: '/pages/mine/wrong' },
         { icon: '👥', label: '好友列表', url: '' },
         { icon: '👑', label: 'VIP会员', url: '/pages/mine/vip' },
-        { icon: '👨‍👩‍👧', label: '家长中心', url: '/pages/parent/index' },
         { icon: '⚙️', label: '设置', url: '/pages/mine/settings' },
       ],
     }

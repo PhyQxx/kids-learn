@@ -243,7 +243,7 @@ const timeRange = ref('近 7 天')
 const timeRangeOptions = ['今日', '近 7 天', '近 30 天']
 
 const summaryMetrics = ref<SummaryMetric[]>([
-  { key: 'totalUsers', label: '注册用户', value: '0', badge: '实时', note: '累计注册儿童账号', tone: 'coral' },
+  { key: 'totalUsers', label: '注册用户', value: '0', badge: '实时', note: '累计注册普通账号', tone: 'coral' },
   { key: 'todayActiveUsers', label: '今日活跃', value: '0', badge: '今日', note: '今日有学习统计的用户', tone: 'teal' },
   { key: 'completionRate', label: '闯关完成率', value: '0%', badge: '近 7 天', note: '学习记录通过率', tone: 'gold' },
   { key: 'totalQuestions', label: '题目总量', value: '0', badge: '实时', note: '题库题目供给', tone: 'blue' },

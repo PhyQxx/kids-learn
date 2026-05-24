@@ -17,8 +17,8 @@ public class RegisterDTO {
     @Size(max = 20, message = "昵称最长20位")
     private String nickname;
 
-    private Integer userType; // 1孩子 2家长
-    private Integer loginType;
+    private Integer userType; // 兼容旧客户端；非管理员统一按普通用户处理
+    private Integer loginType; // 兼容旧客户端；后端不再区分家长/儿童登录
 
     // child fields
     private String birthDate;

@@ -10,7 +10,7 @@ import {
 test('normalizes order questions and builds ordered answer from original labels', () => {
   const question = normalizeQuizQuestion({
     id: 1,
-    questionType: 2,
+    questionType: 4,
     questionContent: '把词语排成句子',
     options: [
       { optionLabel: 'A', answerValue: 'C', optionContent: '学习', optionText: '学习' },
@@ -26,7 +26,7 @@ test('normalizes order questions and builds ordered answer from original labels'
 test('normalizes match questions from json pair option content', () => {
   const question = normalizeQuizQuestion({
     id: 2,
-    questionType: 3,
+    questionType: 5,
     questionContent: '连一连',
     options: [
       { optionLabel: 'A', answerValue: 'A', optionContent: '{"left":"大","right":"小"}' },
@@ -41,6 +41,6 @@ test('normalizes match questions from json pair option content', () => {
 })
 
 test('normalizes voice attempts for tolerant comparison', () => {
-  assert.equal(normalizeQuizQuestion({ questionType: 4, options: [] }).interactionType, 'voice')
+  assert.equal(normalizeQuizQuestion({ questionType: 6, options: [] }).interactionType, 'voice')
   assert.equal(normalizeSpeechAttempt(' I like apples! '), 'ilikeapples')
 })

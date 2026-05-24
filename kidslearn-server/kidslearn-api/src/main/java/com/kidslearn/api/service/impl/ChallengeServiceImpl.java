@@ -245,7 +245,7 @@ public class ChallengeServiceImpl implements ChallengeService {
             candidates = userMapper.selectList(
                 new LambdaQueryWrapper<User>()
                     .ne(User::getId, userId)
-                    .eq(User::getUserType, 1) // Child
+                    .ne(User::getUserType, 3)
                     .last("LIMIT 50")
             );
         }

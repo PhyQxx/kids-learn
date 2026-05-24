@@ -1,7 +1,7 @@
 import { refreshToken as doRefreshToken } from './auth'
 import { useUserStore } from '@/store/user'
 import { showLoading as startLoading, hideLoading as stopLoading } from '@/utils/loading'
-import { handleUnauthorizedResponse } from '@/utils/requestAuth.mjs'
+import { handleUnauthorizedResponse, shouldAttemptTokenRefresh } from '@/utils/requestAuth.mjs'
 
 // API 请求封装
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
@@ -9,6 +9,50 @@ export const BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 let isRefreshing = false
 let requestsToRetry = []
 let loadingCount = 0
+
+const retryWithFreshToken = async (options, responseData, resolve, reject, clearLoading) => {
+  if (!isRefreshing) {
+    isRefreshing = true
+    try {
+      const rToken = uni.getStorageSync('refreshToken')
+      if (!rToken) throw new Error('No refresh token')
+
+      const refreshRes = await doRefreshToken(rToken)
+      if (refreshRes && refreshRes.accessToken) {
+        useUserStore().setToken(refreshRes.accessToken, refreshRes.refreshToken)
+        options.header = options.header || {}
+        options.header['Authorization'] = `Bearer ${refreshRes.accessToken}`
+
+        request(options).then(resolve).catch(reject)
+
+        requestsToRetry.forEach(cb => cb(refreshRes.accessToken))
+        requestsToRetry = []
+      } else {
+        throw new Error('Refresh failed')
+      }
+    } catch (e) {
+      console.error('无感刷新失败，跳转登录', e)
+      requestsToRetry.forEach(cb => cb(null))
+      requestsToRetry = []
+      clearLoading()
+      useUserStore().logout()
+      reject(responseData)
+    } finally {
+      isRefreshing = false
+    }
+  } else {
+    requestsToRetry.push((newToken) => {
+      if (newToken) {
+        options.header = options.header || {}
+        options.header['Authorization'] = `Bearer ${newToken}`
+        request(options).then(resolve).catch(reject)
+      } else {
+        clearLoading()
+        reject(responseData)
+      }
+    })
+  }
+}
 
 const request = (options) => {
   return new Promise((resolve, reject) => {
@@ -42,9 +86,13 @@ const request = (options) => {
       },
       success: async (res) => {
         if (res.statusCode === 401) {
-          clearLoading()
-          handleUnauthorizedResponse(res, useUserStore())
-          reject(res.data || res)
+          if (shouldAttemptTokenRefresh(res, options.url)) {
+            await retryWithFreshToken(options, res.data || res, resolve, reject, clearLoading)
+          } else {
+            clearLoading()
+            handleUnauthorizedResponse(res, useUserStore())
+            reject(res.data || res)
+          }
           return
         }
 

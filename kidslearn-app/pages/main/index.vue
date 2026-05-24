@@ -51,18 +51,12 @@
       <view class="topbar">
         <view class="topbar-left">
           <text class="topbar-title">{{ currentTitle }}</text>
-          <text v-if="activeTab !== 'parent'" class="topbar-subtitle">选一个喜欢的任务开始吧</text>
+          <text class="topbar-subtitle">选一个喜欢的任务开始吧</text>
         </view>
         <view class="topbar-center"></view>
         <view class="topbar-right">
           <text class="greeting-text">你好，{{ userStore.nickname }} 👋</text>
           <view class="action-btn" @tap="goNotifications"><text>🔔</text></view>
-          <view v-if="activeTab !== 'parent'" class="parent-mode-btn" @tap="enterParentMode">
-            <text class="text-white text-xs">👨‍👩‍👧 家长模式</text>
-          </view>
-          <view v-if="activeTab === 'parent'" class="exit-parent-btn" @tap="exitParentMode">
-            <text class="text-white text-xs">退出家长模式</text>
-          </view>
         </view>
       </view>
 
@@ -74,7 +68,6 @@
           <PetContent v-if="loadedTabs.has('pet')" v-show="activeTab === 'pet'" />
           <RankingContent v-if="loadedTabs.has('ranking')" v-show="activeTab === 'ranking'" />
           <AchievementContent v-if="loadedTabs.has('achievement')" v-show="activeTab === 'achievement'" />
-          <ParentContent v-if="loadedTabs.has('parent')" v-show="activeTab === 'parent'" />
         </view>
       </scroll-view>
     </view>
@@ -92,7 +85,7 @@
 
 <script setup>
 import { ref, computed, provide, onMounted, reactive } from 'vue'
-import { onShow, onLoad } from '@dcloudio/uni-app'
+import { onLoad } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { useLearnStore } from '@/store/learn'
 import { getUserInfo, updateChildProfile } from '@/api/user'
@@ -103,7 +96,6 @@ import LearnContent from '@/components/learn/LearnContent.vue'
 import PetContent from '@/components/pet/PetContent.vue'
 import RankingContent from '@/components/ranking/RankingContent.vue'
 import AchievementContent from '@/components/achievement/AchievementContent.vue'
-import ParentContent from '@/components/parent/ParentContent.vue'
 import GradeSelectPopup from '@/components/GradeSelectPopup.vue'
 import GlobalLoadingOverlay from '@/components/common/GlobalLoadingOverlay.vue'
 
@@ -155,7 +147,6 @@ provide('switchTab', switchTab)
 
 const themeClass = computed(() => {
   if (activeTab.value === 'learn') return 'theme-learn'
-  if (activeTab.value === 'parent') return 'theme-parent'
   return 'theme-kids'
 })
 
@@ -165,19 +156,12 @@ const currentTitle = computed(() => {
     learn: '学习中心',
     pet: '我的宠物',
     ranking: '排行榜',
-    achievement: '成就中心',
-    parent: '家长中心'
+    achievement: '成就中心'
   }
   return map[activeTab.value] || ''
 })
 
 const navItems = computed(() => {
-  if (userStore.isParentMode) {
-    return [
-      { key: 'parent', icon: '👨‍👩‍👧', label: '家长中心' },
-      { key: 'vip', icon: '👑', label: 'VIP会员' }
-    ]
-  }
   return [
     { key: 'home', icon: '🏠', label: '首页' },
     { key: 'learn', icon: '📚', label: '学习中心' },
@@ -190,15 +174,6 @@ const navItems = computed(() => {
 
 function toggleSidebar() {
   userStore.toggleSidebar()
-}
-
-function enterParentMode() {
-  uni.navigateTo({ url: '/pages/parent/gate' })
-}
-
-function exitParentMode() {
-  userStore.setParentMode(false)
-  activeTab.value = 'home'
 }
 
 function goSettings() {
@@ -250,24 +225,14 @@ async function handleGradeConfirm(grade) {
 }
 
 onMounted(() => {
-  if (userStore.isParentMode) {
-    loadedTabs.add('parent')
-    activeTab.value = 'parent'
-  }
   // 检测年级配置
   checkGradeSetup()
 })
 
 onLoad((query) => {
-  if (query.tab && ['home', 'learn', 'pet', 'ranking', 'achievement', 'parent'].includes(query.tab)) {
+  if (query.tab && ['home', 'learn', 'pet', 'ranking', 'achievement'].includes(query.tab)) {
     if (!loadedTabs.has(query.tab)) loadedTabs.add(query.tab)
     activeTab.value = query.tab
-  }
-})
-
-onShow(() => {
-  if (userStore.isParentMode && activeTab.value !== 'parent') {
-    activeTab.value = 'parent'
   }
 })
 </script>
@@ -407,14 +372,6 @@ onShow(() => {
 /* 学习主题 */
 .theme-learn .nav-item.active { background: #E8F0FE; .nav-label { color: $learn-blue; } }
 
-/* 家长主题 */
-.theme-parent {
-  .sidebar { background: $white; }
-  .nav-item.active { background: #E8F8F8; .nav-label { color: $teal; } }
-  .topbar { background: linear-gradient(135deg, $teal, $teal-dark); }
-  .topbar-title { color: $white; }
-}
-
 /* 用户区域 */
 .sidebar-footer { padding: 12px; }
 .sidebar-divider { height: 1px; background: rgba(0,0,0,0.06); margin-bottom: 12px; }
@@ -462,21 +419,6 @@ onShow(() => {
   background: #F1F6FC; display: flex; align-items: center; justify-content: center;
   font-size: 18px; cursor: pointer;
   &:active { transform: scale(0.92); }
-}
-
-.parent-mode-btn {
-  background: linear-gradient(135deg, $teal, $teal-dark);
-  border-radius: 100px; padding: 6px 16px;
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
-  cursor: pointer;
-  &:active { transform: scale(0.95); }
-}
-
-.exit-parent-btn {
-  background: $error;
-  border-radius: 100px; padding: 6px 16px;
-  cursor: pointer;
-  &:active { transform: scale(0.95); }
 }
 
 .content-scroll {
@@ -547,6 +489,5 @@ onShow(() => {
   .topbar { height: 56px; min-height: 56px; padding: 0 14px; }
   .topbar-title { font-size: 17px; }
   .topbar-subtitle { display: none; }
-  .parent-mode-btn, .exit-parent-btn { display: none; }
 }
 </style>

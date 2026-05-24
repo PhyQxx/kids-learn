@@ -36,7 +36,7 @@ export function normalizeQuizQuestion(raw = {}) {
 
 export function buildOrderAnswer(items = []) {
   // 后端比对的是 optionLabel 或者 optionContent 的逗号拼接
-  return items.map(item => item.label && item.label !== '_' ? item.label : item.text).join(',')
+  return items.map(item => item.answerValue || (item.label && item.label !== '_' ? item.label : item.text)).join(',')
 }
 
 export function buildMatchAnswer(pairs = {}) {
@@ -61,15 +61,13 @@ function normalizeOption(option = {}, index, questionType) {
   // 对于连线题(5)，optionLabel 是左边，optionContent 是右边
   
   let label = option.optionLabel || ''
-  if (questionType === 1 && !label) label = fallbackLabel
+  if ((questionType === 1 || questionType === 4 || questionType === 5) && !label) label = fallbackLabel
   
-  const text = option.optionText || richContentToText(option.optionContent) || ''
+  const pair = questionType === 5 ? parseMatchPair(option.optionContent) : null
+  const text = option.optionText || pair?.right || richContentToText(option.optionContent) || ''
   
   // answerValue 决定了前端选中该项时提交的值
-  let answerValue = label || text
-  if (questionType === 5) {
-    answerValue = text // 右侧的值
-  }
+  const answerValue = questionType === 5 ? label : (option.answerValue || label || text)
 
   return {
     label,
@@ -78,11 +76,29 @@ function normalizeOption(option = {}, index, questionType) {
     speechText: option.optionSpeechText || '',
     audioUrl: option.optionAudioUrl || '',
     nodes: richContentToNodes(option.optionContent),
-    pairLeft: label || text,
-    pairRight: text,
+    pairLeft: pair?.left || label || text,
+    pairRight: pair?.right || text,
     correct: false, // will be updated by submit answer
     isCorrect: option.isCorrect // from backend, usually hidden, but might be present in practice
   }
+}
+
+function parseMatchPair(value) {
+  if (!value) return null
+
+  try {
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        left: parsed.left ? String(parsed.left) : '',
+        right: parsed.right ? String(parsed.right) : ''
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
 }
 
 function interactionEmoji(interactionType) {

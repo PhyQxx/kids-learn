@@ -10,10 +10,10 @@ public class CommonConstants {
     /** 最大分页大小 */
     public static final int MAX_PAGE_SIZE = 100;
 
-    /** 用户类型：孩子 */
-    public static final int USER_TYPE_CHILD = 1;
-    /** 用户类型：家长 */
-    public static final int USER_TYPE_PARENT = 2;
+    /** 用户类型：普通用户 */
+    public static final int USER_TYPE_NORMAL = 1;
+    /** 用户类型：管理员 */
+    public static final int USER_TYPE_ADMIN = 3;
 
     /** 状态：禁用 */
     public static final int STATUS_DISABLED = 0;

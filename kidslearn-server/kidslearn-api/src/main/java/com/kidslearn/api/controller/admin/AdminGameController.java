@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.service.impl.AdminOperationLogService;
 import com.kidslearn.common.result.PageResult;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,6 +30,7 @@ public class AdminGameController {
     private final StickerMapper stickerMapper;
     private final StickerSeriesMapper stickerSeriesMapper;
     private final TitleMapper titleMapper;
+    private final AdminOperationLogService adminOperationLogService;
 
     // ==================== 宠物管理 ====================
 
@@ -50,6 +52,7 @@ public class AdminGameController {
     @DeleteMapping("/pet/{id}")
     public R<Void> petDelete(@PathVariable Long id) {
         petMapper.deleteById(id);
+        adminOperationLogService.write("game", "delete", "pet", id, "delete pet");
         return R.ok();
     }
 
@@ -86,6 +89,7 @@ public class AdminGameController {
     @DeleteMapping("/pet-item/{id}")
     public R<Void> petItemDelete(@PathVariable Long id) {
         petItemMapper.deleteById(id);
+        adminOperationLogService.write("game", "delete", "pet-item", id, "delete pet item");
         return R.ok();
     }
 
@@ -109,6 +113,7 @@ public class AdminGameController {
     @DeleteMapping("/decoration/{id}")
     public R<Void> decorationDelete(@PathVariable Long id) {
         petDecorationMapper.deleteById(id);
+        adminOperationLogService.write("game", "delete", "decoration", id, "delete decoration");
         return R.ok();
     }
 
@@ -166,6 +171,7 @@ public class AdminGameController {
     public R<Void> achievementDelete(@PathVariable Long id) {
         achievementMapper.deleteById(id);
         achievementTierMapper.delete(new LambdaQueryWrapper<AchievementTier>().eq(AchievementTier::getAchieveId, id));
+        adminOperationLogService.write("game", "delete", "achievement", id, "delete achievement");
         return R.ok();
     }
 
@@ -189,6 +195,7 @@ public class AdminGameController {
     @DeleteMapping("/sticker/{id}")
     public R<Void> stickerDelete(@PathVariable Long id) {
         stickerMapper.deleteById(id);
+        adminOperationLogService.write("game", "delete", "sticker", id, "delete sticker");
         return R.ok();
     }
 
@@ -218,6 +225,7 @@ public class AdminGameController {
     @DeleteMapping("/title/{id}")
     public R<Void> titleDelete(@PathVariable Long id) {
         titleMapper.deleteById(id);
+        adminOperationLogService.write("game", "delete", "title", id, "delete title");
         return R.ok();
     }
 }

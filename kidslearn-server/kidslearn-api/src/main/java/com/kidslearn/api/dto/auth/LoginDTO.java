@@ -14,5 +14,5 @@ public class LoginDTO {
     @Size(min = 6, max = 50, message = "密码长度6-50位")
     private String password;
 
-    private Integer loginType; // 1孩子 2家长
+    private Integer loginType; // 兼容旧客户端；后端不再区分家长/儿童登录
 }

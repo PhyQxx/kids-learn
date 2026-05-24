@@ -7,6 +7,7 @@ import com.kidslearn.api.entity.CourseLevel;
 import com.kidslearn.api.entity.Question;
 import com.kidslearn.api.entity.QuestionOption;
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.service.impl.AdminOperationLogService;
 import com.kidslearn.api.service.impl.QuestionAudioService;
 import com.kidslearn.common.result.PageResult;
 import com.kidslearn.common.result.R;
@@ -29,6 +30,7 @@ public class AdminContentController {
     private final QuestionMapper questionMapper;
     private final QuestionOptionMapper questionOptionMapper;
     private final QuestionAudioService questionAudioService;
+    private final AdminOperationLogService adminOperationLogService;
 
     // ==================== 学科管理 ====================
 
@@ -60,6 +62,7 @@ public class AdminContentController {
     @DeleteMapping("/subject/{id}")
     public R<Void> subjectDelete(@PathVariable Long id) {
         subjectMapper.deleteById(id);
+        adminOperationLogService.write("content", "delete", "subject", id, "delete subject");
         return R.ok();
     }
 
@@ -93,6 +96,7 @@ public class AdminContentController {
     @DeleteMapping("/level/{id}")
     public R<Void> levelDelete(@PathVariable Long id) {
         courseLevelMapper.deleteById(id);
+        adminOperationLogService.write("content", "delete", "level", id, "delete level");
         return R.ok();
     }
 
@@ -170,6 +174,7 @@ public class AdminContentController {
     public R<Void> questionDelete(@PathVariable Long id) {
         questionMapper.deleteById(id);
         questionOptionMapper.delete(new LambdaQueryWrapper<QuestionOption>().eq(QuestionOption::getQuestionId, id));
+        adminOperationLogService.write("content", "delete", "question", id, "delete question");
         return R.ok();
     }
 

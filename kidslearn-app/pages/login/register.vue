@@ -155,7 +155,6 @@ async function doRegister() {
       username: username.value,
       password: password.value,
       nickname: nickname.value,
-      loginType: 1,
       phone: phone.value,
       gradeLevel: selectedGrade.value
     }, { 

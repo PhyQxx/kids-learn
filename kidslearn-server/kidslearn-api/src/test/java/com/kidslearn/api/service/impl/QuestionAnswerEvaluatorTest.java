@@ -12,7 +12,7 @@ class QuestionAnswerEvaluatorTest {
 
     @Test
     void evaluatesOrderAnswerByOriginalOptionOrder() {
-        Question question = question(2);
+        Question question = question(4);
         List<QuestionOption> options = List.of(
             option("A", "我", 0, 1),
             option("B", "爱", 0, 2),
@@ -25,7 +25,7 @@ class QuestionAnswerEvaluatorTest {
 
     @Test
     void evaluatesMatchAnswerByPairs() {
-        Question question = question(3);
+        Question question = question(5);
         List<QuestionOption> options = List.of(
             option("A", "{\"left\":\"大\",\"right\":\"小\"}", 0, 1),
             option("B", "{\"left\":\"上\",\"right\":\"下\"}", 0, 2)
@@ -37,7 +37,7 @@ class QuestionAnswerEvaluatorTest {
 
     @Test
     void evaluatesVoiceAnswerWithPunctuationTolerance() {
-        Question question = question(4);
+        Question question = question(6);
         List<QuestionOption> options = List.of(option("A", "I like apples", 1, 1));
 
         assertTrue(QuestionAnswerEvaluator.evaluate(question, options, "I like apples!").correct());

@@ -6,6 +6,7 @@ import com.kidslearn.api.entity.DictData;
 import com.kidslearn.api.entity.DictType;
 import com.kidslearn.api.mapper.DictDataMapper;
 import com.kidslearn.api.mapper.DictTypeMapper;
+import com.kidslearn.api.service.impl.AdminOperationLogService;
 import com.kidslearn.common.result.PageResult;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +24,7 @@ public class AdminDictController {
 
     private final DictTypeMapper dictTypeMapper;
     private final DictDataMapper dictDataMapper;
+    private final AdminOperationLogService adminOperationLogService;
 
     // ==================== 字典类型 ====================
 
@@ -62,6 +64,7 @@ public class AdminDictController {
     public R<Void> dictTypeDelete(@PathVariable Long id) {
         dictTypeMapper.deleteById(id);
         dictDataMapper.delete(new LambdaQueryWrapper<DictData>().eq(DictData::getDictTypeId, id));
+        adminOperationLogService.write("dict", "delete", "dict-type", id, "delete dict type");
         return R.ok();
     }
 
@@ -106,6 +109,7 @@ public class AdminDictController {
     @DeleteMapping("/data/{id}")
     public R<Void> dictDataDelete(@PathVariable Long id) {
         dictDataMapper.deleteById(id);
+        adminOperationLogService.write("dict", "delete", "dict-data", id, "delete dict data");
         return R.ok();
     }
 }
