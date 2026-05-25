@@ -11,7 +11,7 @@
           <text class="brand-emoji">🌍</text>
           <view class="brand-text">
             <text class="brand-name">趣学星球</text>
-            <text class="brand-sub">KidsLearn</text>
+            <text class="brand-sub">{{ isParentMode ? 'Parent' : 'KidsLearn' }}</text>
           </view>
         </view>
       </view>
@@ -61,6 +61,14 @@
           <slot name="topbar-center"></slot>
         </view>
         <view class="topbar-right">
+          <view v-if="isParentMode" class="mode-switch-btn student-mode-btn" @tap="goStudentMode">
+            <text class="mode-switch-icon">🏠</text>
+            <text class="mode-switch-text">学生模式</text>
+          </view>
+          <view v-else class="mode-switch-btn parent-mode-btn" @tap="goParentMode">
+            <text class="parent-mode-icon">🛡️</text>
+            <text class="mode-switch-text">家长模式</text>
+          </view>
           <slot name="topbar-right"></slot>
         </view>
       </view>
@@ -72,12 +80,14 @@
         </view>
       </scroll-view>
     </view>
+    <ParentModePasswordGate ref="parentModeGate" />
   </view>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useUserStore } from '@/store/user'
+import ParentModePasswordGate from '@/components/ParentModePasswordGate.vue'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -89,6 +99,7 @@ const props = defineProps({
 
 const userStore = useUserStore()
 const collapsed = computed(() => userStore.sidebarCollapsed)
+const parentModeGate = ref(null)
 
 const themeClass = computed(() => `theme-${props.theme}`)
 
@@ -102,6 +113,7 @@ const navKeyByPath = {
   '/pages/ranking/index': 'ranking',
   '/pages/achievement/index': 'achievement',
   '/pages/challenge/index': 'challenge',
+  '/pages/parent/index': 'parent',
   '/pages/mine/vip': 'vip'
 }
 
@@ -118,16 +130,25 @@ const currentNavKey = computed(() => {
   return 'home'
 })
 
+const isParentMode = computed(() => ['parent', 'vip'].includes(currentNavKey.value))
+
+const studentNavItems = [
+  { key: 'home', icon: '🏠', label: '首页', tab: 'home' },
+  { key: 'learn', icon: '📚', label: '学习中心', tab: 'learn' },
+  { key: 'pet', icon: '🐱', label: '我的宠物', tab: 'pet' },
+  { key: 'challenge', icon: '⚔️', label: 'PK挑战', path: '/pages/challenge/index' },
+  { key: 'ranking', icon: '🏆', label: '排行榜', tab: 'ranking' },
+  { key: 'achievement', icon: '🏅', label: '成就', tab: 'achievement' }
+]
+
+const parentNavItems = [
+  { key: 'parent', icon: '🛡️', label: '家长中心', path: '/pages/parent/index' },
+  { key: 'vip', icon: '👑', label: '会员中心', path: '/pages/mine/vip' }
+]
+
 // 导航项
 const navItems = computed(() => {
-  return [
-    { key: 'home', icon: '🏠', label: '首页', tab: 'home' },
-    { key: 'learn', icon: '📚', label: '学习中心', tab: 'learn' },
-    { key: 'pet', icon: '🐱', label: '我的宠物', tab: 'pet' },
-    { key: 'challenge', icon: '⚔️', label: 'PK挑战', path: '/pages/challenge/index' },
-    { key: 'ranking', icon: '🏆', label: '排行榜', tab: 'ranking' },
-    { key: 'achievement', icon: '🏅', label: '成就', tab: 'achievement' }
-  ]
+  return isParentMode.value ? parentNavItems : studentNavItems
 })
 
 function toggleSidebar() {
@@ -154,6 +175,14 @@ function goBack() {
   uni.navigateBack({ fail: () => {
     uni.reLaunch({ url: '/pages/main/index' })
   }})
+}
+
+function goParentMode() {
+  parentModeGate.value?.open()
+}
+
+function goStudentMode() {
+  uni.reLaunch({ url: '/pages/main/index' })
 }
 </script>
 
@@ -497,6 +526,42 @@ function goBack() {
   gap: 8px;
 }
 
+.mode-switch-btn {
+  min-width: 104px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: $radius;
+  background: #FFF0E8;
+  color: $primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(255, 122, 89, 0.12);
+
+  &:active { transform: scale(0.96); }
+}
+
+.student-mode-btn {
+  background: #E8F0FE;
+  color: $learn-blue;
+  box-shadow: 0 8px 18px rgba(74, 144, 217, 0.12);
+}
+
+.parent-mode-icon,
+.mode-switch-icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.mode-switch-text {
+  line-height: 1;
+}
+
 .content-scroll {
   flex: 1;
   height: 0; // 让flex正确计算高度
@@ -553,6 +618,8 @@ function goBack() {
   }
   .topbar-title { font-size: 17px; }
   .back-btn { width: 42px; height: 42px; }
+  .mode-switch-btn { min-width: 44px; width: 44px; padding: 0; }
+  .mode-switch-text { display: none; }
   .content-wrapper { padding: 14px 14px 18px; }
 }
 </style>

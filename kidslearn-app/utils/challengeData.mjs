@@ -32,6 +32,17 @@ export function normalizeChallengeDashboard(payload = {}) {
   }
 }
 
+export function createChallengePayload(input = 'RANKED', opponentId) {
+  const source = typeof input === 'object' && input !== null
+    ? input
+    : { type: input, opponentId }
+  const payload = { type: normalizeChallengeType(source.type) }
+  if (source.opponentId !== undefined && source.opponentId !== null && source.opponentId !== '') {
+    payload.opponentId = Number(source.opponentId)
+  }
+  return payload
+}
+
 export function normalizeChallengeRecords(records = []) {
   if (!Array.isArray(records)) return []
   return records.map((record, index) => ({
@@ -81,4 +92,9 @@ function defaultMe() {
 function clampPercent(value) {
   const numeric = Number(value || 0)
   return Math.max(0, Math.min(100, numeric))
+}
+
+function normalizeChallengeType(type) {
+  const upper = String(type || 'RANKED').trim().toUpperCase()
+  return upper === 'FRIEND' || upper === 'FRIENDS' ? 'FRIEND' : 'RANKED'
 }

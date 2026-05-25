@@ -88,19 +88,10 @@ const tabItems = ref([
 ])
 
 const completedCount = ref(0)
-const totalCount = ref(36)
-const currentTitle = ref('学习小将')
+const totalCount = ref(0)
+const currentTitle = ref('暂无称号')
 
-const achievements = ref([
-  { id: 1, name: '初次通关', desc: '完成第一个关卡', icon: '🌟', status: 'done', rarity: 'bronze', claimed: true },
-  { id: 2, name: '满星达人', desc: '获得10个三星评价', icon: '⭐', status: 'done', rarity: 'silver', claimed: false },
-  { id: 3, name: '语文小能手', desc: '完成所有语文课程', icon: '📖', status: 'done', rarity: 'gold', claimed: false },
-  { id: 4, name: '7日连续打卡', desc: '连续学习7天', icon: '🔥', status: 'progress', rarity: 'bronze', percent: 71, current: 5, target: 7 },
-  { id: 5, name: '数学天才', desc: '完成50道数学题', icon: '🔢', status: 'progress', rarity: 'silver', percent: 50, current: 25, target: 50 },
-  { id: 6, name: '全科达人', desc: '学习6门学科', icon: '🎓', status: 'progress', rarity: 'gold', percent: 67, current: 4, target: 6 },
-  { id: 7, name: '贴纸收藏家', desc: '收集100张贴纸', icon: '🎭', status: 'locked', rarity: 'legendary' },
-  { id: 8, name: '全国冠军', desc: '全国排行榜第一', icon: '🏆', status: 'locked', rarity: 'legendary' }
-])
+const achievements = ref([])
 
 const claimableCount = computed(() =>
   achievements.value.filter(ach => ach.status === 'done' && !ach.claimed).length
@@ -109,12 +100,6 @@ const claimAllLabel = computed(() => {
   if (claimingAll.value) return '领取中...'
   return claimableCount.value > 0 ? `一键领取（${claimableCount.value}）` : '一键领取'
 })
-
-function applyMockData() {
-  completedCount.value = 12
-  totalCount.value = 36
-  currentTitle.value = '学习小将'
-}
 
 async function loadData() {
   loading.value = true
@@ -158,8 +143,11 @@ async function loadData() {
       totalCount.value = prog.totalAchievements || totalCount.value
     }
   } catch (e) {
-    console.log('AchievementContent: 使用模拟数据', e)
-    applyMockData()
+    console.log('AchievementContent: 成就加载失败', e)
+    completedCount.value = 0
+    totalCount.value = 0
+    currentTitle.value = '暂无称号'
+    achievements.value = []
   } finally {
     loading.value = false
   }

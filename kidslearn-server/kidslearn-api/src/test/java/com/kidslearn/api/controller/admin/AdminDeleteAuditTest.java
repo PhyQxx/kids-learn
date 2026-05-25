@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.impl.AdminOperationLogService;
 import com.kidslearn.api.service.impl.QuestionAudioService;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,8 @@ class AdminDeleteAuditTest {
             questionMapper,
             questionOptionMapper,
             mock(QuestionAudioService.class),
-            logService
+            logService,
+            mock(AiService.class)
         );
 
         controller.subjectDelete(11L);

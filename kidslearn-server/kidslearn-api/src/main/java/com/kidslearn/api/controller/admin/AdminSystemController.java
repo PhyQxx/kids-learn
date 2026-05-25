@@ -194,14 +194,26 @@ public class AdminSystemController {
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "20") Integer pageSize) {
         Page<AppConfig> p = appConfigMapper.selectPage(new Page<>(page, pageSize),
-            new LambdaQueryWrapper<AppConfig>().orderByAsc(AppConfig::getId));
-        return R.ok(new PageResult<>(p.getRecords(), p.getTotal(), page, pageSize));
+            new LambdaQueryWrapper<AppConfig>()
+                .notLikeRight(AppConfig::getConfigKey, "ai.")
+                .orderByAsc(AppConfig::getId));
+        List<AppConfig> visibleConfigs = p.getRecords().stream()
+            .filter(config -> !isAiConfigKey(config.getConfigKey()))
+            .toList();
+        return R.ok(new PageResult<>(visibleConfigs, p.getTotal(), page, pageSize));
     }
 
     @PostMapping("/config/save")
     public R<Void> configSave(@RequestBody AppConfig config) {
+        if (config != null && isAiConfigKey(config.getConfigKey())) {
+            return R.fail("AI配置请在AI配置页面维护");
+        }
         appConfigMapper.updateById(config);
         return R.ok();
+    }
+
+    private static boolean isAiConfigKey(String configKey) {
+        return configKey != null && configKey.startsWith("ai.");
     }
 
     // ==================== 操作日志 ====================

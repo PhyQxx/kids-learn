@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
 import com.kidslearn.api.realtime.RealtimeSessionRegistry;
+import com.kidslearn.api.service.AiService;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,6 +34,7 @@ public class ParentController {
     private final CourseLevelMapper courseLevelMapper;
     private final SubjectMapper subjectMapper;
     private final RealtimeSessionRegistry realtimeSessionRegistry;
+    private final AiService aiService;
 
     @Operation(summary = "获取学习报告")
     @GetMapping("/report")
@@ -40,7 +42,18 @@ public class ParentController {
             HttpServletRequest request,
             @RequestParam(required = false) String month) {
         Long userId = (Long) request.getAttribute("userId");
+        return R.ok(buildReport(userId, month));
+    }
 
+    @Operation(summary = "生成家长AI学习总结")
+    @GetMapping("/ai-summary")
+    public R<Map<String, Object>> getAiSummary(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        Map<String, Object> report = buildReport(userId, null);
+        return R.ok(normalizeAiSummary(aiService.generateParentSummary(report, Map.of())));
+    }
+
+    private Map<String, Object> buildReport(Long userId, String month) {
         Map<String, Object> result = new HashMap<>();
 
         // Parse month or use current month
@@ -165,7 +178,7 @@ public class ParentController {
         }
         result.put("todayRecords", todayRecordList);
 
-        return R.ok(result);
+        return result;
     }
 
     @Operation(summary = "获取时间控制设置")
@@ -295,6 +308,10 @@ public class ParentController {
     @GetMapping("/realtime-monitor")
     public R<Map<String, Object>> getRealtimeMonitor(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
+        return R.ok(buildRealtimeMonitor(userId));
+    }
+
+    private Map<String, Object> buildRealtimeMonitor(Long userId) {
         Family family = findFamily(userId);
         Map<String, Object> result = new HashMap<>();
         result.put("generatedAt", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
@@ -303,7 +320,7 @@ public class ParentController {
             result.put("family", Map.of("familyName", "", "inviteCode", ""));
             result.put("children", List.of());
             result.put("summary", buildMonitorSummary(List.of()));
-            return R.ok(result);
+            return result;
         }
 
         result.put("family", Map.of(
@@ -325,7 +342,27 @@ public class ParentController {
 
         result.put("children", childSnapshots);
         result.put("summary", buildMonitorSummary(childSnapshots));
-        return R.ok(result);
+        return result;
+    }
+
+    private Map<String, Object> normalizeAiSummary(Map<String, Object> raw) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("summary", raw != null ? Objects.toString(raw.getOrDefault("summary", ""), "") : "");
+        result.put("highlights", normalizeStringList(raw != null ? raw.get("highlights") : null));
+        result.put("concerns", normalizeStringList(raw != null ? raw.get("concerns") : null));
+        result.put("suggestions", normalizeStringList(raw != null ? raw.get("suggestions") : null));
+        return result;
+    }
+
+    private List<String> normalizeStringList(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        return list.stream()
+            .filter(Objects::nonNull)
+            .map(Object::toString)
+            .filter(text -> !text.isBlank())
+            .collect(Collectors.toList());
     }
 
     private Family findFamily(Long userId) {

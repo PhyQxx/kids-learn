@@ -12,5 +12,7 @@ public interface AuthService {
 
     TokenVO refreshToken(String refreshToken);
 
+    void verifyPassword(Long userId, String password);
+
     void logout(Long userId);
 }

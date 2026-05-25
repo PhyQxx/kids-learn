@@ -96,6 +96,7 @@ public class ChallengeServiceImpl implements ChallengeService {
         record.setOpponentScore(opponentScore);
         record.setIsWinner(settled.isWinner());
         record.setRewardGold(settled.rewardGold());
+        record.setRankDelta(settled.rankDelta());
         record.setPlayTime(LocalDateTime.now());
         challengeRecordMapper.insert(record);
 

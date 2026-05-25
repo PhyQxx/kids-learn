@@ -24,6 +24,7 @@
         { "path": "pages/achievement/sticker", "style": { "navigationStyle": "custom", "navigationBarTitleText": "贴纸册" } },
         { "path": "pages/ranking/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "排行榜" } },
         { "path": "pages/challenge/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "挑战赛" } },
+        { "path": "pages/parent/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "家长中心" } },
         { "path": "pages/mine/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "个人中心" } },
         { "path": "pages/mine/records", "style": { "navigationStyle": "custom", "navigationBarTitleText": "学习记录" } },
         { "path": "pages/mine/wrong", "style": { "navigationStyle": "custom", "navigationBarTitleText": "错题本" } },

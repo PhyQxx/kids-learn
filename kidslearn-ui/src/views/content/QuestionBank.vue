@@ -64,6 +64,16 @@
     />
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑题目' : '新增题目'" width="860px">
+      <div class="ai-tools">
+        <el-input
+          v-model="aiKnowledgePoint"
+          placeholder="输入知识点或出题要求，如：10以内加法、认识颜色"
+          clearable
+        />
+        <el-button type="primary" plain :loading="aiGenerating" @click="handleAiGenerate">AI生成题目</el-button>
+        <el-button plain :loading="aiAnalysisLoading" @click="handleAiAnalysis">AI补解析</el-button>
+      </div>
+
       <el-form :model="form" label-width="90px">
 
         <el-form-item label="所属学科">
@@ -215,7 +225,17 @@
 import { computed, reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import RichContentEditor from '@/components/RichContentEditor.vue'
-import { deleteQuestion, generateQuestionAudio, getQuestionList, getQuestionOptions, saveQuestion, getSubjectList, getGradeLevelList } from '@/api/request'
+import {
+  deleteQuestion,
+  generateAiQuestionAnalysis,
+  generateAiQuestionDraft,
+  generateQuestionAudio,
+  getQuestionList,
+  getQuestionOptions,
+  saveQuestion,
+  getSubjectList,
+  getGradeLevelList,
+} from '@/api/request'
 import {
   richContentSpeech,
   richContentSummary,
@@ -233,6 +253,8 @@ type QuestionOptionForm = {
 const loading = ref(false)
 const saving = ref(false)
 const generatingAudio = ref(false)
+const aiGenerating = ref(false)
+const aiAnalysisLoading = ref(false)
 const tableData = ref<any[]>([])
 const subjects = ref<any[]>([])
 const grades = ref<any[]>([])
@@ -246,6 +268,7 @@ const filterType = ref<number | ''>('')
 
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
+const aiKnowledgePoint = ref('')
 
 const form = reactive({
   subjectId: null as number | null,
@@ -445,6 +468,73 @@ async function handleGenerateAudio() {
   }
 }
 
+async function handleAiGenerate() {
+  const subjectName = subjectLabel(Number(form.subjectId))
+  const gradeName = gradeLabel(Number(form.gradeLevelId))
+  if (!form.subjectId || !form.gradeLevelId) {
+    ElMessage.warning('请先选择学科和年级')
+    return
+  }
+
+  aiGenerating.value = true
+  try {
+    const res = await generateAiQuestionDraft({
+      subjectName,
+      gradeName,
+      questionType: form.questionType,
+      knowledgePoint: aiKnowledgePoint.value,
+    })
+    if (res.code === 200 && res.data) {
+      if (res.data.questionContent) form.questionContent = res.data.questionContent
+      if (res.data.analysis) form.analysis = res.data.analysis
+      if (Array.isArray(res.data.options) && res.data.options.length > 0) {
+        form.options = res.data.options.map((option, index) => ({
+          optionLabel: option.optionLabel || String.fromCharCode(65 + index),
+          optionContent: option.optionContent || '',
+          isCorrect: option.isCorrect ?? (index === 0 ? 1 : 0),
+          sortOrder: option.sortOrder ?? index,
+        }))
+      }
+      syncSpeechTextFromContent()
+      ElMessage.success('AI题目已生成，请审核后保存')
+    } else {
+      ElMessage.error(res.msg || 'AI题目生成失败')
+    }
+  } finally {
+    aiGenerating.value = false
+  }
+}
+
+async function handleAiAnalysis() {
+  if (!form.questionContent) {
+    ElMessage.warning('请先填写题目内容')
+    return
+  }
+  const correctAnswer = collectCorrectAnswer()
+  if (!correctAnswer) {
+    ElMessage.warning('请先配置正确答案')
+    return
+  }
+
+  aiAnalysisLoading.value = true
+  try {
+    const res = await generateAiQuestionAnalysis({
+      questionContent: richContentSummary(form.questionContent, 300),
+      correctAnswer,
+      options: form.options.map(option => richContentSummary(option.optionContent, 120)).filter(Boolean),
+      existingAnalysis: richContentSummary(form.analysis, 300),
+    })
+    if (res.code === 200 && res.data?.analysis) {
+      form.analysis = res.data.analysis
+      ElMessage.success('AI解析已生成，请审核后保存')
+    } else {
+      ElMessage.error(res.msg || 'AI解析生成失败')
+    }
+  } finally {
+    aiAnalysisLoading.value = false
+  }
+}
+
 async function handleDelete(id: number) {
   await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' })
   const res = await deleteQuestion(id)
@@ -508,6 +598,14 @@ function syncSpeechToContent() {
 
 function hasQuestionAudio(questionContent?: string) {
   return Boolean(richContentSpeech(questionContent).audioUrl)
+}
+
+function collectCorrectAnswer() {
+  const correctOptions = form.options
+    .filter(option => option.isCorrect === 1)
+    .map(option => option.optionLabel || richContentSummary(option.optionContent, 120))
+    .filter(Boolean)
+  return correctOptions.join('；')
 }
 
 function questionTypeLabel(type: number) {
@@ -606,5 +704,22 @@ onMounted(() => {
 
 .audio-player {
   width: 100%;
+}
+
+.ai-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #e8f0fe;
+  border-radius: 8px;
+  background: #f7fbff;
+}
+
+@media (max-width: 760px) {
+  .ai-tools {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -11,6 +11,7 @@ import com.kidslearn.api.mapper.ChildProfileMapper;
 import com.kidslearn.api.mapper.GradeLevelMapper;
 import com.kidslearn.api.mapper.ParentProfileMapper;
 import com.kidslearn.api.mapper.UserMapper;
+import com.kidslearn.api.service.AuthService;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +22,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.Map;
 
 @Tag(name = "用户接口")
 @RestController
@@ -32,6 +34,7 @@ public class UserController {
     private final ChildProfileMapper childProfileMapper;
     private final ParentProfileMapper parentProfileMapper;
     private final GradeLevelMapper gradeLevelMapper;
+    private final AuthService authService;
 
     @Operation(summary = "获取用户信息")
     @GetMapping("/info")
@@ -113,6 +116,14 @@ public class UserController {
             user.setOnboardingStep(step);
             userMapper.updateById(user);
         }
+        return R.ok();
+    }
+
+    @Operation(summary = "验证当前账号密码")
+    @PostMapping("/verify-password")
+    public R<Void> verifyPassword(HttpServletRequest request, @RequestBody Map<String, String> body) {
+        Long userId = (Long) request.getAttribute("userId");
+        authService.verifyPassword(userId, body.get("password"));
         return R.ok();
     }
 }

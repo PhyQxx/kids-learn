@@ -50,7 +50,10 @@ async function fetchData() {
   loading.value = true
   try {
     const res = await getConfigList({ page: currentPage.value, pageSize: pageSize.value })
-    if (res.code === 200) { tableData.value = res.data.list; total.value = res.data.total }
+    if (res.code === 200) {
+      tableData.value = (res.data.list || []).filter(item => !String(item.configKey || '').startsWith('ai.'))
+      total.value = res.data.total
+    }
   } finally { loading.value = false }
 }
 

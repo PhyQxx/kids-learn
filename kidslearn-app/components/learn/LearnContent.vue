@@ -81,6 +81,8 @@ import { onShow } from '@dcloudio/uni-app'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
 import { getRecords } from '@/api/learn'
+import { getParentReport, getTimeControl } from '@/api/parent'
+import { ensureLearningAccess } from '@/utils/learningAccess.mjs'
 
 const learnStore = useLearnStore()
 const userStore = useUserStore()
@@ -99,7 +101,25 @@ const iconMap = {
 
 const recentLearn = ref([])
 
-function goMode(mode) {
+function showLearningBlocked(message) {
+  uni.showModal({
+    title: '休息一下',
+    content: message,
+    showCancel: false
+  })
+}
+
+async function canStartLearning() {
+  return ensureLearningAccess({
+    fetchTimeControl: getTimeControl,
+    fetchReport: getParentReport,
+    showBlockedMessage: showLearningBlocked
+  })
+}
+
+async function goMode(mode) {
+  if (!(await canStartLearning())) return
+
   if (mode === 'level') {
     uni.navigateTo({ url: '/pages/learn/subjects' })
   } else if (mode === 'practice') {
@@ -157,7 +177,9 @@ watch(gradeLevelId, () => {
   loadData()
 })
 
-function goCourse(item) {
+async function goCourse(item) {
+  if (!(await canStartLearning())) return
+
   learnStore.setLevel({ id: item.courseId, name: item.levelName })
   const grade = gradeLevelId.value || ''
   uni.navigateTo({ url: `/pages/learn/quiz?levelId=${item.courseId}&gradeLevelId=${grade}` })

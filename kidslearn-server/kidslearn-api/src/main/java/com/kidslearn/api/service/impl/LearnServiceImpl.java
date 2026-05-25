@@ -1242,21 +1242,26 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public List<PracticeModeVO> getPracticeModes(Long userId, Long subjectId) {
-        List<PracticeModeVO> modes = new ArrayList<>();
-        PracticeModeVO vo = new PracticeModeVO();
-        vo.setId(subjectId != null ? subjectId : 1L);
-        vo.setName("综合练习");
-        vo.setDescription("涵盖所选学科所有知识点的大量题目练习");
-        vo.setIcon("📚");
-        vo.setType("ENDLESS");
-        vo.setTimeLimitSeconds(null);
-        modes.add(vo);
-        return modes;
+        List<PracticeMode> configuredModes = practiceModeMapper.selectList(
+            new LambdaQueryWrapper<PracticeMode>()
+                .eq(PracticeMode::getStatus, 1)
+                .eq(subjectId != null, PracticeMode::getSubjectId, subjectId)
+                .orderByAsc(PracticeMode::getSortOrder)
+                .orderByAsc(PracticeMode::getId)
+        );
+        if (!configuredModes.isEmpty()) {
+            return configuredModes.stream().map(this::toPracticeModeVO).collect(Collectors.toList());
+        }
+        return List.of(defaultPracticeMode(subjectId));
     }
 
     @Override
     public Map<String, Object> startPractice(Long userId, Long practiceModeId) {
-        Long subjectId = practiceModeId;
+        PracticeMode mode = practiceModeMapper.selectById(practiceModeId);
+        if (mode != null && !Integer.valueOf(1).equals(mode.getStatus())) {
+            throw new BusinessException("练习模式已下线");
+        }
+        Long subjectId = mode != null ? mode.getSubjectId() : practiceModeId;
 
         User user = userMapper.selectById(userId);
         ChildProfile profile = childProfileMapper.selectOne(new LambdaQueryWrapper<ChildProfile>().eq(ChildProfile::getUserId, userId));
@@ -1281,12 +1286,35 @@ public class LearnServiceImpl implements LearnService {
 
         Map<String, Object> result = new HashMap<>();
         result.put("practiceSessionId", System.currentTimeMillis());
-        result.put("modeId", subjectId);
-        result.put("modeName", "专项练习");
-        result.put("type", "ENDLESS");
-        result.put("timeLimit", 0);
+        result.put("modeId", mode != null ? mode.getId() : subjectId);
+        result.put("modeName", mode != null ? mode.getName() : "专项练习");
+        result.put("type", mode != null && mode.getType() != null ? mode.getType() : "ENDLESS");
+        result.put("timeLimit", mode != null && mode.getTimeLimitSeconds() != null ? mode.getTimeLimitSeconds() : 0);
         result.put("questions", formattedQuestions);
         return result;
+    }
+
+    private PracticeModeVO toPracticeModeVO(PracticeMode mode) {
+        PracticeModeVO vo = new PracticeModeVO();
+        vo.setId(mode.getId());
+        vo.setName(mode.getName());
+        vo.setDescription(mode.getDescription());
+        vo.setIcon(mode.getIcon());
+        vo.setType(mode.getType());
+        vo.setTimeLimitSeconds(mode.getTimeLimitSeconds());
+        vo.setTags(mode.getTags());
+        return vo;
+    }
+
+    private PracticeModeVO defaultPracticeMode(Long subjectId) {
+        PracticeModeVO vo = new PracticeModeVO();
+        vo.setId(subjectId != null ? subjectId : 1L);
+        vo.setName("综合练习");
+        vo.setDescription("涵盖所选学科所有知识点的大量题目练习");
+        vo.setIcon("📚");
+        vo.setType("ENDLESS");
+        vo.setTimeLimitSeconds(null);
+        return vo;
     }
 
     private Map<String, Object> formatQuestion(Question q) {

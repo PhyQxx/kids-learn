@@ -32,6 +32,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '闯关管理' },
       },
       {
+        path: 'content/audit',
+        name: 'ContentAudit',
+        component: () => import('@/views/content/AuditQueue.vue'),
+        meta: { title: '内容审核' },
+      },
+      {
         path: 'pet/list',
         name: 'PetList',
         component: () => import('@/views/pet/list.vue'),
@@ -84,6 +90,12 @@ const routes: RouteRecordRaw[] = [
         name: 'SystemConfig',
         component: () => import('@/views/system/config.vue'),
         meta: { title: '系统配置' },
+      },
+      {
+        path: 'system/ai',
+        name: 'SystemAiConfig',
+        component: () => import('@/views/system/AiConfig.vue'),
+        meta: { title: 'AI配置' },
       },
       {
         path: 'system/log',

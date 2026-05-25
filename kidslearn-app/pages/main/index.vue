@@ -56,6 +56,10 @@
         <view class="topbar-center"></view>
         <view class="topbar-right">
           <text class="greeting-text">你好，{{ userStore.nickname }} 👋</text>
+          <view class="parent-mode-btn" @tap="goParentMode">
+            <text class="parent-mode-icon">🛡️</text>
+            <text class="parent-mode-text">家长模式</text>
+          </view>
           <view class="action-btn" @tap="goNotifications"><text>🔔</text></view>
         </view>
       </view>
@@ -81,6 +85,7 @@
   />
 
   <GlobalLoadingOverlay />
+  <ParentModePasswordGate ref="parentModeGate" />
 </template>
 
 <script setup>
@@ -89,6 +94,8 @@ import { onLoad } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { useLearnStore } from '@/store/learn'
 import { getUserInfo, updateChildProfile } from '@/api/user'
+import { getParentReport, getTimeControl } from '@/api/parent'
+import { ensureLearningAccess } from '@/utils/learningAccess.mjs'
 import { soundManager } from '@/utils/sound'
 
 import HomeContent from '@/components/home/HomeContent.vue'
@@ -98,6 +105,7 @@ import RankingContent from '@/components/ranking/RankingContent.vue'
 import AchievementContent from '@/components/achievement/AchievementContent.vue'
 import GradeSelectPopup from '@/components/GradeSelectPopup.vue'
 import GlobalLoadingOverlay from '@/components/common/GlobalLoadingOverlay.vue'
+import ParentModePasswordGate from '@/components/ParentModePasswordGate.vue'
 
 const userStore = useUserStore()
 const learnStore = useLearnStore()
@@ -106,6 +114,7 @@ const activeTab = ref('home')
 const collapsed = computed(() => userStore.sidebarCollapsed)
 const loadedTabs = reactive(new Set(['home']))
 const showGradePopup = ref(false)
+const parentModeGate = ref(null)
 
 // 向子组件暴露年级弹窗状态，避免签到弹窗同时弹出
 provide('gradePopupVisible', showGradePopup)
@@ -184,7 +193,27 @@ function goNotifications() {
   uni.showToast({ title: '暂无新消息', icon: 'none' })
 }
 
-function goSubject(subject) {
+function goParentMode() {
+  soundManager.play('tap')
+  parentModeGate.value?.open()
+}
+
+function showLearningBlocked(message) {
+  uni.showModal({
+    title: '休息一下',
+    content: message,
+    showCancel: false
+  })
+}
+
+async function goSubject(subject) {
+  const allowed = await ensureLearningAccess({
+    fetchTimeControl: getTimeControl,
+    fetchReport: getParentReport,
+    showBlockedMessage: showLearningBlocked
+  })
+  if (!allowed) return
+
   learnStore.setSubject(subject)
   // 移动端首页今日学习进入专项练习，不再是闯关
   uni.navigateTo({ url: `/pages/learn/quiz?practiceModeId=${subject.id}&timeLimit=0` })
@@ -414,6 +443,28 @@ onLoad((query) => {
 
 .greeting-text { font-size: 15px; color: $text-secondary; margin-right: 4px; font-weight: 600; }
 
+.parent-mode-btn {
+  min-width: 104px;
+  height: 42px;
+  padding: 0 14px;
+  border-radius: $radius;
+  background: #FFF0E8;
+  color: $primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(255, 122, 89, 0.12);
+  &:active { transform: scale(0.96); }
+}
+
+.parent-mode-icon { font-size: 17px; line-height: 1; }
+.parent-mode-text { line-height: 1; }
+
 .action-btn {
   width: 48px; height: 48px; border-radius: $radius;
   background: #F1F6FC; display: flex; align-items: center; justify-content: center;
@@ -444,6 +495,8 @@ onLoad((query) => {
   .content-wrapper { padding: 16px; }
   .topbar { padding: 0 16px; }
   .greeting-text { display: none; }
+  .parent-mode-btn { min-width: 46px; width: 46px; padding: 0; }
+  .parent-mode-text { display: none; }
 }
 
 @media (max-width: 640px) {

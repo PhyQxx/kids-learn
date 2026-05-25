@@ -219,14 +219,6 @@ const subjects = ref([
 
 const topRankers = ref([])
 
-// Mock 数据 fallback
-function applyMockData() {
-  completedTasks.value = 2
-  totalTasks.value = 5
-  myRank.value = null
-  achievementCount.value = 32
-}
-
 async function loadData() {
   loading.value = true
   try {
@@ -293,8 +285,12 @@ async function loadData() {
       achievementCount.value = prog.completedAchievements || 0
     }
   } catch (e) {
-    console.log('HomeContent: 使用模拟数据', e)
-    applyMockData()
+    console.log('HomeContent: 数据加载失败', e)
+    completedTasks.value = 0
+    totalTasks.value = 0
+    myRank.value = null
+    achievementCount.value = 0
+    topRankers.value = []
   } finally {
     loading.value = false
     // 加载薄弱点推荐（不阻塞主流程）

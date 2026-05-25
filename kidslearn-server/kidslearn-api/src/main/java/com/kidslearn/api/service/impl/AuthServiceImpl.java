@@ -48,7 +48,7 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordHashService.matches(rawPassword, user.getPassword())) {
             throw new BusinessException("用户名或密码错误");
         }
-        if (user.getStatus() == 0) {
+        if (Integer.valueOf(0).equals(user.getStatus())) {
             throw new BusinessException("账号已被禁用");
         }
 
@@ -155,6 +155,20 @@ public class AuthServiceImpl implements AuthService {
             throw e;
         } catch (Exception e) {
             throw new BusinessException("刷新Token失败");
+        }
+    }
+
+    @Override
+    public void verifyPassword(Long userId, String password) {
+        if (userId == null || password == null || password.isBlank()) {
+            throw new BusinessException("密码错误");
+        }
+        User user = userMapper.selectById(userId);
+        if (user == null || !passwordHashService.matches(password, user.getPassword())) {
+            throw new BusinessException("密码错误");
+        }
+        if (Integer.valueOf(0).equals(user.getStatus())) {
+            throw new BusinessException("账号已被禁用");
         }
     }
 

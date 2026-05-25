@@ -7,6 +7,7 @@ import com.kidslearn.api.entity.CourseLevel;
 import com.kidslearn.api.entity.Question;
 import com.kidslearn.api.entity.QuestionOption;
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.impl.AdminOperationLogService;
 import com.kidslearn.api.service.impl.QuestionAudioService;
 import com.kidslearn.common.result.PageResult;
@@ -14,10 +15,12 @@ import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Tag(name = "管理后台-内容管理")
 @RestController
@@ -31,6 +34,7 @@ public class AdminContentController {
     private final QuestionOptionMapper questionOptionMapper;
     private final QuestionAudioService questionAudioService;
     private final AdminOperationLogService adminOperationLogService;
+    private final AiService aiService;
 
     // ==================== 学科管理 ====================
 
@@ -121,6 +125,7 @@ public class AdminContentController {
 
     @Operation(summary = "新增/编辑题目")
     @PostMapping("/question/save")
+    @Transactional
     public R<Void> questionSave(@RequestBody Map<String, Object> body) {
         Long id = body.get("id") != null ? Long.valueOf(body.get("id").toString()) : null;
         Question question = new Question();
@@ -178,6 +183,36 @@ public class AdminContentController {
         return R.ok();
     }
 
+    @Operation(summary = "AI生成题目草稿")
+    @PostMapping("/question/ai-generate")
+    public R<Map<String, Object>> questionAiGenerate(@RequestBody Map<String, Object> body) {
+        String subjectName = safe(body.get("subjectName"));
+        String gradeName = safe(body.get("gradeName"));
+        Integer questionType = parseInt(body.get("questionType"), 1);
+        String knowledgePoint = safe(body.get("knowledgePoint"));
+
+        Map<String, Object> draft = aiService.generateQuestionDraft(subjectName, gradeName, questionType, knowledgePoint);
+        if (draft == null || draft.isEmpty()) {
+            return R.fail("AI题目生成暂不可用");
+        }
+        return R.ok(draft);
+    }
+
+    @Operation(summary = "AI生成题目解析")
+    @PostMapping("/question/ai-analysis")
+    public R<Map<String, String>> questionAiAnalysis(@RequestBody Map<String, Object> body) {
+        String questionContent = safe(body.get("questionContent"));
+        String correctAnswer = safe(body.get("correctAnswer"));
+        String existingAnalysis = safe(body.get("existingAnalysis"));
+        List<String> options = parseStringList(body.get("options"));
+
+        String analysis = aiService.generateQuestionAnalysis(questionContent, correctAnswer, options, existingAnalysis);
+        if (analysis == null || analysis.isBlank()) {
+            return R.fail("AI解析生成暂不可用");
+        }
+        return R.ok(Map.of("analysis", analysis));
+    }
+
     @Operation(summary = "获取题目选项")
     @GetMapping("/question/{id}/options")
     public R<List<QuestionOption>> questionOptions(@PathVariable Long id) {
@@ -185,5 +220,30 @@ public class AdminContentController {
             new LambdaQueryWrapper<QuestionOption>().eq(QuestionOption::getQuestionId, id).orderByAsc(QuestionOption::getSortOrder)
         );
         return R.ok(options);
+    }
+
+    private static String safe(Object value) {
+        return value == null ? "" : value.toString().trim();
+    }
+
+    private static Integer parseInt(Object value, Integer defaultValue) {
+        if (value == null) return defaultValue;
+        try {
+            return Integer.valueOf(value.toString());
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    private static List<String> parseStringList(Object value) {
+        if (!(value instanceof List<?> list)) {
+            return List.of();
+        }
+        return list.stream()
+            .filter(Objects::nonNull)
+            .map(Object::toString)
+            .map(String::trim)
+            .filter(item -> !item.isBlank())
+            .toList();
     }
 }

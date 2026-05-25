@@ -124,7 +124,7 @@ const myRankData = ref({ rank: '-', name: '我', avatar: '👦', level: 0, city:
 
 const rankList = ref([])
 
-function applyMockData() {
+function clearRankingData() {
   podiumData.value = []
   rankList.value = []
   myRankData.value = { rank: '-', name: '我', avatar: '👦', level: 0, city: '', score: 0, stars: 0 }
@@ -152,8 +152,8 @@ async function loadData() {
       myRankData.value = normalized.me
     }
   } catch (e) {
-    console.log('RankingContent: 使用模拟数据', e)
-    applyMockData()
+    console.log('RankingContent: 排行榜加载失败', e)
+    clearRankingData()
   } finally {
     loading.value = false
   }

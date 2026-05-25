@@ -51,12 +51,6 @@ question:
     temp-dir: ${QUESTION_AUDIO_TEMP_DIR:${java.io.tmpdir}}
     timeout: ${QUESTION_AUDIO_TIMEOUT:5m}
 
-ai:
-  api-key: ${AI_API_KEY:}
-  base-url: ${AI_BASE_URL:https://api.deepseek.com}
-  model: ${AI_MODEL:deepseek-chat}
-  timeout: ${AI_TIMEOUT:15}
-
 payment:
   callback:
     secret: ${PAYMENT_CALLBACK_SECRET:}

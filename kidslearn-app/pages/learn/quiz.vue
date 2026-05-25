@@ -242,7 +242,11 @@
 
       <!-- 答错反馈 -->
       <view v-if="showWrong" class="feedback-overlay wrong-overlay">
-        <text class="feedback-text text-title text-bold text-white animate-shake">❌ 再想想</text>
+        <view class="wrong-feedback-card animate-shake">
+          <text class="feedback-text text-title text-bold text-white">❌ 再想想</text>
+          <text v-if="wrongAiLoading" class="wrong-ai-text">AI老师正在讲一讲...</text>
+          <text v-else-if="wrongAiExplanation" class="wrong-ai-text">{{ wrongAiExplanation }}</text>
+        </view>
       </view>
     </view>
   </AppLayout>
@@ -256,7 +260,7 @@ import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
 import { usePetStore } from '@/store/pet'
-import { getQuestions, submitAnswer, completeLevel, getHint, startPractice } from '@/api/learn'
+import { getQuestions, submitAnswer, completeLevel, getHint, startPractice, getExplainWrong } from '@/api/learn'
 import { submitChallengeResult } from '@/api/challenge'
 import { getUserInfo } from '@/api/user'
 import { resolveQuestionSpeech } from '@/utils/questionSpeech.mjs'
@@ -344,6 +348,8 @@ const fillAttempt = ref('')
 const voiceListening = ref(false)
 const showCorrect = ref(false)
 const showWrong = ref(false)
+const wrongAiLoading = ref(false)
+const wrongAiExplanation = ref('')
 const countdown = ref(60)
 const timeLimit = ref(60)
 const usedTimeInQuiz = ref(0)
@@ -756,10 +762,13 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
         if (res?.petExp) showPetExpGain(res.petExp)
       } else {
         showWrong.value = true
+        wrongAiExplanation.value = ''
+        wrongAiLoading.value = true
         // 增加较明显的震动反馈
         uni.vibrateLong()
         soundManager.play('fail')
         playFeedbackAudio('wrong')
+        loadWrongAiExplanation(q.id, res?.explanationText)
         // Mark correct answer in options
         if (res?.correctAnswer) {
           const cOpt = q.options.find(o => (o.answerValue || o.label) === res.correctAnswer)
@@ -769,10 +778,13 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
       setTimeout(() => {
         showCorrect.value = false
         showWrong.value = false
+        wrongAiLoading.value = false
         nextQuestion()
-      }, isCorrect ? 2500 : 3000)
+      }, isCorrect ? 2500 : 6500)
     }).catch(() => {
       showWrong.value = true
+      wrongAiExplanation.value = ''
+      wrongAiLoading.value = false
       playFeedbackAudio('wrong')
       setTimeout(() => { showWrong.value = false; nextQuestion() }, 3000)
     })
@@ -785,6 +797,8 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
 
 function nextQuestion() {
   selectedAnswer.value = ''
+  wrongAiExplanation.value = ''
+  wrongAiLoading.value = false
   eliminatedOptions.value = new Set()
   if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value++
@@ -794,6 +808,22 @@ function nextQuestion() {
     setTimeout(() => questionToSpeech(), 250)
   } else {
     finishQuiz()
+  }
+}
+
+async function loadWrongAiExplanation(questionId, fallbackText = '') {
+  if (!questionId) {
+    wrongAiExplanation.value = fallbackText || ''
+    wrongAiLoading.value = false
+    return
+  }
+  try {
+    const res = await getExplainWrong(questionId)
+    wrongAiExplanation.value = res?.aiExplanation || res?.analysisText || fallbackText || ''
+  } catch (e) {
+    wrongAiExplanation.value = fallbackText || ''
+  } finally {
+    wrongAiLoading.value = false
   }
 }
 
@@ -1465,6 +1495,26 @@ onUnmounted(() => {
 }
 
 .feedback-text { text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2); }
+
+.wrong-feedback-card {
+  width: min(560px, 88%);
+  padding: 18px 22px;
+  border-radius: $radius-md;
+  background: rgba(231, 76, 60, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  box-shadow: 0 12px 30px rgba(231, 76, 60, 0.24);
+}
+
+.wrong-ai-text {
+  color: $white;
+  font-size: 15px;
+  line-height: 1.55;
+  font-weight: 700;
+}
 
 .feedback-content {
   display: flex;

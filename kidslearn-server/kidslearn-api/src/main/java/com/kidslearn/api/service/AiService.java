@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -96,11 +97,6 @@ public class AiService {
             return null;
         }
 
-        String apiKey = getApiKey();
-        String baseUrl = getBaseUrl();
-        String model = getModel();
-        int timeout = getTimeout();
-
         StringBuilder optionStr = new StringBuilder();
         for (int i = 0; i < options.size(); i++) {
             optionStr.append((char) ('A' + i)).append(". ").append(options.get(i)).append("\n");
@@ -114,42 +110,384 @@ public class AiService {
         );
 
         try {
-            Map<String, Object> body = Map.of(
-                "model", model,
-                "messages", List.of(
-                    Map.of("role", "system", "content", systemPrompt),
-                    Map.of("role", "user", "content", userPrompt)
-                ),
-                "max_tokens", 300,
-                "temperature", 0.7
-            );
-
-            String jsonBody = objectMapper.writeValueAsString(body);
-
-            String url = baseUrl.endsWith("/v1") ? baseUrl + "/chat/completions" : baseUrl + "/v1/chat/completions";
-
-            HttpResponse response = HttpRequest.post(url)
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .body(jsonBody)
-                .timeout(timeout * 1000)
-                .execute();
-
-            if (response.isOk()) {
-                JsonNode root = objectMapper.readTree(response.body());
-                JsonNode choices = root.get("choices");
-                if (choices != null && choices.isArray() && choices.size() > 0) {
-                    JsonNode message = choices.get(0).get("message");
-                    if (message != null && message.has("content")) {
-                        return message.get("content").asText();
-                    }
-                }
-            }
-            log.warn("AI API returned non-OK status: {} body: {}", response.getStatus(), response.body());
-            return null;
+            return chatCompletion(List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
+            ), 300, 0.7);
         } catch (Exception e) {
             log.error("AI explanation failed", e);
             return null;
         }
+    }
+
+    public Map<String, Object> generateQuestionDraft(
+        String subjectName,
+        String gradeName,
+        Integer questionType,
+        String knowledgePoint
+    ) {
+        if (!isAvailable()) {
+            return Map.of();
+        }
+
+        String typeName = questionTypeName(questionType);
+        String systemPrompt = "你是儿童学习平台的题库编辑。请生成适合儿童的单道题，内容安全、语言简洁、答案唯一。只返回JSON，不要解释。";
+        String userPrompt = """
+            请生成一道题目草稿。
+            学科：%s
+            年级：%s
+            题型：%s
+            知识点：%s
+
+            JSON格式：
+            {
+              "questionContent": "题干文本",
+              "analysis": "100字以内儿童友好解析",
+              "options": [
+                {"optionLabel":"A","optionContent":"选项文本","isCorrect":1,"sortOrder":0}
+              ]
+            }
+            选择题给4个选项；判断题给“正确/错误”；填空题给1-3个可接受答案；排序题/连线题给3-5项。
+            """.formatted(blankDefault(subjectName, "未指定"), blankDefault(gradeName, "未指定"), typeName, blankDefault(knowledgePoint, "基础练习"));
+
+        try {
+            String content = chatCompletion(List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
+            ), 900, 0.5);
+            return normalizeQuestionDraft(content, questionType);
+        } catch (Exception e) {
+            log.error("AI question generation failed", e);
+            return Map.of();
+        }
+    }
+
+    public String generateQuestionAnalysis(
+        String questionContent,
+        String correctAnswer,
+        List<String> options,
+        String existingAnalysis
+    ) {
+        if (!isAvailable()) {
+            return null;
+        }
+
+        String optionText = options == null || options.isEmpty() ? "无" : String.join("；", options);
+        String systemPrompt = "你是一位耐心的儿童教育老师。请把题目解析写得简短、准确、鼓励孩子理解，不要直接责备。";
+        String userPrompt = """
+            题目：%s
+            选项：%s
+            正确答案：%s
+            原解析：%s
+            请输出100字以内解析，只返回解析正文。
+            """.formatted(blankDefault(questionContent, "未提供"), optionText, blankDefault(correctAnswer, "未提供"), blankDefault(existingAnalysis, "无"));
+
+        try {
+            return chatCompletion(List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
+            ), 300, 0.5);
+        } catch (Exception e) {
+            log.error("AI analysis generation failed", e);
+            return null;
+        }
+    }
+
+    public Map<String, Object> precheckContent(String targetType, String content) {
+        if (!isAvailable()) {
+            return Map.of();
+        }
+
+        String systemPrompt = "你是儿童学习平台内容安全与题库质量审核助手。只返回JSON，不要替审核员作最终决定。";
+        String userPrompt = """
+            请预审以下内容，检查：
+            1. 是否适合儿童；
+            2. 是否包含暴力、恐吓、歧视、成人、不良引导；
+            3. 题目是否表述清晰；
+            4. 答案是否唯一且解析是否准确。
+
+            对象类型：%s
+            内容：
+            %s
+
+            JSON格式：
+            {
+              "riskLevel": "LOW|MEDIUM|HIGH",
+              "summary": "一句话结论",
+              "issues": ["问题1"],
+              "suggestions": ["建议1"]
+            }
+            """.formatted(blankDefault(targetType, "UNKNOWN"), blankDefault(content, "无内容"));
+
+        try {
+            String response = chatCompletion(List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
+            ), 700, 0.2);
+            return normalizePrecheckResult(response);
+        } catch (Exception e) {
+            log.error("AI content precheck failed", e);
+            return Map.of();
+        }
+    }
+
+    public Map<String, Object> generateParentSummary(Map<String, Object> report, Map<String, Object> monitor) {
+        if (!isAvailable()) {
+            return Map.of();
+        }
+
+        String systemPrompt = "你是儿童学习平台的家庭学习顾问。请给家长提供温和、可执行的学习总结，不制造焦虑，不做医疗或心理诊断。只返回JSON，不要输出思考过程。";
+        String userPrompt;
+        try {
+            userPrompt = """
+                请根据学习报告，为家长生成学习建议。
+                要求：
+                1. 总结控制在80字以内；
+                2. 亮点、关注点、建议各1-3条；
+                3. 建议要具体、温和、可执行；
+                4. 不要泄露技术字段名。
+
+                学习报告JSON：
+                %s
+
+                JSON格式：
+                {
+                  "summary": "一句话总结",
+                  "highlights": ["亮点1"],
+                  "concerns": ["关注点1"],
+                  "suggestions": ["建议1"]
+                }
+                """.formatted(objectMapper.writeValueAsString(report));
+        } catch (Exception e) {
+            log.error("Parent summary prompt build failed", e);
+            return fallbackParentSummary(report);
+        }
+
+        try {
+            String response = chatCompletion(List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
+            ), 1200, 0.3);
+            Map<String, Object> result = normalizeParentSummary(response);
+            return result.isEmpty() ? fallbackParentSummary(report) : result;
+        } catch (Exception e) {
+            log.error("AI parent summary unavailable, using local fallback", e);
+            return fallbackParentSummary(report);
+        }
+    }
+
+    private String chatCompletion(List<Map<String, String>> messages, int maxTokens, double temperature) throws Exception {
+        String provider = getProvider();
+        String apiKey = getConfig("ai." + provider + ".api_key");
+        String baseUrl = getConfig("ai." + provider + ".base_url");
+        String model = getConfig("ai." + provider + ".model");
+        int timeout = getTimeout();
+
+        Map<String, Object> body = Map.of(
+            "model", model,
+            "messages", messages,
+            "max_tokens", maxTokens,
+            "temperature", temperature
+        );
+
+        String jsonBody = objectMapper.writeValueAsString(body);
+
+        String url = baseUrl.endsWith("/v1") ? baseUrl + "/chat/completions" : baseUrl + "/v1/chat/completions";
+        log.info("AI chat request provider={} model={} url={} maxTokens={} temperature={} body={}",
+            provider, model, url, maxTokens, temperature, jsonBody);
+
+        HttpResponse response = HttpRequest.post(url)
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + apiKey)
+            .body(jsonBody)
+            .timeout(timeout * 1000)
+            .execute();
+
+        String responseBody = response.body();
+        log.info("AI chat response provider={} model={} status={} body={}",
+            provider, model, response.getStatus(), responseBody);
+
+        if (response.isOk()) {
+            JsonNode root = objectMapper.readTree(responseBody);
+            JsonNode choices = root.get("choices");
+            if (choices != null && choices.isArray() && choices.size() > 0) {
+                JsonNode choice = choices.get(0);
+                JsonNode message = choice.get("message");
+                if (message != null && message.has("content")) {
+                    String content = message.get("content").asText();
+                    if (!content.isBlank()) {
+                        return content;
+                    }
+                    String finishReason = choice.path("finish_reason").asText("");
+                    log.error("AI API returned empty assistant content, finish_reason={} body={}", finishReason, responseBody);
+                    return null;
+                }
+            }
+        }
+        log.error("AI API returned invalid response, status: {} body: {}", response.getStatus(), responseBody);
+        return null;
+    }
+
+    private Map<String, Object> normalizePrecheckResult(String content) throws Exception {
+        if (content == null || content.isBlank()) {
+            return Map.of();
+        }
+        JsonNode root = objectMapper.readTree(stripJsonFence(content));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("riskLevel", root.path("riskLevel").asText("MEDIUM"));
+        result.put("summary", root.path("summary").asText(""));
+        result.put("issues", objectMapper.convertValue(
+            root.path("issues"),
+            objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
+        ));
+        result.put("suggestions", objectMapper.convertValue(
+            root.path("suggestions"),
+            objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
+        ));
+        return result;
+    }
+
+    private Map<String, Object> normalizeParentSummary(String content) throws Exception {
+        if (content == null || content.isBlank()) {
+            return Map.of();
+        }
+        JsonNode root = objectMapper.readTree(stripJsonFence(content));
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("summary", root.path("summary").asText(""));
+        result.put("highlights", objectMapper.convertValue(
+            root.path("highlights"),
+            objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
+        ));
+        result.put("concerns", objectMapper.convertValue(
+            root.path("concerns"),
+            objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
+        ));
+        result.put("suggestions", objectMapper.convertValue(
+            root.path("suggestions"),
+            objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
+        ));
+        return result;
+    }
+
+    private Map<String, Object> fallbackParentSummary(Map<String, Object> report) {
+        Map<String, Object> today = mapValue(report, "today");
+        Map<String, Object> stats = mapValue(report, "stats");
+        int todayMinutes = intValue(today.get("learnMinutes"));
+        int completedLevels = intValue(today.get("completedLevels"));
+        int accuracy = intValue(today.get("accuracy"));
+        int monthMinutes = intValue(stats.get("totalTime"));
+
+        List<String> highlights = new java.util.ArrayList<>();
+        if (todayMinutes > 0) {
+            highlights.add("今天已经完成 " + todayMinutes + " 分钟学习。");
+        }
+        if (completedLevels > 0) {
+            highlights.add("今天完成了 " + completedLevels + " 个关卡。");
+        }
+        if (accuracy >= 80) {
+            highlights.add("今日正确率较稳定，可以继续保持。");
+        }
+        if (highlights.isEmpty()) {
+            highlights.add("可以从一个轻松的小练习开始建立节奏。");
+        }
+
+        List<String> concerns = new java.util.ArrayList<>();
+        if (accuracy > 0 && accuracy < 60) {
+            concerns.add("今日正确率偏低，建议先复盘错题。");
+        } else if (todayMinutes >= 50) {
+            concerns.add("今日学习时间较长，注意安排休息。");
+        } else {
+            concerns.add("暂无明显风险，继续观察学习节奏。");
+        }
+
+        List<String> suggestions = new java.util.ArrayList<>();
+        suggestions.add(todayMinutes > 0 ? "结束后和孩子一起回顾一道印象最深的题。" : "先安排 10 分钟左右的短练习，降低开始难度。");
+        suggestions.add(monthMinutes > 0 ? "结合本月学习记录，优先保持固定的小段学习时间。" : "完成首次练习后再观察兴趣点和薄弱点。");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("summary", todayMinutes > 0
+            ? "AI服务响应较慢，已根据现有学习报告生成本地建议。"
+            : "AI服务响应较慢，建议先从轻量练习开始。");
+        result.put("highlights", highlights);
+        result.put("concerns", concerns);
+        result.put("suggestions", suggestions);
+        return result;
+    }
+
+    private Map<String, Object> mapValue(Map<String, Object> source, String key) {
+        if (source == null || !(source.get(key) instanceof Map<?, ?> raw)) {
+            return Map.of();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : raw.entrySet()) {
+            if (entry.getKey() != null) {
+                result.put(entry.getKey().toString(), entry.getValue());
+            }
+        }
+        return result;
+    }
+
+    private int intValue(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text) {
+            try {
+                return Integer.parseInt(text);
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
+        }
+        return 0;
+    }
+
+    private Map<String, Object> normalizeQuestionDraft(String content, Integer questionType) throws Exception {
+        if (content == null || content.isBlank()) {
+            return Map.of();
+        }
+        String json = stripJsonFence(content);
+        JsonNode root = objectMapper.readTree(json);
+        Map<String, Object> draft = new LinkedHashMap<>();
+        draft.put("questionType", questionType == null ? 1 : questionType);
+        draft.put("questionContent", root.path("questionContent").asText(""));
+        draft.put("analysis", root.path("analysis").asText(""));
+
+        List<Map<String, Object>> options = objectMapper.convertValue(
+            root.path("options"),
+            objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
+        );
+        draft.put("options", options == null ? List.of() : options);
+        if (draft.get("questionContent").toString().isBlank()) {
+            return Map.of();
+        }
+        return draft;
+    }
+
+    private static String stripJsonFence(String content) {
+        String text = content.trim();
+        if (text.startsWith("```")) {
+            text = text.replaceFirst("^```(?:json)?\\s*", "");
+            text = text.replaceFirst("\\s*```$", "");
+        }
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return text.substring(start, end + 1);
+        }
+        return text;
+    }
+
+    private static String questionTypeName(Integer type) {
+        return switch (type == null ? 1 : type) {
+            case 2 -> "判断题";
+            case 3 -> "填空题";
+            case 4 -> "排序题";
+            case 5 -> "连线题";
+            default -> "选择题";
+        };
+    }
+
+    private static String blankDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value.trim();
     }
 }

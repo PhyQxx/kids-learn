@@ -54,7 +54,9 @@ kids-learn/
 
 通过 `AiService` 实现可配置的多提供商 AI 服务：
 
-- **配置方式**: 数据库 `app_config` 表动态配置（提供商、API Key、模型、超时）
+- **配置方式**: 管理后台「系统管理 / AI配置」可视化维护，配置写入数据库 `app_config` 表
+- **配置边界**: 不在 `application.yml` 或环境变量中维护 AI API Key、Base URL、模型名
+- **多模型支持**: 内置 DeepSeek、OpenAI、通义千问、Moonshot、自定义兼容模型
 - **接口标准**: OpenAI 兼容 (`/v1/chat/completions`)
 - **已实现**: 错题 AI 解析（`GET /learn/explain-wrong`）
 - **待扩展**: AI 出题、AI 对话辅导、AI 题目生成

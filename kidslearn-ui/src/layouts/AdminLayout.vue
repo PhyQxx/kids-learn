@@ -24,6 +24,7 @@
           </template>
           <el-menu-item index="/question-bank">题库管理</el-menu-item>
           <el-menu-item index="/content">闯关管理</el-menu-item>
+          <el-menu-item index="/content/audit">内容审核</el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="pet">
@@ -53,6 +54,7 @@
           </template>
           <el-menu-item index="/system/user">用户管理</el-menu-item>
           <el-menu-item index="/system/config">系统配置</el-menu-item>
+          <el-menu-item index="/system/ai">AI配置</el-menu-item>
           <el-menu-item index="/system/log">操作日志</el-menu-item>
           <el-menu-item index="/system/dict">字典管理</el-menu-item>
           <el-menu-item index="/system/version">版本管理</el-menu-item>
