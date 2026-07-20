@@ -592,12 +592,23 @@ async function handleAiGenerate() {
       if (res.data.questionContent) form.questionContent = res.data.questionContent
       if (res.data.analysis) form.analysis = res.data.analysis
       if (Array.isArray(res.data.options) && res.data.options.length > 0) {
-        form.options = res.data.options.map((option, index) => ({
-          optionLabel: option.optionLabel || String.fromCharCode(65 + index),
-          optionContent: option.optionContent || '',
-          isCorrect: option.isCorrect ?? (index === 0 ? 1 : 0),
-          sortOrder: option.sortOrder ?? index,
-        }))
+        form.options = res.data.options.map((option, index) => {
+          let label = option.optionLabel || ''
+          // 连线题：如果 optionLabel 为空或是单个字母(A/B/C)，使用"左侧N"格式
+          if (form.questionType === 5 && (!label || /^[A-Z]$/.test(label))) {
+            label = `左侧${index + 1}`
+          }
+          // 其他题型：如果 optionLabel 为空，使用 A/B/C
+          if (!label) {
+            label = String.fromCharCode(65 + index)
+          }
+          return {
+            optionLabel: label,
+            optionContent: option.optionContent || '',
+            isCorrect: option.isCorrect ?? (index === 0 ? 1 : 0),
+            sortOrder: option.sortOrder ?? index,
+          }
+        })
       }
       syncSpeechTextFromContent()
       ElMessage.success('AI题目已生成，请审核后保存')

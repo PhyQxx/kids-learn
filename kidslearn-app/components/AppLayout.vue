@@ -74,7 +74,7 @@
       </view>
 
       <!-- 内容区域 -->
-      <scroll-view class="content-scroll custom-scroll" scroll-y>
+      <scroll-view class="content-scroll custom-scroll" scroll-y :enhanced="true" :bounces="false" :show-scrollbar="false">
         <view class="content-wrapper">
           <slot></slot>
         </view>
@@ -572,7 +572,7 @@ function goStudentMode() {
   min-height: 100%;
 }
 
-@media (max-width: 640px) {
+@include respond-sm {
   .app-layout { flex-direction: column-reverse; }
   .sidebar {
     width: 100%;
@@ -582,6 +582,7 @@ function goStudentMode() {
     border-right: 0;
     border-top: 1px solid rgba(73, 98, 128, 0.08);
     box-shadow: 0 -8px 28px rgba(73, 98, 128, 0.08);
+    padding-bottom: $safe-area-bottom;
 
     &.collapsed {
       width: 100%;

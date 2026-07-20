@@ -264,7 +264,7 @@ onMounted(loadVipData)
   }
 }
 
-@media (max-width: 900px) {
+@include respond-md-lg {
   .plan-grid {
     grid-template-columns: 1fr;
   }

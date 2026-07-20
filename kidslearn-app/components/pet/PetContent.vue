@@ -153,7 +153,7 @@
     </view>
 
     <!-- 喂食弹窗 -->
-    <tn-popup v-model="showFeedModal" direction="center" :custom-style="{ width: '420px', borderRadius: '24px' }">
+    <tn-popup v-model="showFeedModal" direction="center" :custom-style="{ width: 'min(90vw, 420px)', borderRadius: '24px' }">
       <view class="feed-modal">
         <text class="text-xl text-bold" style="margin-bottom: 20px; display:block; text-align:center; color:#D35400;">🍖 要喂哪个食物？</text>
         <view v-if="availableFood.length > 0" class="feed-grid">
@@ -180,7 +180,7 @@
     </tn-popup>
 
     <!-- 换宠物弹窗 -->
-    <tn-popup v-model="showPetPicker" direction="center" :custom-style="{ width: '520px', maxHeight: '80vh', borderRadius: '24px' }">
+    <tn-popup v-model="showPetPicker" direction="center" :custom-style="{ width: 'min(90vw, 520px)', maxHeight: '80vh', borderRadius: '24px' }">
       <view class="pet-picker-modal">
         <text class="text-xl text-bold" style="margin-bottom: 20px; display:block; text-align:center; color:#2C3E50;">🌟 召唤新的小伙伴</text>
         <scroll-view scroll-y style="max-height: 400px;">
@@ -682,14 +682,14 @@ function syncUserBalance(petRes) {
 }
 .pet-picker-item .pet-emoji { font-size: 48px; }
 
-@media (max-width: 800px) {
+@include respond-md {
   .pet-layout { grid-template-columns: 300px 1fr; gap: 16px; }
   .pet-emoji { font-size: 64px; }
   .pet-stage { width: 110px; height: 110px; }
   .item-grid { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
 }
 
-@media (max-width: 640px) {
+@include respond-sm {
   .pet-layout { grid-template-columns: 1fr; }
   .pet-panel { padding: 20px; }
   .pet-picker-grid { grid-template-columns: repeat(2, 1fr); }

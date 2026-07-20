@@ -214,3 +214,44 @@
 .animate-chest-open { animation: chest-open 0.8s var(--ease-bounce) both; }
 .animate-chest-glow { animation: chest-glow 1.5s ease-in-out infinite; }
 .animate-coin-scatter { animation: coin-scatter 1s ease-out forwards; }
+
+/* ===== 动画性能优化 ===== */
+
+/* 添加 will-change 提示 */
+.animate-float,
+.animate-pulse,
+.animate-bounce-in,
+.animate-glow,
+.animate-chest-glow {
+  will-change: transform;
+}
+
+.animate-fade-in,
+.animate-slide-up,
+.animate-slide-left,
+.animate-slide-right {
+  will-change: opacity, transform;
+}
+
+.animate-coin-scatter {
+  will-change: transform, opacity;
+}
+
+/* 支持减少动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .animate-float,
+  .animate-pulse,
+  .animate-bounce-in,
+  .animate-glow,
+  .animate-chest-glow {
+    animation: none !important;
+  }
+}

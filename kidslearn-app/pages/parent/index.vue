@@ -434,7 +434,7 @@ onShow(loadParentData)
   text-align: center;
 }
 
-@media (max-width: 900px) {
+@include respond-md-lg {
   .summary-grid,
   .panel-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -445,7 +445,7 @@ onShow(loadParentData)
   }
 }
 
-@media (max-width: 640px) {
+@include respond-sm {
   .summary-grid,
   .panel-grid {
     grid-template-columns: 1fr;

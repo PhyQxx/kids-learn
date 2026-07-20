@@ -582,7 +582,7 @@ onUnmounted(() => {
   to { opacity: 1; transform: scale(1); }
 }
 
-@media (max-width: 640px) {
+@include respond-sm {
   .challenge-grid {
     grid-template-columns: 1fr;
   }

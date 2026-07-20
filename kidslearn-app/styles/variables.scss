@@ -57,6 +57,19 @@ $font-xxl: 24px;
 $font-title: 28px;
 $font-hero: 36px;
 
+// ===== 移动端专用变量 =====
+$mobile-font-base: 16px;
+$mobile-font-sm: 14px;
+$mobile-font-xs: 12px;
+$mobile-padding: 16px;
+$mobile-gap: 12px;
+$tap-target-min: 44px;
+$tap-target-lg: 52px;
+
+// Safe area 适配
+$safe-area-bottom: env(safe-area-inset-bottom, 0px);
+$safe-area-top: env(safe-area-inset-top, 0px);
+
 // ===== 侧边栏 =====
 $sidebar-width: 220px;
 $sidebar-collapsed: 60px;
@@ -70,14 +83,17 @@ $ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
 // ===== 响应式断点（横屏） =====
 // 小屏横屏: ~640px (如手机横屏)
+// 中小屏横屏: ~900px (如小平板)
 // 中屏横屏: ~800px (如小平板)
 // 大屏横屏: ~1024px+ (如iPad横屏)
 
 $screen-sm: 640px;
 $screen-md: 800px;
+$screen-md-lg: 900px;
 $screen-lg: 1024px;
 
 // 响应式混合宏
 @mixin respond-sm { @media (max-width: #{$screen-sm}) { @content; } }
 @mixin respond-md { @media (max-width: #{$screen-md}) { @content; } }
+@mixin respond-md-lg { @media (max-width: #{$screen-md-lg}) { @content; } }
 @mixin respond-lg { @media (min-width: #{$screen-lg}) { @content; } }

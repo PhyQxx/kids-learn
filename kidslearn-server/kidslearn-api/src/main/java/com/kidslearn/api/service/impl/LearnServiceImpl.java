@@ -416,7 +416,7 @@ public class LearnServiceImpl implements LearnService {
                     .eq(QuestionOption::getQuestionId, q.getId())
                     .orderByAsc(QuestionOption::getSortOrder)
             );
-            map.put("options", QuestionRandomizer.toRandomizedOptions(options, random));
+            map.put("options", QuestionRandomizer.toRandomizedOptions(options, random, q.getQuestionType()));
             return map;
         }).collect(Collectors.toList());
     }
@@ -1101,7 +1101,7 @@ public class LearnServiceImpl implements LearnService {
                     .eq(QuestionOption::getQuestionId, q.getId())
                     .orderByAsc(QuestionOption::getSortOrder)
             );
-            map.put("options", QuestionRandomizer.toRandomizedOptions(options, random));
+            map.put("options", QuestionRandomizer.toRandomizedOptions(options, random, q.getQuestionType()));
             return map;
         }).collect(Collectors.toList());
     }
@@ -1235,7 +1235,7 @@ public class LearnServiceImpl implements LearnService {
                     .eq(QuestionOption::getQuestionId, q.getId())
                     .orderByAsc(QuestionOption::getSortOrder)
             );
-            map.put("options", QuestionRandomizer.toRandomizedOptions(options, random));
+            map.put("options", QuestionRandomizer.toRandomizedOptions(options, random, q.getQuestionType()));
             return map;
         }).collect(Collectors.toList());
     }
@@ -1329,7 +1329,7 @@ public class LearnServiceImpl implements LearnService {
                 .eq(QuestionOption::getQuestionId, q.getId())
                 .orderByAsc(QuestionOption::getSortOrder)
         );
-        map.put("options", QuestionRandomizer.toRandomizedOptions(options, new Random()));
+        map.put("options", QuestionRandomizer.toRandomizedOptions(options, new Random(), q.getQuestionType()));
         return map;
     }
 

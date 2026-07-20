@@ -101,15 +101,15 @@
   white-space: nowrap;
 }
 
-/* 响应式断点 */
+/* 响应式断点 - 使用 variables.scss 中的变量 */
 @mixin respond-sm {
-  @media (max-width: 640px) { @content; }
+  @media (max-width: #{$screen-sm}) { @content; }
 }
 
 @mixin respond-md {
-  @media (max-width: 800px) { @content; }
+  @media (max-width: #{$screen-md}) { @content; }
 }
 
 @mixin respond-lg {
-  @media (min-width: 1024px) { @content; }
+  @media (min-width: #{$screen-lg}) { @content; }
 }

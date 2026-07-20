@@ -75,6 +75,15 @@ export function normalizeTimeControl(raw = {}) {
 }
 
 export function evaluateLearningAccess({ timeControl, todayMinutes = 0, now = new Date() } = {}) {
+  // 临时禁用学习时段限制
+  return {
+    allowed: true,
+    reasonCode: 'ALLOWED',
+    message: ''
+  }
+
+  // 以下是原始代码，恢复时取消注释
+  /*
   const control = normalizeTimeControl(timeControl)
   const learnedMinutes = toInteger(todayMinutes, 0)
 
@@ -106,4 +115,5 @@ export function evaluateLearningAccess({ timeControl, todayMinutes = 0, now = ne
     reasonCode: 'ALLOWED',
     message: ''
   }
+  */
 }

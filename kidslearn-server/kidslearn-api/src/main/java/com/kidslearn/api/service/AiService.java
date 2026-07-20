@@ -141,6 +141,31 @@ public class AiService {
 
         String typeName = questionTypeName(questionType);
         String systemPrompt = "你是儿童学习平台的题库编辑。请生成适合儿童的单道题，内容安全、语言简洁、答案唯一。只返回JSON，不要解释。";
+        String optionFormat;
+        if (questionType != null && questionType == 5) {
+            // 连线题：optionLabel 是左侧内容，optionContent 是 JSON 格式包含 right 字段
+            optionFormat = """
+                {
+                  "questionContent": "题干文本",
+                  "analysis": "100字以内儿童友好解析",
+                  "options": [
+                    {"optionLabel":"左侧内容1","optionContent":"{\\"right\\":\\"右侧内容1\\"}","isCorrect":1,"sortOrder":0},
+                    {"optionLabel":"左侧内容2","optionContent":"{\\"right\\":\\"右侧内容2\\"}","isCorrect":1,"sortOrder":1},
+                    {"optionLabel":"左侧内容3","optionContent":"{\\"right\\":\\"右侧内容3\\"}","isCorrect":1,"sortOrder":2}
+                  ]
+                }
+                注意：连线题必须给3-5项，optionLabel是左边要连线的内容，optionContent是JSON格式包含right字段表示右边的内容。""";
+        } else {
+            optionFormat = """
+                {
+                  "questionContent": "题干文本",
+                  "analysis": "100字以内儿童友好解析",
+                  "options": [
+                    {"optionLabel":"A","optionContent":"选项文本","isCorrect":1,"sortOrder":0}
+                  ]
+                }
+                选择题给4个选项；判断题给正确或错误；填空题给1-3个可接受答案；排序题给3-5项。""";
+        }
         String userPrompt = """
             请生成一道题目草稿。
             学科：%s
@@ -149,15 +174,8 @@ public class AiService {
             知识点：%s
 
             JSON格式：
-            {
-              "questionContent": "题干文本",
-              "analysis": "100字以内儿童友好解析",
-              "options": [
-                {"optionLabel":"A","optionContent":"选项文本","isCorrect":1,"sortOrder":0}
-              ]
-            }
-            选择题给4个选项；判断题给“正确/错误”；填空题给1-3个可接受答案；排序题/连线题给3-5项。
-            """.formatted(blankDefault(subjectName, "未指定"), blankDefault(gradeName, "未指定"), typeName, blankDefault(knowledgePoint, "基础练习"));
+            %s
+            """.formatted(blankDefault(subjectName, "未指定"), blankDefault(gradeName, "未指定"), typeName, blankDefault(knowledgePoint, "基础练习"), optionFormat);
 
         try {
             String content = chatCompletion(List.of(

@@ -377,7 +377,7 @@ onUnmounted(() => {
   font-weight: 800;
 }
 
-@media (max-width: 900px) {
+@include respond-md-lg {
   .videos-shell {
     grid-template-columns: 1fr;
   }

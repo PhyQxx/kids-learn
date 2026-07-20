@@ -284,6 +284,15 @@ async function handleSave() {
   saving.value = true
   try {
     syncSpeechToContent()
+
+    // 判断题：强制使用"正确"/"错误"选项，覆盖默认的 A/B/C/D
+    if (form.questionType === 2) {
+      form.options = [
+        { optionLabel: '', optionContent: '正确', isCorrect: 1, sortOrder: 0 },
+        { optionLabel: '', optionContent: '错误', isCorrect: 0, sortOrder: 1 },
+      ]
+    }
+
     form.options.forEach((option, index) => {
       option.sortOrder = index
     })

@@ -76,7 +76,9 @@ export default {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
+@import '@/styles/variables.scss';
+
 .login-container {
   min-height: 100vh;
   display: flex;
@@ -84,7 +86,9 @@ export default {
   justify-content: center;
   background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
   padding: 20px;
+  padding-bottom: $safe-area-bottom;
 }
+
 .login-box {
   width: 100%;
   max-width: 400px;
@@ -93,28 +97,33 @@ export default {
   padding: 40px 30px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
 }
+
 .logo-area {
   display: flex;
   flex-direction: column;
   align-items: center;
   margin-bottom: 40px;
 }
+
 .logo-emoji {
   font-size: 64px;
   margin-bottom: 10px;
 }
+
 .logo-text {
   font-size: 28px;
   font-weight: 800;
   color: #333;
   letter-spacing: 2px;
 }
+
 .form-area {
   display: flex;
   flex-direction: column;
   gap: 20px;
   margin-bottom: 30px;
 }
+
 .input-group {
   display: flex;
   align-items: center;
@@ -122,34 +131,40 @@ export default {
   border-radius: 16px;
   padding: 12px 20px;
 }
+
 .input-icon {
   font-size: 20px;
   margin-right: 12px;
 }
+
 .input-field {
   flex: 1;
-  font-size: 16px;
+  font-size: $mobile-font-base; /* 防止iOS自动缩放 */
   height: 24px;
   min-height: 24px;
   border: none;
   background: transparent;
   outline: none;
 }
+
 .ph-color {
   color: #a0aab5;
 }
+
 .error-msg {
   color: #ff4d4f;
   font-size: 14px;
   text-align: center;
   margin-top: -10px;
 }
+
 .btn-area {
   margin-bottom: 20px;
 }
+
 .primary-btn {
   width: 100%;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E8B);
+  background: linear-gradient(135deg, $primary, $primary-light);
   color: white;
   font-size: 18px;
   font-weight: bold;
@@ -157,19 +172,53 @@ export default {
   border-radius: 16px;
   padding: 14px 0;
   line-height: 1.5;
+  min-height: $tap-target-lg;
 }
+
 .primary-btn::after {
   border: none;
 }
+
 .primary-btn:active {
   transform: scale(0.98);
   opacity: 0.9;
 }
+
 .link-area {
   text-align: center;
 }
+
 .link-text {
   color: #666;
   font-size: 14px;
+}
+
+/* 响应式适配 */
+@include respond-sm {
+  .login-box {
+    padding: 30px 20px;
+    border-radius: 20px;
+  }
+
+  .logo-emoji {
+    font-size: 48px;
+  }
+
+  .logo-text {
+    font-size: 24px;
+  }
+
+  .input-group {
+    padding: 14px 16px;
+  }
+
+  .input-field {
+    font-size: $mobile-font-base;
+  }
+
+  .primary-btn {
+    min-height: 56px;
+    font-size: 16px;
+  }
 }
 </style>

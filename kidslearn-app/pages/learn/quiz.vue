@@ -1,6 +1,6 @@
 <template>
   <AppLayout theme="kids" :show-topbar="false">
-    <view class="quiz-container">
+    <view class="quiz-container" :class="{ 'has-bottom-nav': isPractice && screen === 'quiz' }">
       <!-- 开始屏 -->
       <view v-if="screen === 'start'" class="screen start-screen">
         <text class="start-emoji animate-pulse">{{ levelEmoji }}</text>
@@ -111,6 +111,33 @@
             </view>
             <text v-if="voiceAttempt" class="voice-attempt">{{ voiceAttempt }}</text>
             <tn-button type="primary" shape="round" size="lg" :disabled="!voiceAttempt || !!selectedAnswer" @click="submitVoiceAnswer">提交跟读</tn-button>
+          </view>
+
+          <!-- 练习模式：解析卡片 -->
+          <view v-if="isPractice && showAnalysis" class="analysis-card" :class="userAnswers[currentIndex]?.isCorrect ? 'analysis-correct' : 'analysis-wrong'">
+            <view class="analysis-header">
+              <text class="analysis-icon">{{ userAnswers[currentIndex]?.isCorrect ? '✅' : '❌' }}</text>
+              <text class="analysis-title text-bold">{{ userAnswers[currentIndex]?.isCorrect ? '回答正确！' : '回答错误' }}</text>
+            </view>
+            <view v-if="currentAnalysisText" class="analysis-body">
+              <text class="analysis-label">📝 解析</text>
+              <text class="analysis-text">{{ currentAnalysisText }}</text>
+            </view>
+          </view>
+        </view>
+
+        <!-- 练习模式：底部导航栏 -->
+        <view v-if="isPractice" class="quiz-bottom-nav">
+          <view class="nav-btn" :class="{ disabled: currentIndex <= 0 }" @tap="prevQuestion">
+            <text class="nav-arrow">‹</text>
+            <text class="nav-text">上一题</text>
+          </view>
+          <view class="nav-center" @tap="showQuestionCardPopup = true">
+            <text class="nav-counter">{{ currentIndex + 1 }} / {{ totalQuestions }}</text>
+          </view>
+          <view class="nav-btn" @tap="nextQuestion">
+            <text class="nav-text">{{ currentIndex >= totalQuestions - 1 ? '完成' : '下一题' }}</text>
+            <text class="nav-arrow">›</text>
           </view>
         </view>
       </view>
@@ -355,6 +382,15 @@ const timeLimit = ref(60)
 const usedTimeInQuiz = ref(0)
 let timer = null
 
+// 练习模式：存储每题答案 { [idx]: { answer, displayAnswer, isCorrect, correctAnswer, analysis } }
+const userAnswers = ref({})
+// 练习模式：当前题是否已显示解析
+const showAnalysis = ref(false)
+// 练习模式：当前题解析文本
+const currentAnalysisText = ref('')
+// 练习模式：答题卡弹窗
+const showQuestionCardPopup = ref(false)
+
 const levelId = ref(null)
 const pageGradeLevelId = ref(null)
 const challengeId = ref(null)
@@ -585,9 +621,16 @@ const resultSubtitle = computed(() => {
 function getOptionClass(opt) {
   if (eliminatedOptions.value.has(opt.label)) return 'eliminated'
   if (!selectedAnswer.value) return ''
-  if (opt.correct) return 'correct'
-  if (opt.label === selectedAnswer.value && !opt.correct) return 'wrong'
-  return ''
+  if (isPractice.value) {
+    // 练习模式：显示对错
+    if (opt.correct) return 'correct'
+    if ((opt.label === selectedAnswer.value || opt.answerValue === selectedAnswer.value) && !opt.correct) return 'wrong'
+    return ''
+  } else {
+    // 闯关模式：仅标记已选，不显示对错
+    if (opt.label === selectedAnswer.value || opt.answerValue === selectedAnswer.value) return 'selected'
+    return ''
+  }
 }
 
 async function useHint() {
@@ -722,8 +765,36 @@ function startVoicePractice() {
 }
 
 function selectOption(opt) {
-  if (selectedAnswer.value) return
-  submitCurrentAnswer(opt.answerValue || opt.label, opt.label)
+  if (isPractice.value) {
+    // 练习模式：已提交则锁定，未提交则提交
+    if (userAnswers.value[currentIndex.value]) return
+    submitCurrentAnswer(opt.answerValue || opt.label, opt.label)
+  } else {
+    // 闯关模式：选择后立即自动跳转（不等待接口）
+    if (selectedAnswer.value) return
+    const answer = opt.answerValue || opt.label
+    selectedAnswer.value = opt.label
+    // 异步提交，不等待结果
+    const q = currentQuestion.value
+    const answerTime = Math.round((Date.now() - (questionStartTime.value || startTime.value)) / 1000)
+    if (q.id) {
+      submitAnswer({ questionId: q.id, answer, answerTime }).then(res => {
+        if (res?.correct) {
+          correctCount.value++
+          totalScore.value += (q.score || 10)
+          if (res?.petExp) {
+            petExpGained.value = res.petExp
+            showPetExp.value = true
+          }
+        }
+      }).catch(() => {})
+    }
+    // 立即跳下一题
+    setTimeout(() => {
+      showPetExp.value = false
+      nextQuestionAuto()
+    }, 300)
+  }
 }
 
 function submitOrderAnswer() {
@@ -753,61 +824,100 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
   const q = currentQuestion.value
   const answerTime = Math.round((Date.now() - (questionStartTime.value || startTime.value)) / 1000)
 
-  // 提交答案到后端判定
   if (q.id) {
-    submitAnswer({
-      questionId: q.id,
-      answer,
-      answerTime
-    }).then(res => {
+    submitAnswer({ questionId: q.id, answer, answerTime }).then(res => {
       const isCorrect = res?.correct || false
-      if (isCorrect) {
-        correctCount.value++
-        totalScore.value += (q.score || 10)
-        showCorrect.value = true
-        try { uni.vibrateShort() } catch (_) {}
-        try { soundManager.play('success') } catch (_) {}
-        try { playFeedbackAudio('correct') } catch (_) {}
-        generateCoinParticles(8)
-        if (res?.petExp) showPetExpGain(res.petExp)
+      const correctAnswer = res?.correctAnswer || ''
+      const analysis = res?.explanationText || ''
+
+      if (isPractice.value) {
+        // 练习模式：存储答案，显示对错+解析，不自动跳转
+        userAnswers.value[currentIndex.value] = { answer, displayAnswer, isCorrect, correctAnswer, analysis }
+        if (isCorrect) {
+          correctCount.value++
+          totalScore.value += (q.score || 10)
+          showCorrect.value = true
+          try { uni.vibrateShort() } catch (_) {}
+          try { soundManager.play('success') } catch (_) {}
+          try { playFeedbackAudio('correct') } catch (_) {}
+          generateCoinParticles(8)
+          if (res?.petExp) showPetExpGain(res.petExp)
+        } else {
+          showWrong.value = true
+          wrongAiExplanation.value = ''
+          wrongAiLoading.value = true
+          try { uni.vibrateLong() } catch (_) {}
+          try { soundManager.play('fail') } catch (_) {}
+          try { playFeedbackAudio('wrong') } catch (_) {}
+          loadWrongAiExplanation(q.id, analysis)
+          if (correctAnswer) {
+            const cOpt = q.options.find(o => (o.answerValue || o.label) === correctAnswer)
+            if (cOpt) cOpt.correct = true
+          }
+        }
+        // 显示解析
+        currentAnalysisText.value = analysis
+        showAnalysis.value = true
+      } else {
+        // 闯关模式（非选项题型：填空/排序/连线/语音）
+        if (isCorrect) {
+          correctCount.value++
+          totalScore.value += (q.score || 10)
+          showCorrect.value = true
+          try { uni.vibrateShort() } catch (_) {}
+          try { soundManager.play('success') } catch (_) {}
+          try { playFeedbackAudio('correct') } catch (_) {}
+          generateCoinParticles(8)
+          if (res?.petExp) showPetExpGain(res.petExp)
+        } else {
+          showWrong.value = true
+          wrongAiExplanation.value = ''
+          wrongAiLoading.value = true
+          try { uni.vibrateLong() } catch (_) {}
+          try { soundManager.play('fail') } catch (_) {}
+          try { playFeedbackAudio('wrong') } catch (_) {}
+          loadWrongAiExplanation(q.id, analysis)
+          if (correctAnswer) {
+            const cOpt = q.options.find(o => (o.answerValue || o.label) === correctAnswer)
+            if (cOpt) cOpt.correct = true
+          }
+        }
+        setTimeout(() => {
+          showCorrect.value = false
+          showWrong.value = false
+          wrongAiLoading.value = false
+          nextQuestionAuto()
+        }, isCorrect ? 2500 : 6500)
+      }
+    }).catch(() => {
+      if (isPractice.value) {
+        userAnswers.value[currentIndex.value] = { answer, displayAnswer, isCorrect: false, correctAnswer: '', analysis: '' }
+        showWrong.value = true
+        currentAnalysisText.value = ''
+        showAnalysis.value = true
+        try { playFeedbackAudio('wrong') } catch (_) {}
       } else {
         showWrong.value = true
-        wrongAiExplanation.value = ''
-        wrongAiLoading.value = true
-        try { uni.vibrateLong() } catch (_) {}
-        try { soundManager.play('fail') } catch (_) {}
         try { playFeedbackAudio('wrong') } catch (_) {}
-        loadWrongAiExplanation(q.id, res?.explanationText)
-        // Mark correct answer in options
-        if (res?.correctAnswer) {
-          const cOpt = q.options.find(o => (o.answerValue || o.label) === res.correctAnswer)
-          if (cOpt) cOpt.correct = true
-        }
+        setTimeout(() => { showWrong.value = false; nextQuestionAuto() }, 3000)
       }
-      setTimeout(() => {
-        showCorrect.value = false
-        showWrong.value = false
-        wrongAiLoading.value = false
-        nextQuestion()
-      }, isCorrect ? 2500 : 6500)
-    }).catch(() => {
-      showWrong.value = true
-      wrongAiExplanation.value = ''
-      wrongAiLoading.value = false
-      try { playFeedbackAudio('wrong') } catch (_) {}
-      setTimeout(() => { showWrong.value = false; nextQuestion() }, 3000)
     })
   } else {
-    // 无 levelId 或 questionId 时随机判定（fallback mock 题目）
-    showWrong.value = true
-    setTimeout(() => { showWrong.value = false; nextQuestion() }, 1000)
+    // 无 questionId fallback
+    if (isPractice.value) {
+      userAnswers.value[currentIndex.value] = { answer, displayAnswer, isCorrect: false, correctAnswer: '', analysis: '' }
+      showWrong.value = true
+      showAnalysis.value = true
+    } else {
+      showWrong.value = true
+      setTimeout(() => { showWrong.value = false; nextQuestionAuto() }, 1000)
+    }
   }
 }
 
-function nextQuestion() {
+// 闯关模式：自动跳转下一题（不等接口结果）
+function nextQuestionAuto() {
   selectedAnswer.value = ''
-  wrongAiExplanation.value = ''
-  wrongAiLoading.value = false
   eliminatedOptions.value = new Set()
   if (currentIndex.value < questions.value.length - 1) {
     currentIndex.value++
@@ -818,6 +928,52 @@ function nextQuestion() {
   } else {
     finishQuiz()
   }
+}
+
+// 练习模式：下一题（手动）
+function nextQuestion() {
+  if (currentIndex.value >= questions.value.length - 1) {
+    finishQuiz()
+    return
+  }
+  currentIndex.value++
+  restoreQuestionState()
+}
+
+// 练习模式：上一题（手动）
+function prevQuestion() {
+  if (currentIndex.value <= 0) return
+  currentIndex.value--
+  restoreQuestionState()
+}
+
+// 练习模式：切换题目后恢复已答状态
+function restoreQuestionState() {
+  showAnalysis.value = false
+  currentAnalysisText.value = ''
+  showCorrect.value = false
+  showWrong.value = false
+  wrongAiExplanation.value = ''
+  wrongAiLoading.value = false
+  eliminatedOptions.value = new Set()
+  const saved = userAnswers.value[currentIndex.value]
+  if (saved) {
+    selectedAnswer.value = saved.displayAnswer
+    showAnalysis.value = true
+    currentAnalysisText.value = saved.analysis || ''
+    // 恢复正确答案标记
+    const q = currentQuestion.value
+    if (saved.correctAnswer && q.options) {
+      const cOpt = q.options.find(o => (o.answerValue || o.label) === saved.correctAnswer)
+      if (cOpt) cOpt.correct = true
+    }
+  } else {
+    selectedAnswer.value = ''
+    resetInteractionState()
+  }
+  questionStartTime.value = Date.now()
+  preloadQuestionAudio(questions.value[currentIndex.value])
+  setTimeout(() => questionToSpeech(), 250)
 }
 
 async function loadWrongAiExplanation(questionId, fallbackText = '') {
@@ -1011,6 +1167,15 @@ onUnmounted(() => {
   height: 100%;
   position: relative;
   overflow: hidden;
+
+  // 练习模式下强制撑满，确保底部导航固定
+  &.has-bottom-nav {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
 }
 
 .screen {
@@ -1061,7 +1226,9 @@ onUnmounted(() => {
 /* ===== 答题屏 ===== */
 .quiz-screen {
   justify-content: flex-start;
-  padding-top: 16px;
+  align-items: stretch;
+  padding: 16px 0 0;
+  overflow: hidden;
 }
 
 .quiz-topbar {
@@ -1070,6 +1237,9 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   margin-bottom: 18px;
+  padding: 0 28px;
+  flex-shrink: 0;
+  box-sizing: border-box;
 }
 
 .close-btn {
@@ -1137,6 +1307,10 @@ onUnmounted(() => {
   gap: 14px;
   width: 100%;
   max-width: 680px;
+  margin: 0 auto;
+  overflow-y: auto;
+  padding: 0 28px 20px;
+  box-sizing: border-box;
 }
 
 .question-speech {
@@ -1227,6 +1401,11 @@ onUnmounted(() => {
     pointer-events: none;
     background: #F5F5F5;
     border-color: #E0E0E0;
+  }
+
+  &.selected {
+    background: #E8F0FE;
+    border-color: $learn-blue;
   }
 }
 
@@ -1628,7 +1807,109 @@ onUnmounted(() => {
   font-size: 22px;
 }
 
-@media (max-width: 640px) {
+/* ===== 练习模式：解析卡片 ===== */
+.analysis-card {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: $radius-md;
+  background: #F8FFF8;
+  border: 2px solid #D4EDDA;
+  animation: slideUp 0.3s ease;
+
+  &.analysis-wrong {
+    background: #FFF8F8;
+    border-color: #F5C6CB;
+  }
+}
+
+.analysis-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.analysis-icon { font-size: 20px; }
+.analysis-title { font-size: 16px; color: $text; }
+
+.analysis-body {
+  padding-top: 8px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.analysis-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: $text-light;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.analysis-text {
+  font-size: 14px;
+  color: $text;
+  line-height: 1.6;
+}
+
+/* ===== 练习模式：底部导航栏 ===== */
+.quiz-bottom-nav {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 28px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  background: $white;
+  border-top: 1px solid #F0F0F0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 18px;
+  border-radius: $radius;
+  background: #F5F7FA;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:active { transform: scale(0.95); }
+
+  &.disabled {
+    opacity: 0.3;
+    pointer-events: none;
+  }
+}
+
+.nav-arrow {
+  font-size: 20px;
+  font-weight: 700;
+  color: $learn-blue;
+}
+
+.nav-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: $learn-blue;
+}
+
+.nav-center {
+  padding: 8px 16px;
+  border-radius: $radius-sm;
+  background: #F0F4FF;
+  cursor: pointer;
+}
+
+.nav-counter {
+  font-size: 14px;
+  font-weight: 700;
+  color: $learn-blue;
+}
+
+@include respond-sm {
   .screen { padding: 16px; }
   .start-emoji { font-size: 76px; }
   .info-row { gap: 8px; }

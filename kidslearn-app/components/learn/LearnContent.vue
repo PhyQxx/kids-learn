@@ -317,11 +317,11 @@ async function goCourse(item) {
 }
 
 /* 响应式 */
-@media (max-width: 800px) {
+@include respond-md {
   .recent-card { flex-wrap: wrap; }
 }
 
-@media (max-width: 640px) {
+@include respond-sm {
   .learn-content { gap: 16px; }
   .recent-progress { width: 100%; margin-left: 64px; }
 }

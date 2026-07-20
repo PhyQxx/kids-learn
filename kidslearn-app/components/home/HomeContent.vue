@@ -600,7 +600,7 @@ function goAdaptivePractice(wp) {
 .ranking-empty { padding: 12px 0; text-align: center; }
 
 /* 响应式 */
-@media (max-width: 800px) {
+@include respond-md {
   .subject-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
   .subject-emoji { font-size: 32px; }
   .subject-card { padding: 16px 12px; min-height: 130px; }
@@ -611,7 +611,7 @@ function goAdaptivePractice(wp) {
   .ranking-quick { display: none; }
 }
 
-@media (max-width: 640px) {
+@include respond-sm {
   .home-content { gap: 16px; }
   .task-banner {
     align-items: flex-start;

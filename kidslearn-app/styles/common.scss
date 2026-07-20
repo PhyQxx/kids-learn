@@ -85,7 +85,7 @@ uni-page-body, html, body {
   font-size: $font-md;
   font-weight: 500;
   padding: 0 20px;
-  min-height: 48px;
+  min-height: $tap-target-lg;
   cursor: pointer;
   transition: all $transition-fast;
   border: none;
@@ -341,8 +341,8 @@ uni-page-body, html, body {
 
 /* Kids UX primitives */
 .kid-tap {
-  min-width: 48px;
-  min-height: 48px;
+  min-width: $tap-target-min;
+  min-height: $tap-target-min;
 }
 
 .kid-section {
@@ -354,4 +354,64 @@ uni-page-body, html, body {
 .kid-helper {
   font-size: $font-sm;
   color: $text-secondary;
+}
+
+/* ===== 移动端优化 ===== */
+@include respond-sm {
+  /* 增大触控区域 */
+  .btn {
+    min-height: $tap-target-lg;
+    padding: 0 16px;
+  }
+
+  .card {
+    padding: $mobile-padding;
+  }
+
+  /* 增大间距 */
+  .gap-8 { gap: 10px; }
+  .gap-12 { gap: 14px; }
+  .gap-16 { gap: 18px; }
+
+  /* 输入框适配 */
+  .input {
+    height: 56px;
+    font-size: $mobile-font-base; /* 防止iOS自动缩放 */
+  }
+
+  /* 徽章适配 */
+  .badge {
+    padding: 4px 12px;
+    font-size: $mobile-font-xs;
+  }
+
+  /* 字体大小优化 */
+  .text-xs { font-size: $mobile-font-xs; }
+  .text-sm { font-size: $mobile-font-sm; }
+  .text-base { font-size: $mobile-font-base; }
+
+  /* 题目和选项文字增大 */
+  .question-text { font-size: 18px; }
+  .option-text { font-size: 16px; }
+}
+
+/* ===== Safe Area 适配 ===== */
+.safe-area-bottom {
+  padding-bottom: $safe-area-bottom;
+}
+
+.safe-area-top {
+  padding-top: $safe-area-top;
+}
+
+/* 底部tab栏safe-area */
+@include respond-sm {
+  .sidebar {
+    padding-bottom: $safe-area-bottom;
+  }
+
+  /* 全屏布局 */
+  .app-layout {
+    padding-bottom: $safe-area-bottom;
+  }
 }

@@ -32,8 +32,25 @@ final class QuestionAnswerEvaluator {
             case TYPE_MATCH -> evaluateMatch(options, answer);
             case TYPE_FILL -> evaluateFill(options, answer);
             case TYPE_VOICE -> evaluateVoice(options, answer);
-            default -> evaluateSingle(options, answer); // SINGLE 和 TRUE_FALSE 的判断逻辑一致
+            case TYPE_TRUE_FALSE -> evaluateTrueFalse(options, answer);
+            default -> evaluateSingle(options, answer);
         };
+    }
+
+    private static Evaluation evaluateTrueFalse(List<QuestionOption> options, String answer) {
+        // 判断题：先用 isCorrect 找到正确选项，再标准化为"正确"/"错误"比对
+        // 兼容旧数据（optionLabel=A/B/C/D、optionContent 可能为空）
+        boolean submittedCorrect = "正确".equalsIgnoreCase(safe(answer));
+
+        boolean hasCorrectOption = options.stream()
+            .anyMatch(option -> option.getIsCorrect() != null && option.getIsCorrect() == 1);
+
+        // 判断题只有两个选项，用户选"正确"表示认为题目说法正确（即 isCorrect=1 的选项）
+        // 用户选"错误"表示认为题目说法错误（即 isCorrect=0 的选项）
+        boolean answerIsCorrect = hasCorrectOption == submittedCorrect;
+
+        String correctAnswer = hasCorrectOption ? "正确" : "错误";
+        return new Evaluation(answerIsCorrect, correctAnswer);
     }
 
     private static Evaluation evaluateSingle(List<QuestionOption> options, String answer) {

@@ -6,10 +6,10 @@
 /* ----- Age-Adaptive Color Tokens ----- */
 :root {
   /* Brand Core */
-  --color-primary: #FF6B6B;
-  --color-primary-light: #FF8E8E;
-  --color-accent: #FFE66D;
-  --color-teal: #4ECDC4;
+  --color-primary: #FF7A59;
+  --color-primary-light: #FFA06F;
+  --color-accent: #FFD95A;
+  --color-teal: #35C9B8;
   --color-teal-dark: #26A69A;
 
   /* Learning Blue */
@@ -23,30 +23,35 @@
   --color-gold: #FFD700;
 
   /* Semantic */
-  --color-success: #2ECC71;
-  --color-warning: #F39C12;
-  --color-error: #E74C3C;
+  --color-success: #35C773;
+  --color-warning: #F4A62A;
+  --color-error: #F05A5A;
   --color-info: #4A90D9;
 
   /* Neutrals */
-  --color-bg: #F7F7F7;
+  --color-bg: #F8FBFF;
   --color-white: #FFFFFF;
-  --color-text: #333333;
-  --color-text-light: #999999;
-  --color-text-secondary: #666666;
-  --color-border: #F0F0F0;
+  --color-text: #2D3440;
+  --color-text-light: #7A8797;
+  --color-text-secondary: #5D6A7A;
+  --color-border: #E7EEF7;
 
   /* Typography */
   --font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
-  --font-xs: 11px;
-  --font-sm: 12px;
-  --font-base: 14px;
+  --font-xs: 12px;
+  --font-sm: 13px;
+  --font-base: 15px;
   --font-md: 16px;
   --font-lg: 18px;
   --font-xl: 20px;
   --font-xxl: 24px;
   --font-title: 28px;
   --font-hero: 36px;
+
+  /* Mobile Typography */
+  --mobile-font-base: 16px;
+  --mobile-font-sm: 14px;
+  --mobile-font-xs: 12px;
 
   /* Spacing */
   --space-xs: 4px;
@@ -57,17 +62,17 @@
   --space-xl: 24px;
   --space-xxl: 32px;
 
-  /* Radii - 按钮12px、卡片16px、弹窗24px */
+  /* Radii */
   --radius-sm: 8px;
-  --radius: 12px;
-  --radius-md: 16px;
-  --radius-lg: 20px;
-  --radius-xl: 24px;
+  --radius: 14px;
+  --radius-md: 18px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
 
   /* Shadows */
-  --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --shadow: 0 10px 28px rgba(73, 98, 128, 0.10);
+  --shadow-sm: 0 4px 14px rgba(73, 98, 128, 0.08);
+  --shadow-lg: 0 16px 42px rgba(73, 98, 128, 0.14);
 
   /* Touch targets - minimum 44x44px for kids */
   --touch-min: 44px;
@@ -85,6 +90,10 @@
   --sidebar-width: 220px;
   --sidebar-collapsed: 60px;
   --topbar-height: 64px;
+
+  /* Safe Area */
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-top: env(safe-area-inset-top, 0px);
 }
 
 /* 3-6岁：马卡龙色系 - 柔和可爱 */
@@ -102,11 +111,11 @@
 
 /* 6-9岁：明快色系 - 活泼活力 */
 .theme-lively {
-  --color-primary: #FF6B6B;
-  --color-primary-light: #FF8E8E;
-  --color-accent: #FFE66D;
-  --color-teal: #4ECDC4;
-  --color-bg: #F7F7F7;
+  --color-primary: #FF7A59;
+  --color-primary-light: #FFA06F;
+  --color-accent: #FFD95A;
+  --color-teal: #35C9B8;
+  --color-bg: #F8FBFF;
   --color-learn: #4A90D9;
   --color-learn-light: #6BA3E0;
 }
