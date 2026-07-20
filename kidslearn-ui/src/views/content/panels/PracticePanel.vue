@@ -5,7 +5,8 @@
       <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增练习</el-button>
     </div>
 
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="icon" label="图标" width="60">
         <template #default="{ row }">
           <span style="font-size: 24px;">{{ row.icon }}</span>
@@ -36,6 +37,7 @@
 
     <el-pagination v-if="total > 0" style="margin-top:16px;justify-content:flex-end" :total="total" :page-size="pageSize"
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑练习' : '新增练习'" width="500">
       <el-form :model="form" label-width="90px">
@@ -67,6 +69,9 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPracticeModeList, savePracticeMode, deletePracticeMode } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const props = defineProps<{
   subject: any

@@ -19,7 +19,8 @@
       </div>
     </template>
 
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="targetType" label="对象类型" width="120" />
       <el-table-column prop="targetId" label="对象 ID" width="100" />
       <el-table-column prop="action" label="动作" width="120" />
@@ -49,6 +50,7 @@
       layout="total, prev, pager, next"
       @current-change="fetchData"
     />
+    </div>
 
     <el-dialog v-model="reviewDialogVisible" :title="reviewStatus === 2 ? '通过审核' : '驳回审核'" width="480px">
       <el-form label-width="80px">
@@ -103,6 +105,9 @@ import {
   type ContentAiPrecheckResult,
   type ContentAuditRecord,
 } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const loading = ref(false)
 const reviewing = ref(false)

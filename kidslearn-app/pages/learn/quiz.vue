@@ -82,44 +82,24 @@
           </view>
 
           <!-- 排序题 -->
-          <view v-else-if="currentQuestion.interactionType === 'order'" class="order-panel card">
-            <view v-for="(item, i) in orderItems" :key="item.answerValue" class="order-row">
-              <text class="order-index">{{ i + 1 }}</text>
-              <text class="order-text">{{ item.text }}</text>
-              <view class="order-actions">
-                <view class="mini-btn" :class="{ disabled: i === 0 }" @tap="moveOrderItem(i, -1)">↑</view>
-                <view class="mini-btn" :class="{ disabled: i === orderItems.length - 1 }" @tap="moveOrderItem(i, 1)">↓</view>
-              </view>
-            </view>
-            <tn-button type="primary" shape="round" size="lg" :disabled="!!selectedAnswer" @click="submitOrderAnswer">提交排序</tn-button>
+          <view v-else-if="currentQuestion.interactionType === 'order'" class="order-panel-wrapper">
+            <SortableList
+              :items="orderItems"
+              :disabled="!!selectedAnswer"
+              @update:items="orderItems = $event"
+            />
+            <tn-button class="order-submit-btn" type="primary" shape="round" size="lg" :disabled="!!selectedAnswer" @click="submitOrderAnswer">提交排序</tn-button>
           </view>
 
           <!-- 连线题 -->
-          <view v-else-if="currentQuestion.interactionType === 'match'" class="match-panel">
-            <view class="match-column card">
-              <view
-                v-for="left in currentQuestion.options"
-                :key="left.answerValue"
-                class="match-item"
-                :class="{ active: selectedMatchLeft === left.answerValue, paired: matchPairs[left.answerValue] }"
-                @tap="selectMatchLeft(left)"
-              >
-                <text class="match-label">{{ left.pairLeft }}</text>
-                <text class="match-pair">{{ matchRightText(matchPairs[left.answerValue]) }}</text>
-              </view>
-            </view>
-            <view class="match-column card">
-              <view
-                v-for="right in matchRightItems"
-                :key="right.answerValue"
-                class="match-item right"
-                :class="{ paired: matchedRightValues.has(right.answerValue) }"
-                @tap="selectMatchRight(right)"
-              >
-                <text class="match-label">{{ right.pairRight }}</text>
-              </view>
-            </view>
-            <tn-button class="match-submit" type="primary" shape="round" size="lg" :disabled="!canSubmitMatch || !!selectedAnswer" @click="submitMatchAnswer">提交连线</tn-button>
+          <view v-else-if="currentQuestion.interactionType === 'match'" class="match-panel-wrapper">
+            <MatchPanel
+              ref="matchPanelRef"
+              :options="currentQuestion.options"
+              :disabled="!!selectedAnswer"
+              @pair-change="onMatchPairChange"
+            />
+            <tn-button class="match-submit-btn" type="primary" shape="round" size="lg" :disabled="!canSubmitMatch || !!selectedAnswer" @click="submitMatchAnswer">提交连线</tn-button>
           </view>
 
           <!-- 语音题 -->
@@ -257,6 +237,9 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import RewardOverlay from '@/components/common/RewardOverlay.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import SortableList from '@/components/quiz/SortableList.vue'
+import MatchPanel from '@/components/quiz/MatchPanel.vue'
+import { soundManager } from '@/utils/sound'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
 import { usePetStore } from '@/store/pet'
@@ -346,6 +329,7 @@ const selectedMatchLeft = ref('')
 const voiceAttempt = ref('')
 const fillAttempt = ref('')
 const voiceListening = ref(false)
+const matchPanelRef = ref(null)
 const showCorrect = ref(false)
 const showWrong = ref(false)
 const wrongAiLoading = ref(false)
@@ -561,6 +545,11 @@ const canSubmitMatch = computed(() =>
   && Object.keys(matchPairs.value).length === currentQuestion.value.options.length
 )
 
+// 连线题配对变化回调
+function onMatchPairChange(newPairs) {
+  matchPairs.value = newPairs
+}
+
 const resultEmoji = computed(() => {
   if (isPractice.value) return '🏆'
   return earnedStars.value >= 3 ? '🎉' : earnedStars.value >= 1 ? '👍' : '💪'
@@ -642,6 +631,10 @@ function resetInteractionState() {
   voiceAttempt.value = ''
   fillAttempt.value = ''
   voiceListening.value = false
+  // 重置 MatchPanel 组件
+  if (matchPanelRef.value && q.interactionType === 'match') {
+    matchPanelRef.value.reset()
+  }
 }
 
 function moveOrderItem(index, direction) {
@@ -753,21 +746,18 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
         correctCount.value++
         totalScore.value += (q.score || 10)
         showCorrect.value = true
-        // 增加震动反馈
-        uni.vibrateShort()
-        // 同时播放 UI 音效和语音反馈
-        soundManager.play('success')
-        playFeedbackAudio('correct')
-        generateCoinParticles(8) // 增加粒子数量
+        try { uni.vibrateShort() } catch (_) {}
+        try { soundManager.play('success') } catch (_) {}
+        try { playFeedbackAudio('correct') } catch (_) {}
+        generateCoinParticles(8)
         if (res?.petExp) showPetExpGain(res.petExp)
       } else {
         showWrong.value = true
         wrongAiExplanation.value = ''
         wrongAiLoading.value = true
-        // 增加较明显的震动反馈
-        uni.vibrateLong()
-        soundManager.play('fail')
-        playFeedbackAudio('wrong')
+        try { uni.vibrateLong() } catch (_) {}
+        try { soundManager.play('fail') } catch (_) {}
+        try { playFeedbackAudio('wrong') } catch (_) {}
         loadWrongAiExplanation(q.id, res?.explanationText)
         // Mark correct answer in options
         if (res?.correctAnswer) {
@@ -785,7 +775,7 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
       showWrong.value = true
       wrongAiExplanation.value = ''
       wrongAiLoading.value = false
-      playFeedbackAudio('wrong')
+      try { playFeedbackAudio('wrong') } catch (_) {}
       setTimeout(() => { showWrong.value = false; nextQuestion() }, 3000)
     })
   } else {
@@ -1276,6 +1266,30 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.order-panel-wrapper {
+  width: min(640px, 100%);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.order-submit-btn {
+  margin-top: 4px;
+}
+
+.match-panel-wrapper {
+  width: min(760px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.match-submit-btn {
+  margin-top: 4px;
 }
 
 .order-row {

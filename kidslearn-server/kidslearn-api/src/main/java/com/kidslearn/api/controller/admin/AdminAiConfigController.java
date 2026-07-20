@@ -5,6 +5,7 @@ import com.kidslearn.api.entity.AppConfig;
 import com.kidslearn.api.mapper.AppConfigMapper;
 import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.impl.AdminOperationLogService;
+import com.kidslearn.api.service.impl.QuestionAudioProperties;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,78 +27,191 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AdminAiConfigController {
 
-    private static final String PREFIX = "ai.";
-    private static final String ACTIVE_PROVIDER_KEY = "ai.provider";
+    private static final String AI_PREFIX = "ai.";
+    private static final String TTS_PREFIX = "tts.";
+    private static final String AI_PROVIDER_KEY = "ai.provider";
+    private static String aiImgProviderKey() { return "ai.image.provider"; }
+    private static final String TTS_PROVIDER_KEY = "tts.provider";
     private static final String TIMEOUT_KEY = "ai.timeout";
     private static final int DEFAULT_TIMEOUT = 15;
+
+    // provider, name, baseUrl, model, type(text/image/tts)
     private static final List<ProviderSeed> PROVIDER_SEEDS = List.of(
-        new ProviderSeed("deepseek", "DeepSeek", "https://api.deepseek.com", "deepseek-chat"),
-        new ProviderSeed("openai", "OpenAI", "https://api.openai.com", "gpt-4o-mini"),
-        new ProviderSeed("qwen", "通义千问", "https://dashscope.aliyuncs.com/compatible-mode", "qwen-plus"),
-        new ProviderSeed("moonshot", "Moonshot", "https://api.moonshot.cn", "moonshot-v1-8k"),
-        new ProviderSeed("custom", "自定义兼容模型", "", "")
+        // ---- 文字生成 ----
+        new ProviderSeed("deepseek", "DeepSeek", "https://api.deepseek.com", "deepseek-chat", "text", ""),
+        new ProviderSeed("openai", "OpenAI", "https://api.openai.com", "gpt-4o-mini", "text", ""),
+        new ProviderSeed("qwen", "通义千问", "https://dashscope.aliyuncs.com/compatible-mode", "qwen-plus", "text", ""),
+        new ProviderSeed("moonshot", "Moonshot", "https://api.moonshot.cn", "moonshot-v1-8k", "text", ""),
+        new ProviderSeed("custom", "自定义兼容模型", "", "", "text", ""),
+        // ---- 图片生成 ----
+        new ProviderSeed("zhipu", "智谱 CogView", "https://open.bigmodel.cn/api/paas/v4", "cogview-3-flash", "image", ""),
+        // ---- 语音合成 ----
+        new ProviderSeed("mimo", "MiMo（云端）", "https://api.xiaomimimo.com/v1", "mimo-v2.5-tts", "tts", "冰糖"),
+        new ProviderSeed("moss", "moss-tts（本地）", "/opt/moss-tts/bin/moss-tts-nano", "onnx", "tts", "Junhao")
     );
 
     private final AppConfigMapper appConfigMapper;
     private final AdminOperationLogService adminOperationLogService;
     private final AiService aiService;
+    private final QuestionAudioProperties questionAudioProperties;
+
+    // ===== 查询 =====
 
     @Operation(summary = "AI配置详情")
     @GetMapping("/config")
     public R<AiConfigResponse> detail() {
-        Map<String, AppConfig> configs = loadAiConfigs();
-        Map<String, ProviderConfig> providers = buildProviderMap(configs);
-        String provider = value(configs, ACTIVE_PROVIDER_KEY, "deepseek");
+        Map<String, AppConfig> configs = loadAllConfigs();
 
         AiConfigResponse response = new AiConfigResponse();
-        response.setProvider(provider);
-        response.setTimeout(parseTimeout(value(configs, TIMEOUT_KEY, String.valueOf(DEFAULT_TIMEOUT))));
-        response.setProviders(new ArrayList<>(providers.values()));
+        response.setProvider(val(configs, AI_PROVIDER_KEY, "deepseek"));
+        response.setImageProvider(val(configs, aiImgProviderKey(), "zhipu"));
+        response.setTimeout(parseTimeout(val(configs, TIMEOUT_KEY, String.valueOf(DEFAULT_TIMEOUT))));
+        response.setCategories(buildCategories(configs));
         return R.ok(response);
     }
+
+    // ===== 保存 =====
 
     @Operation(summary = "保存AI配置")
     @PostMapping("/config")
     public R<Void> save(@RequestBody AiConfigRequest request) {
-        if (request == null || isBlank(request.getProvider())) {
-            return R.fail("请选择AI服务商");
-        }
-        if (request.getTimeout() == null || request.getTimeout() < 1 || request.getTimeout() > 120) {
-            return R.fail("超时时间需在1-120秒之间");
-        }
-        if (request.getProviders() == null || request.getProviders().isEmpty()) {
-            return R.fail("请至少配置一个AI服务商");
+        if (request == null) {
+            return R.fail("请求不能为空");
         }
 
-        Map<String, AppConfig> existing = loadAiConfigs();
-        upsert(existing, ACTIVE_PROVIDER_KEY, request.getProvider().trim(), "当前AI服务商");
-        upsert(existing, TIMEOUT_KEY, String.valueOf(request.getTimeout()), "AI请求超时时间（秒）");
+        Map<String, AppConfig> existing = loadAllConfigs();
 
-        for (ProviderConfig provider : request.getProviders()) {
-            if (provider == null || isBlank(provider.getProvider())) {
-                continue;
-            }
-            String providerKey = provider.getProvider().trim();
-            if (!isProviderKey(providerKey)) {
-                return R.fail("AI服务商标识只能包含字母、数字、下划线和短横线");
-            }
-            String prefix = PREFIX + providerKey + ".";
-            upsert(existing, prefix + "enabled", provider.isEnabled() ? "1" : "0", providerKey + " 启用状态");
-            upsert(existing, prefix + "base_url", trim(provider.getBaseUrl()), providerKey + " API地址");
-            upsert(existing, prefix + "model", trim(provider.getModel()), providerKey + " 模型名称");
-            if (!isBlank(provider.getApiKey()) && !"******".equals(provider.getApiKey().trim())) {
-                upsert(existing, prefix + "api_key", provider.getApiKey().trim(), providerKey + " API Key");
+        // 保存默认服务商
+        if (!isBlank(request.getProvider()))        upsert(existing, AI_PROVIDER_KEY, request.getProvider().trim(), "文字默认服务商");
+        if (!isBlank(request.getImageProvider()))    upsert(existing, aiImgProviderKey(), request.getImageProvider().trim(), "图片默认服务商");
+        if (request.getTimeout() != null)            upsert(existing, TIMEOUT_KEY, String.valueOf(request.getTimeout()), "AI请求超时时间（秒）");
+
+        // 保存所有 provider 配置（文字 + 图片 + TTS 统一处理）
+        if (request.getProviders() != null) {
+            for (ProviderConfig provider : request.getProviders()) {
+                if (provider == null || isBlank(provider.getProvider())) continue;
+                String providerKey = provider.getProvider().trim();
+                if (!isProviderKey(providerKey)) {
+                    return R.fail("服务商标识只能包含字母、数字、下划线和短横线");
+                }
+                String category = provider.getCategory() != null ? provider.getCategory().trim() : "text";
+                String prefix;
+                if ("tts".equals(category)) {
+                    prefix = TTS_PREFIX + providerKey + ".";
+                } else if ("image".equals(category)) {
+                    prefix = AI_PREFIX + providerKey + ".";
+                } else {
+                    prefix = AI_PREFIX + providerKey + ".";
+                }
+                upsert(existing, prefix + "enabled", provider.isEnabled() ? "1" : "0", providerKey + " 启用状态");
+                upsert(existing, prefix + "base_url", trim(provider.getBaseUrl()), providerKey + " API地址");
+                upsert(existing, prefix + "model", trim(provider.getModel()), providerKey + " 模型名称");
+                if (!isBlank(provider.getApiKey()) && !"******".equals(provider.getApiKey().trim())) {
+                    upsert(existing, prefix + "api_key", provider.getApiKey().trim(), providerKey + " API Key");
+                }
+                // TTS 专有字段
+                if ("tts".equals(category) && !isBlank(provider.getVoice())) {
+                    upsert(existing, prefix + "voice", provider.getVoice().trim(), providerKey + " 语音");
+                }
             }
         }
 
-        adminOperationLogService.write("ai-config", "save", "app-config", null, "provider=" + request.getProvider().trim());
+        // 保存 TTS 默认引擎
+        if (!isBlank(request.getTtsProvider())) {
+            upsert(existing, TTS_PROVIDER_KEY, request.getTtsProvider().trim(), "TTS默认引擎");
+        }
+
+        questionAudioProperties.refresh();
+        adminOperationLogService.write("ai-config", "save", "app-config", null, "saved");
         aiService.clearCache();
         return R.ok();
     }
 
-    private Map<String, AppConfig> loadAiConfigs() {
+    // ===== 构建分类数据 =====
+
+    private List<CategoryGroup> buildCategories(Map<String, AppConfig> configs) {
+        Map<String, List<ProviderConfig>> grouped = new LinkedHashMap<>();
+        grouped.put("text", new ArrayList<>());
+        grouped.put("image", new ArrayList<>());
+        grouped.put("tts", new ArrayList<>());
+
+        // 从 seeds 构建
+        Map<String, String> builtKeys = new LinkedHashMap<>();
+        for (ProviderSeed seed : PROVIDER_SEEDS) {
+            String prefix = "tts".equals(seed.type()) ? TTS_PREFIX : AI_PREFIX;
+            ProviderConfig p = new ProviderConfig();
+            p.setProvider(seed.provider());
+            p.setName(seed.name());
+            p.setCategory(seed.type());
+            p.setBaseUrl(val(configs, prefix + seed.provider() + ".base_url", seed.baseUrl()));
+            p.setModel(val(configs, prefix + seed.provider() + ".model", seed.model()));
+            p.setEnabled("1".equals(val(configs, prefix + seed.provider() + ".enabled", "0")));
+            p.setApiKey("");
+            p.setApiKeyConfigured(!isBlank(val(configs, prefix + seed.provider() + ".api_key", "")));
+            // TTS 专有字段
+            if ("tts".equals(seed.type())) {
+                p.setVoice(val(configs, prefix + seed.provider() + ".voice", seed.extra()));
+            }
+            builtKeys.put(seed.type() + ":" + seed.provider(), seed.type());
+            grouped.get(seed.type()).add(p);
+        }
+
+        // 动态发现的 ai.* provider（文字/图片）
+        for (String configKey : configs.keySet()) {
+            if (!configKey.startsWith(AI_PREFIX)) continue;
+            String providerKey = parseProviderKey(configKey, AI_PREFIX);
+            if (providerKey == null) continue;
+            String lookup = "text:" + providerKey;
+            if (builtKeys.containsKey(lookup) || builtKeys.containsKey("image:" + providerKey)) continue;
+            ProviderConfig p = new ProviderConfig();
+            p.setProvider(providerKey);
+            p.setName(providerKey);
+            p.setCategory("text");
+            p.setBaseUrl(val(configs, AI_PREFIX + providerKey + ".base_url", ""));
+            p.setModel(val(configs, AI_PREFIX + providerKey + ".model", ""));
+            p.setEnabled("1".equals(val(configs, AI_PREFIX + providerKey + ".enabled", "0")));
+            p.setApiKey("");
+            p.setApiKeyConfigured(!isBlank(val(configs, AI_PREFIX + providerKey + ".api_key", "")));
+            grouped.get("text").add(p);
+        }
+
+        // 动态发现的 tts.* provider
+        for (String configKey : configs.keySet()) {
+            if (!configKey.startsWith(TTS_PREFIX)) continue;
+            String providerKey = parseProviderKey(configKey, TTS_PREFIX);
+            if (providerKey == null || "provider".equals(providerKey)) continue;
+            if (builtKeys.containsKey("tts:" + providerKey)) continue;
+            ProviderConfig p = new ProviderConfig();
+            p.setProvider(providerKey);
+            p.setName(providerKey);
+            p.setCategory("tts");
+            p.setBaseUrl(val(configs, TTS_PREFIX + providerKey + ".base_url", ""));
+            p.setModel(val(configs, TTS_PREFIX + providerKey + ".model", ""));
+            p.setEnabled("1".equals(val(configs, TTS_PREFIX + providerKey + ".enabled", "0")));
+            p.setApiKey("");
+            p.setApiKeyConfigured(!isBlank(val(configs, TTS_PREFIX + providerKey + ".api_key", "")));
+            p.setVoice(val(configs, TTS_PREFIX + providerKey + ".voice", ""));
+            grouped.get("tts").add(p);
+        }
+
+        // TTS 默认引擎
+        String ttsProvider = val(configs, TTS_PROVIDER_KEY, "mimo");
+
+        List<CategoryGroup> categories = new ArrayList<>();
+        categories.add(new CategoryGroup("text", "文字生成", grouped.get("text"), val(configs, AI_PROVIDER_KEY, "deepseek")));
+        categories.add(new CategoryGroup("image", "图片生成", grouped.get("image"), val(configs, aiImgProviderKey(), "zhipu")));
+        categories.add(new CategoryGroup("tts", "语音合成", grouped.get("tts"), ttsProvider));
+        return categories;
+    }
+
+    // ===== 工具方法 =====
+
+    private Map<String, AppConfig> loadAllConfigs() {
         List<AppConfig> configs = appConfigMapper.selectList(
-            new LambdaQueryWrapper<AppConfig>().likeRight(AppConfig::getConfigKey, PREFIX)
+            new LambdaQueryWrapper<AppConfig>()
+                .likeRight(AppConfig::getConfigKey, AI_PREFIX)
+                .or()
+                .likeRight(AppConfig::getConfigKey, TTS_PREFIX)
         );
         Map<String, AppConfig> map = new LinkedHashMap<>();
         for (AppConfig config : configs) {
@@ -106,38 +220,6 @@ public class AdminAiConfigController {
             }
         }
         return map;
-    }
-
-    private Map<String, ProviderConfig> buildProviderMap(Map<String, AppConfig> configs) {
-        Map<String, ProviderConfig> providers = new LinkedHashMap<>();
-        for (ProviderSeed seed : PROVIDER_SEEDS) {
-            ProviderConfig provider = new ProviderConfig();
-            provider.setProvider(seed.provider());
-            provider.setName(seed.name());
-            provider.setBaseUrl(value(configs, key(seed.provider(), "base_url"), seed.baseUrl()));
-            provider.setModel(value(configs, key(seed.provider(), "model"), seed.model()));
-            provider.setEnabled("1".equals(value(configs, key(seed.provider(), "enabled"), "0")));
-            provider.setApiKey("");
-            provider.setApiKeyConfigured(!isBlank(value(configs, key(seed.provider(), "api_key"), "")));
-            providers.put(seed.provider(), provider);
-        }
-
-        for (String configKey : configs.keySet()) {
-            String providerKey = parseProviderKey(configKey);
-            if (providerKey == null || providers.containsKey(providerKey)) {
-                continue;
-            }
-            ProviderConfig provider = new ProviderConfig();
-            provider.setProvider(providerKey);
-            provider.setName(providerKey);
-            provider.setBaseUrl(value(configs, key(providerKey, "base_url"), ""));
-            provider.setModel(value(configs, key(providerKey, "model"), ""));
-            provider.setEnabled("1".equals(value(configs, key(providerKey, "enabled"), "0")));
-            provider.setApiKey("");
-            provider.setApiKeyConfigured(!isBlank(value(configs, key(providerKey, "api_key"), "")));
-            providers.put(providerKey, provider);
-        }
-        return providers;
     }
 
     private void upsert(Map<String, AppConfig> existing, String key, String value, String description) {
@@ -153,83 +235,71 @@ public class AdminAiConfigController {
             return;
         }
         config.setConfigValue(value == null ? "" : value);
-        if (isBlank(config.getDescription())) {
-            config.setDescription(description);
-        }
-        if (config.getConfigType() == null) {
-            config.setConfigType(1);
-        }
+        if (isBlank(config.getDescription())) config.setDescription(description);
+        if (config.getConfigType() == null) config.setConfigType(1);
         appConfigMapper.updateById(config);
     }
 
-    private static String key(String provider, String field) {
-        return PREFIX + provider + "." + field;
-    }
-
-    private static String value(Map<String, AppConfig> configs, String key, String defaultValue) {
+    private static String val(Map<String, AppConfig> configs, String key, String defaultValue) {
         AppConfig config = configs.get(key);
-        if (config == null || config.getConfigValue() == null || config.getConfigValue().isBlank()) {
-            return defaultValue;
-        }
+        if (config == null || config.getConfigValue() == null || config.getConfigValue().isBlank()) return defaultValue;
         return config.getConfigValue().trim();
     }
 
     private static int parseTimeout(String value) {
-        try {
-            return Integer.parseInt(value);
-        } catch (NumberFormatException e) {
-            return DEFAULT_TIMEOUT;
-        }
+        try { return Integer.parseInt(value); } catch (NumberFormatException e) { return DEFAULT_TIMEOUT; }
     }
 
-    private static String parseProviderKey(String configKey) {
-        if (configKey == null || !configKey.startsWith(PREFIX)) {
-            return null;
-        }
-        String suffix = configKey.substring(PREFIX.length());
+    private static String parseProviderKey(String configKey, String prefix) {
+        if (configKey == null || !configKey.startsWith(prefix)) return null;
+        String suffix = configKey.substring(prefix.length());
         int dot = suffix.indexOf('.');
-        if (dot <= 0) {
-            return null;
-        }
-        return suffix.substring(0, dot);
+        return dot <= 0 ? null : suffix.substring(0, dot);
     }
 
-    private static boolean isProviderKey(String value) {
-        return value.matches("[A-Za-z0-9_-]+");
-    }
+    private static boolean isProviderKey(String value) { return value.matches("[A-Za-z0-9_-]+"); }
+    private static String trim(String value) { return value == null ? "" : value.trim(); }
+    private static boolean isBlank(String value) { return value == null || value.isBlank(); }
 
-    private static String trim(String value) {
-        return value == null ? "" : value.trim();
-    }
+    private record ProviderSeed(String provider, String name, String baseUrl, String model, String type, String extra) {}
 
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
-    }
-
-    private record ProviderSeed(String provider, String name, String baseUrl, String model) {}
+    // ===== DTO =====
 
     @Data
     public static class AiConfigResponse {
-        private String provider;
+        private String provider;        // 文字默认
+        private String imageProvider;   // 图片默认
         private Integer timeout;
-        private List<ProviderConfig> providers;
+        private List<CategoryGroup> categories;
     }
 
     @Data
     public static class AiConfigRequest {
-        private String provider;
+        private String provider;        // 文字默认
+        private String imageProvider;   // 图片默认
+        private String ttsProvider;     // TTS 默认引擎
         private Integer timeout;
         private List<ProviderConfig> providers;
+    }
+
+    @Data
+    public static class CategoryGroup {
+        private final String type;    // text / image / tts
+        private final String label;   // 文字生成 / 图片生成 / 语音合成
+        private final List<ProviderConfig> providers;
+        private final String defaultProvider;  // 该分类的默认服务商
     }
 
     @Data
     public static class ProviderConfig {
         private String provider;
         private String name;
+        private String category;   // text / image / tts
         private boolean enabled;
         private String baseUrl;
         private String model;
         private String apiKey;
         private boolean apiKeyConfigured;
+        private String voice;      // TTS 专有
     }
 }

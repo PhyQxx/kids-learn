@@ -4,7 +4,8 @@
       <span style="font-size:15px;font-weight:600">{{ subject.subjectName }} - 课程列表</span>
       <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增课程</el-button>
     </div>
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="courseName" label="课程名称" />
       <el-table-column prop="totalLevels" label="关卡数" width="80" />
       <el-table-column prop="isElite" label="精英关" width="80">
@@ -23,6 +24,7 @@
     </el-table>
     <el-pagination v-if="total > 0" style="margin-top:16px;justify-content:flex-end" :total="total" :page-size="pageSize"
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑课程' : '新增课程'" width="600">
       <el-form :model="form" label-width="80px">
@@ -60,6 +62,9 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCourseList, saveCourse, deleteCourse, getGradeLevelList, getCourseGrades, bindCourseGrades } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const props = defineProps<{
   subject: any

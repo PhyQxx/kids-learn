@@ -7,10 +7,16 @@ import cn.hutool.http.HttpRequest;
 import cn.hutool.http.HttpResponse;
 import com.kidslearn.api.entity.AppConfig;
 import com.kidslearn.api.mapper.AppConfigMapper;
+import com.kidslearn.common.exception.BusinessException;
+import com.kidslearn.common.ftp.FtpTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -20,16 +26,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AiService {
 
     private static final Logger log = LoggerFactory.getLogger(AiService.class);
+    private static final DateTimeFormatter FILE_TIME = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final AppConfigMapper appConfigMapper;
+    private final FtpTool ftpTool;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final Map<String, String> configCache = new ConcurrentHashMap<>();
     private long cacheTime = 0;
     private static final long CACHE_TTL_MS = 60_000; // 1分钟缓存
 
-    public AiService(AppConfigMapper appConfigMapper) {
+    public AiService(AppConfigMapper appConfigMapper, FtpTool ftpTool) {
         this.appConfigMapper = appConfigMapper;
+        this.ftpTool = ftpTool;
     }
 
     private String getConfig(String key) {
@@ -489,5 +498,85 @@ public class AiService {
 
     private static String blankDefault(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    // ---- AI 图片生成 (智谱 CogView) ----
+
+    private static final String ZHIPU_IMAGE_URL = "https://open.bigmodel.cn/api/paas/v4/images/generations";
+    private static final String ZHIPU_DEFAULT_MODEL = "cogview-3-flash";
+
+    /**
+     * 调用智谱 CogView 生成图片，下载后上传到 FTP，返回永久可访问 URL。
+     *
+     * @param prompt 图片描述
+     * @param size   图片尺寸，如 "1024x1024"，null 则默认 1024x1024
+     * @return FTP 上的公开图片 URL
+     */
+    public String generateImage(String prompt, String size) {
+        String apiKey = getConfig("ai.zhipu.api_key");
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new BusinessException("智谱 API Key 未配置 (ai.zhipu.api_key)");
+        }
+        String model = getConfig("ai.zhipu.image_model");
+        if (model == null || model.isBlank()) {
+            model = ZHIPU_DEFAULT_MODEL;
+        }
+        if (size == null || size.isBlank()) {
+            size = "1024x1024";
+        }
+
+        try {
+            // 1. 调用智谱图片生成 API
+            Map<String, Object> body = Map.of("model", model, "prompt", prompt, "size", size);
+            String jsonBody = objectMapper.writeValueAsString(body);
+            log.info("Zhipu image request model={} size={} prompt={}", model, size, prompt);
+
+            HttpResponse response = HttpRequest.post(ZHIPU_IMAGE_URL)
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
+                .body(jsonBody)
+                .timeout(60_000)
+                .execute();
+
+            String responseBody = response.body();
+            log.info("Zhipu image response status={}", response.getStatus());
+
+            if (!response.isOk()) {
+                log.error("Zhipu image API error, status={} body={}", response.getStatus(), responseBody);
+                throw new BusinessException("AI 图片生成失败: HTTP " + response.getStatus());
+            }
+
+            JsonNode root = objectMapper.readTree(responseBody);
+            String imageUrl = root.path("data").path(0).path("url").asText("");
+            if (imageUrl.isBlank()) {
+                log.error("Zhipu image response missing url, body={}", responseBody);
+                throw new BusinessException("AI 图片生成失败: 未返回图片 URL");
+            }
+
+            // 2. 下载图片
+            HttpResponse imgResponse = HttpRequest.get(imageUrl)
+                .timeout(30_000)
+                .execute();
+            if (!imgResponse.isOk()) {
+                throw new BusinessException("AI 图片下载失败: HTTP " + imgResponse.getStatus());
+            }
+            byte[] imageBytes = imgResponse.bodyBytes();
+
+            // 3. 上传到 FTP
+            String serviceDir = "/question/images/ai";
+            String fileName = FILE_TIME.format(LocalDateTime.now()) + ".png";
+            try (InputStream is = new ByteArrayInputStream(imageBytes)) {
+                fileName = ftpTool.upload(serviceDir, fileName, is);
+            }
+            String publicUrl = ftpTool.buildPublicUrl(serviceDir, fileName);
+            log.info("AI image saved to FTP: {}", publicUrl);
+            return publicUrl;
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("AI image generation failed", e);
+            throw new BusinessException("AI 图片生成失败: " + e.getMessage());
+        }
     }
 }

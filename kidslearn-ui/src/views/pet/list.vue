@@ -6,7 +6,8 @@
         <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增宠物</el-button>
       </div>
     </template>
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="petCode" label="宠物代码" />
       <el-table-column prop="petName" label="宠物名称" />
       <el-table-column prop="petType" label="类型" width="80">
@@ -29,6 +30,7 @@
     </el-table>
     <el-pagination v-if="total > 0" style="margin-top:16px;justify-content:flex-end" :total="total" :page-size="pageSize"
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
+    </div>
 
     <!-- 宠物编辑 -->
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑宠物' : '新增宠物'" width="500">
@@ -83,6 +85,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPetList, savePet, deletePet, getPetEvolutions, savePetEvolution } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const loading = ref(false)
 const saving = ref(false)

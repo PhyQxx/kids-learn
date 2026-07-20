@@ -67,6 +67,7 @@ export default {
       usedTime: 0,
 
       showSummary: false,
+      answerResult: null,
     }
   },
   computed: {
@@ -121,38 +122,51 @@ export default {
         options: q.options.map(opt => ({
           ...opt,
           optionContent: opt.optionContent || opt.text,
-          label: opt.label || opt.optionLabel
+          label: opt.optionLabel || opt.label,
+          answerValue: opt.answerValue || opt.optionLabel || opt.label
         }))
       }
     },
     getOptionClass(opt) {
       if (!this.selectedAnswer) return ''
       if (opt.isCorrect) return 'correct'
-      if (opt.label === this.selectedAnswer.label && !opt.isCorrect) return 'wrong'
+      if (this.answerResult !== null) {
+        // API 已返回：选中的错的变红
+        if (opt.label === this.selectedAnswer.label && !opt.isCorrect) return 'wrong'
+      } else {
+        // API 未返回：选中的暂时变蓝（等待中）
+        if (opt.label === this.selectedAnswer.label) return 'selected'
+      }
       return ''
     },
     async selectOption(opt) {
       if (this.selectedAnswer) return
       this.selectedAnswer = opt
+      this.answerResult = null
 
       try {
         const res = await submitPracticeAnswer(this.sessionId, {
           questionId: this.currentQuestion.id,
-          answer: opt.label
+          answer: opt.answerValue || opt.label
         })
+
+        this.answerResult = res.correct
 
         if (res.correct) {
           this.correctCount++
           opt.isCorrect = true
         } else {
           this.wrongCount++
-          // Mark the correct answer
-          const correctOpt = this.currentQuestion.options.find(o => o.label === res.correctAnswer)
+          // Mark the correct answer - match by answerValue or label
+          const correctOpt = this.currentQuestion.options.find(o =>
+            (o.answerValue || o.label) === res.correctAnswer || o.label === res.correctAnswer
+          )
           if (correctOpt) correctOpt.isCorrect = true
         }
 
         setTimeout(() => {
           this.selectedAnswer = null
+          this.answerResult = null
           if (this.currentIndex < this.questions.length - 1) {
             this.currentIndex++
           } else {
@@ -163,6 +177,7 @@ export default {
       } catch (e) {
         uni.showToast({ title: '提交失败', icon: 'none' })
         this.selectedAnswer = null
+        this.answerResult = null
       }
     },
     finishPractice() {
@@ -257,6 +272,11 @@ export default {
   align-items: center;
   gap: 24rpx;
   border: 2px solid transparent;
+
+  &.selected {
+    background: #EEF6FF;
+    border-color: #4A90D9;
+  }
 
   &.correct {
     background: #E8FFF0;

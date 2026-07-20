@@ -3,7 +3,24 @@
     <template #header>
       <div style="display:flex;align-items:center;justify-content:space-between">
         <span style="font-size:16px;font-weight:600">题库管理</span>
-        <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增题目</el-button>
+        <div style="display:flex;gap:10px;align-items:center">
+          <el-button
+            v-if="selectedRows.length > 0 && !batchGenerating"
+            type="success"
+            @click="handleBatchGenerateAudio"
+          >
+            🗣️ 批量生成语音 ({{ selectedRows.length }})
+          </el-button>
+          <div v-if="batchGenerating" style="display:flex;align-items:center;gap:12px">
+            <el-progress
+              :percentage="batchProgress"
+              :format="() => `${batchDone}/${batchTotal}`"
+              style="width: 200px"
+            />
+            <el-button type="danger" size="small" @click="batchCancelled = true">停止</el-button>
+          </div>
+          <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增题目</el-button>
+        </div>
       </div>
     </template>
 
@@ -23,7 +40,9 @@
       </el-select>
     </div>
 
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight" @selection-change="handleSelectionChange">
+      <el-table-column type="selection" width="50" />
       <el-table-column prop="subjectId" label="学科" width="100">
         <template #default="{ row }">{{ subjectLabel(row.subjectId) }}</template>
       </el-table-column>
@@ -58,12 +77,15 @@
       class="pagination"
       :total="total"
       :page-size="pageSize"
+      :page-sizes="[20, 50, 100, 200]"
       v-model:current-page="currentPage"
-      layout="total, prev, pager, next"
+      layout="total, sizes, prev, pager, next"
       @current-change="fetchData"
+      @size-change="handleSizeChange"
     />
+    </div>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑题目' : '新增题目'" width="860px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑题目' : '新增题目'" top="1vh" width="60vw">
       <div class="ai-tools">
         <el-input
           v-model="aiKnowledgePoint"
@@ -225,6 +247,9 @@
 import { computed, reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import RichContentEditor from '@/components/RichContentEditor.vue'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 import {
   deleteQuestion,
   generateAiQuestionAnalysis,
@@ -253,6 +278,12 @@ type QuestionOptionForm = {
 const loading = ref(false)
 const saving = ref(false)
 const generatingAudio = ref(false)
+const batchGenerating = ref(false)
+const batchProgress = ref(0)
+const batchDone = ref(0)
+const batchTotal = ref(0)
+const batchCancelled = ref(false)
+const selectedRows = ref<any[]>([])
 const aiGenerating = ref(false)
 const aiAnalysisLoading = ref(false)
 const tableData = ref<any[]>([])
@@ -265,6 +296,12 @@ const pageSize = ref(20)
 const filterSubject = ref<number | ''>('')
 const filterGrade = ref<number | ''>('')
 const filterType = ref<number | ''>('')
+
+function handleSizeChange(size: number) {
+  pageSize.value = size
+  currentPage.value = 1
+  fetchData()
+}
 
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
@@ -541,6 +578,80 @@ async function handleDelete(id: number) {
   if (res.code === 200) {
     ElMessage.success('删除成功')
     fetchData()
+  }
+}
+
+function handleSelectionChange(rows: any[]) {
+  selectedRows.value = rows
+}
+
+async function handleBatchGenerateAudio() {
+  const targets = selectedRows.value.filter(row => row.id)
+  if (targets.length === 0) {
+    ElMessage.warning('请先选择题目')
+    return
+  }
+
+  await ElMessageBox.confirm(
+    `确认为 ${targets.length} 道题目生成语音？已有语音的题目将跳过。`,
+    '批量生成语音',
+    { type: 'info', confirmButtonText: '开始生成' }
+  )
+
+  batchGenerating.value = true
+  batchCancelled.value = false
+  let success = 0
+  let skipped = 0
+  let failed = 0
+
+  // 过滤出需要生成的题目（跳过已有语音的）
+  const toGenerate = targets.filter(row => !hasQuestionAudio(row.questionContent))
+  skipped = targets.length - toGenerate.length
+  batchTotal.value = toGenerate.length
+  batchDone.value = 0
+  batchProgress.value = 0
+
+  const CONCURRENCY = 3
+
+  try {
+    // 并发执行，每次最多 CONCURRENCY 个
+    for (let i = 0; i < toGenerate.length; i += CONCURRENCY) {
+      if (batchCancelled.value) break
+
+      const batch = toGenerate.slice(i, i + CONCURRENCY)
+      const results = await Promise.allSettled(
+        batch.map(row => generateQuestionAudio(row.id, {}))
+      )
+
+      for (let j = 0; j < results.length; j++) {
+        const result = results[j]
+        const row = batch[j]
+        if (result.status === 'fulfilled' && result.value.code === 200) {
+          success++
+          row.questionContent = withRichContentSpeech(row.questionContent, {
+            text: result.value.data?.speechText || '',
+            audioUrl: result.value.data?.audioUrl || '',
+          })
+        } else {
+          failed++
+        }
+      }
+
+      batchDone.value = Math.min(i + CONCURRENCY, toGenerate.length)
+      batchProgress.value = batchTotal.value > 0
+        ? Math.round((batchDone.value / batchTotal.value) * 100)
+        : 0
+    }
+
+    const msg = []
+    if (batchCancelled.value) msg.push('已停止')
+    msg.push(`完成！成功 ${success}`)
+    if (skipped > 0) msg.push(`跳过 ${skipped}`)
+    if (failed > 0) msg.push(`失败 ${failed}`)
+    ElMessage.success(msg.join('，'))
+    fetchData()
+  } finally {
+    batchGenerating.value = false
   }
 }
 

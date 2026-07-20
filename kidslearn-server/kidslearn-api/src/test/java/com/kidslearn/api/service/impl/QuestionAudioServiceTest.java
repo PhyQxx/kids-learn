@@ -31,7 +31,10 @@ class QuestionAudioServiceTest {
         QuestionMapper questionMapper = Mockito.mock(QuestionMapper.class);
         FtpTool ftpTool = Mockito.mock(FtpTool.class);
         FakeAudioGenerator audioGenerator = new FakeAudioGenerator(tempDir);
-        QuestionAudioService service = new QuestionAudioService(questionMapper, ftpTool, audioGenerator);
+        QuestionAudioProperties properties = new QuestionAudioProperties();
+        properties.setEngine("fake");
+        QuestionAudioService service = new QuestionAudioService(questionMapper, ftpTool, properties,
+                Map.of("fake", audioGenerator));
 
         Question question = new Question();
         question.setId(12L);
@@ -40,7 +43,7 @@ class QuestionAudioServiceTest {
         when(ftpTool.upload(eq("/question/audio/admin/question-12"), any(), any(InputStream.class))).thenReturn("q.wav");
         when(ftpTool.buildPublicUrl("/question/audio/admin/question-12", "q.wav")).thenReturn("https://cdn.example.com/q.wav");
 
-        Map<String, String> result = service.generateQuestionAudio(12L, "新的朗读文本");
+        Map<String, String> result = service.generateQuestionAudio(12L, "新的朗读文本", null);
 
         assertEquals("https://cdn.example.com/q.wav", result.get("audioUrl"));
         assertEquals("新的朗读文本", audioGenerator.receivedText);

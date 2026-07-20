@@ -4,7 +4,8 @@
       <span style="font-size:15px;font-weight:600">{{ subject.subjectName }} - 关卡列表</span>
       <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增关卡</el-button>
     </div>
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="levelNum" label="序号" width="80" />
       <el-table-column prop="levelName" label="关卡名称" />
       <el-table-column prop="baseQuestionCount" label="基础题数" width="90" />
@@ -25,6 +26,7 @@
     </el-table>
     <el-pagination v-if="total > 0" style="margin-top:16px;justify-content:flex-end" :total="total" :page-size="pageSize"
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑关卡' : '新增关卡'" width="600">
       <el-form :model="form" label-width="100px">
@@ -56,6 +58,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getLevelList, saveLevel, deleteLevel } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const props = defineProps<{
   subject: any

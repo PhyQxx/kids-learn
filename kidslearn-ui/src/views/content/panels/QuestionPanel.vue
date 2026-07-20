@@ -2,9 +2,20 @@
   <div>
     <div class="panel-header">
       <span class="panel-title">{{ courseLevel.levelName }} - 题目列表</span>
-      <el-button type="primary" class="primary-btn" @click="openDialog()">新增题目</el-button>
+      <div class="header-actions">
+        <el-button
+          v-if="selectedRows.length > 0"
+          type="success"
+          :loading="batchGenerating"
+          @click="handleBatchGenerateAudio"
+        >
+          🗣️ 批量生成语音 ({{ selectedRows.length }})
+        </el-button>
+        <el-button type="primary" class="primary-btn" @click="openDialog()">新增题目</el-button>
+      </div>
     </div>
 
+    <div ref="tableBox">
     <div class="filter-row">
       <el-select v-model="filterType" placeholder="题型" clearable @change="fetchData" style="width: 140px">
         <el-option label="选择题" :value="1" />
@@ -13,7 +24,8 @@
       </el-select>
     </div>
 
-    <el-table :data="tableData" stripe v-loading="loading">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight" @selection-change="handleSelectionChange">
+      <el-table-column type="selection" width="50" />
       <el-table-column prop="questionType" label="题型" width="90">
         <template #default="{ row }">{{ questionTypeLabel(row.questionType) }}</template>
       </el-table-column>
@@ -48,8 +60,9 @@
       layout="total, prev, pager, next"
       @current-change="fetchData"
     />
+    </div>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑题目' : '新增题目'" width="860px">
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑题目' : '新增题目'" top="1vh" width="60vw">
       <el-form :model="form" label-width="90px">
         <el-form-item label="所属关卡">
           <el-select v-model="form.courseLevelId" style="width: 100%" disabled>
@@ -151,6 +164,9 @@ import { computed, reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import RichContentEditor from '@/components/RichContentEditor.vue'
 import { deleteQuestion, generateQuestionAudio, getQuestionList, getQuestionOptions, saveQuestion } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 import {
   richContentSpeech,
   richContentSummary,
@@ -172,6 +188,8 @@ const props = defineProps<{
 const loading = ref(false)
 const saving = ref(false)
 const generatingAudio = ref(false)
+const batchGenerating = ref(false)
+const selectedRows = ref<any[]>([])
 const tableData = ref<any[]>([])
 const total = ref(0)
 const currentPage = ref(1)
@@ -321,6 +339,63 @@ async function handleDelete(id: number) {
   }
 }
 
+function handleSelectionChange(rows: any[]) {
+  selectedRows.value = rows
+}
+
+async function handleBatchGenerateAudio() {
+  const targets = selectedRows.value.filter(row => row.id)
+  if (targets.length === 0) {
+    ElMessage.warning('请先选择题目')
+    return
+  }
+
+  await ElMessageBox.confirm(
+    `确认为 ${targets.length} 道题目生成语音？已有语音的题目将跳过。`,
+    '批量生成语音',
+    { type: 'info', confirmButtonText: '开始生成' }
+  )
+
+  batchGenerating.value = true
+  let success = 0
+  let skipped = 0
+  let failed = 0
+
+  try {
+    for (let i = 0; i < targets.length; i++) {
+      const row = targets[i]
+      // 已有语音的跳过
+      if (hasQuestionAudio(row.questionContent)) {
+        skipped++
+        continue
+      }
+      try {
+        const res = await generateQuestionAudio(row.id, {})
+        if (res.code === 200) {
+          success++
+          // 更新本地数据
+          row.questionContent = withRichContentSpeech(row.questionContent, {
+            text: res.data?.speechText || '',
+            audioUrl: res.data?.audioUrl || '',
+          })
+        } else {
+          failed++
+        }
+      } catch {
+        failed++
+      }
+    }
+
+    const msg = [`完成！成功 ${success}`]
+    if (skipped > 0) msg.push(`跳过 ${skipped}`)
+    if (failed > 0) msg.push(`失败 ${failed}`)
+    ElMessage.success(msg.join('，'))
+    fetchData()
+  } finally {
+    batchGenerating.value = false
+  }
+}
+
 function addOption() {
   form.options.push({
     optionLabel: String.fromCharCode(65 + form.options.length),
@@ -380,6 +455,12 @@ onMounted(() => fetchData())
 .panel-title {
   font-size: 15px;
   font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .primary-btn {

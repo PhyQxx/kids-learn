@@ -91,17 +91,28 @@ export type ContentAiPrecheckResult = {
 export type AiProviderConfig = {
   provider: string
   name?: string
+  category?: string
   enabled: boolean
   baseUrl: string
   model: string
   apiKey: string
   apiKeyConfigured?: boolean
+  voice?: string
 }
 
 export type AiConfigPayload = {
   provider: string
+  imageProvider: string
+  ttsProvider: string
   timeout: number
   providers: AiProviderConfig[]
+}
+
+export type AiCategoryGroup = {
+  type: 'text' | 'image' | 'tts'
+  label: string
+  providers: AiProviderConfig[]
+  defaultProvider: string
 }
 
 export type AiQuestionDraftRequest = {
@@ -250,7 +261,7 @@ export function deleteRole(id: number) { return del(`/admin/role/${id}`) }
 // ==================== 系统配置 ====================
 export function getConfigList(params: PageQuery) { return get<PageResult<AdminRecord>>('/admin/config/list', params) }
 export function saveConfig(data: AdminRecord) { return post<void>('/admin/config/save', data) }
-export function getAiConfig() { return get<AiConfigPayload>('/admin/ai/config') }
+export function getAiConfig() { return get<{ provider: string; imageProvider: string; ttsProvider: string; timeout: number; categories: AiCategoryGroup[] }>('/admin/ai/config') }
 export function saveAiConfig(data: AiConfigPayload) { return post<void>('/admin/ai/config', data) }
 
 // ==================== 操作日志 ====================

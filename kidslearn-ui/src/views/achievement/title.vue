@@ -6,7 +6,8 @@
         <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增称号</el-button>
       </div>
     </template>
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="titleCode" label="称号代码" />
       <el-table-column prop="titleName" label="称号名称" />
       <el-table-column prop="titleColor" label="颜色" width="100">
@@ -30,6 +31,7 @@
     </el-table>
     <el-pagination v-if="total > 0" style="margin-top:16px;justify-content:flex-end" :total="total" :page-size="pageSize"
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑称号' : '新增称号'" width="500">
       <el-form :model="form" label-width="80px">
@@ -55,6 +57,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTitleList, saveTitle, deleteTitle } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const loading = ref(false)
 const saving = ref(false)

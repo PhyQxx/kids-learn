@@ -1,7 +1,8 @@
 <template>
   <el-card>
     <template #header><span style="font-weight:700">系统配置</span></template>
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="configKey" label="配置键" />
       <el-table-column prop="configValue" label="配置值" show-overflow-tooltip />
       <el-table-column prop="configType" label="类型" width="80">
@@ -16,6 +17,7 @@
     </el-table>
     <el-pagination v-if="total > 0" style="margin-top:16px;justify-content:flex-end" :total="total" :page-size="pageSize"
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
+    </div>
 
     <el-dialog v-model="dialogVisible" title="编辑配置" width="500">
       <el-form :model="form" label-width="80px">
@@ -35,6 +37,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getConfigList, saveConfig } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const loading = ref(false)
 const saving = ref(false)

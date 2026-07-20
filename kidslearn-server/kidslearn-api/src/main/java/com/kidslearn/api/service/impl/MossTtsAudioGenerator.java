@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-@Component
+@Component("moss")
 @RequiredArgsConstructor
 class MossTtsAudioGenerator implements QuestionAudioGenerator {
 

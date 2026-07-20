@@ -168,10 +168,16 @@ public class AdminContentController {
     @PostMapping("/question/{id}/audio")
     public R<Map<String, String>> questionAudio(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
         String speechText = null;
-        if (body != null && body.get("speechText") != null) {
-            speechText = body.get("speechText").toString();
+        String engine = null;
+        if (body != null) {
+            if (body.get("speechText") != null) {
+                speechText = body.get("speechText").toString();
+            }
+            if (body.get("engine") != null) {
+                engine = body.get("engine").toString();
+            }
         }
-        return R.ok(questionAudioService.generateQuestionAudio(id, speechText));
+        return R.ok(questionAudioService.generateQuestionAudio(id, speechText, engine));
     }
 
     @Operation(summary = "删除题目")
@@ -220,6 +226,18 @@ public class AdminContentController {
             new LambdaQueryWrapper<QuestionOption>().eq(QuestionOption::getQuestionId, id).orderByAsc(QuestionOption::getSortOrder)
         );
         return R.ok(options);
+    }
+
+    @Operation(summary = "AI生成图片")
+    @PostMapping("/image/ai-generate")
+    public R<Map<String, String>> aiGenerateImage(@RequestBody Map<String, Object> body) {
+        String prompt = safe(body.get("prompt"));
+        if (prompt.isBlank()) {
+            return R.fail("请输入图片描述");
+        }
+        String size = safe(body.get("size"));
+        String imageUrl = aiService.generateImage(prompt, size.isBlank() ? null : size);
+        return R.ok(Map.of("imageUrl", imageUrl));
     }
 
     private static String safe(Object value) {

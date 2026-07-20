@@ -11,7 +11,8 @@
     </template>
 
     <!-- 字典类型列表 -->
-    <el-table :data="typeList" stripe v-loading="typeLoading" highlight-current-row @current-change="onTypeSelect">
+    <div ref="tableBox">
+    <el-table :data="typeList" stripe v-loading="typeLoading" :max-height="tableMaxHeight" highlight-current-row @current-change="onTypeSelect">
       <el-table-column prop="dictName" label="字典名称" />
       <el-table-column prop="dictType" label="字典类型" />
       <el-table-column prop="status" label="状态" width="80">
@@ -27,6 +28,7 @@
     </el-table>
     <el-pagination v-if="typeTotal > 0" style="margin-top:16px;justify-content:flex-end" :total="typeTotal" :page-size="20"
       v-model:current-page="typePage" layout="total, prev, pager, next" @current-change="fetchTypes" />
+    </div>
 
     <!-- 字典数据 -->
     <el-divider v-if="selectedType" content-position="left">{{ selectedType.dictName }} - 字典数据</el-divider>
@@ -94,6 +96,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getDictTypeList, saveDictType, deleteDictType, getDictDataList, saveDictData, deleteDictData } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 // ==================== 字典类型 ====================
 const typeLoading = ref(false)

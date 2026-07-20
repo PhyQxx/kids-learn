@@ -93,7 +93,9 @@
       </el-header>
 
       <el-main class="main">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <component :is="Component" class="page-fill" />
+        </router-view>
       </el-main>
     </el-container>
   </el-container>
@@ -235,6 +237,30 @@ function handleCommand(command: string) {
   min-width: 0;
   padding: 24px;
   background: var(--admin-bg);
-  overflow-y: auto;
+  overflow: hidden;
+}
+</style>
+
+<!-- 非 scoped：页面级布局，page-fill 和 .el-card 是同一个元素 -->
+<style>
+/* 卡片填满 main */
+.page-fill {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 卡片 header 不收缩 */
+.page-fill > .el-card__header {
+  flex-shrink: 0;
+}
+
+/* 卡片 body 撑满剩余空间，内部由 JS 控制布局 */
+.page-fill > .el-card__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 </style>

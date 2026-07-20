@@ -36,20 +36,18 @@ logging:
     com.kidslearn: info
 
 ftp:
-  host:
-  port: 21
-  username:
-  password:
-  path: /ftp
-  site-url:
+  # ftp地址
+  host: ${FTP_HOST:127.0.0.1}
+  # ftp端口
+  port: ${FTP_PORT:21}
+  # ftp用户名
+  username: ${FTP_USERNAME:admin}
+  # ftp密码
+  password: ${FTP_PASSWORD:}
+  # ftp上传路径
+  path: /ftp/
+  site-url: ${FTP_URL_PREFIX:}
 
-question:
-  audio:
-    tts-command: ${QUESTION_AUDIO_TTS_COMMAND:/opt/moss-tts/bin/moss-tts-nano}
-    backend: ${QUESTION_AUDIO_BACKEND:onnx}
-    voice: ${QUESTION_AUDIO_VOICE:Junhao}
-    temp-dir: ${QUESTION_AUDIO_TEMP_DIR:${java.io.tmpdir}}
-    timeout: ${QUESTION_AUDIO_TIMEOUT:5m}
 
 payment:
   callback:

@@ -5,7 +5,8 @@
       <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增年级</el-button>
     </div>
 
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="levelCode" label="年级编码" width="100" />
       <el-table-column prop="levelName" label="年级名称" />
       <el-table-column prop="ageGroup" label="年龄段" width="120">
@@ -28,6 +29,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑年级' : '新增年级'" width="500">
       <el-form :model="form" label-width="80px">
@@ -66,6 +68,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getGradeLevelList, saveGradeLevel, deleteGradeLevel } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const loading = ref(false)
 const saving = ref(false)

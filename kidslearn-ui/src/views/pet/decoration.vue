@@ -6,7 +6,8 @@
         <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增装饰</el-button>
       </div>
     </template>
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="decoCode" label="装饰代码" />
       <el-table-column prop="decoName" label="装饰名称" />
       <el-table-column prop="slot" label="部位" width="100">
@@ -32,6 +33,7 @@
     </el-table>
     <el-pagination v-if="total > 0" style="margin-top:16px;justify-content:flex-end" :total="total" :page-size="pageSize"
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑装饰' : '新增装饰'" width="500">
       <el-form :model="form" label-width="80px">
@@ -62,6 +64,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getDecorationList, saveDecoration, deleteDecoration } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const slotMap: Record<string, string> = { HEAD: '头部', BODY: '身体', FACE: '脸部', BACK: '背部', FOOT: '脚部', EFFECT: '特效' }
 const loading = ref(false)

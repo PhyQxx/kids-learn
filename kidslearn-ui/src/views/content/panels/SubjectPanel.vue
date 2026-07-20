@@ -10,7 +10,8 @@
       <span style="font-size:15px;font-weight:600">学科列表</span>
       <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增学科</el-button>
     </div>
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="subjectCode" label="学科代码" width="120" />
       <el-table-column prop="subjectName" label="学科名称" width="120" />
       <el-table-column prop="iconUrl" label="图标URL" show-overflow-tooltip />
@@ -35,6 +36,7 @@
     </el-table>
     <el-pagination v-if="total > 0" style="margin-top:16px;justify-content:flex-end" :total="total" :page-size="pageSize"
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑学科' : '新增学科'" width="500">
       <el-form :model="form" label-width="80px">
@@ -56,6 +58,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 import { getSubjectList, saveSubject, deleteSubject, getDictDataByType } from '@/api/request'
 
 const emit = defineEmits<{

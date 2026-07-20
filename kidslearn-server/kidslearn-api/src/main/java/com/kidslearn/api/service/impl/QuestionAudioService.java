@@ -23,18 +23,26 @@ public class QuestionAudioService {
 
     private final QuestionMapper questionMapper;
     private final FtpTool ftpTool;
-    private final QuestionAudioGenerator audioGenerator;
+    private final QuestionAudioProperties properties;
+    private final Map<String, QuestionAudioGenerator> generators;
 
-    public Map<String, String> generateQuestionAudio(Long questionId, String requestedSpeechText) {
+    public Map<String, String> generateQuestionAudio(Long questionId, String requestedSpeechText, String engine) {
         Question question = questionMapper.selectById(questionId);
         if (question == null) {
             throw new BusinessException("Question not found");
         }
 
         String speechText = chooseSpeechText(question.getQuestionContent(), requestedSpeechText);
+
+        String selectedEngine = (engine != null && !engine.isBlank()) ? engine : properties.getEngine();
+        QuestionAudioGenerator generator = generators.get(selectedEngine);
+        if (generator == null) {
+            throw new BusinessException("Unknown TTS engine: " + selectedEngine + ", available: " + generators.keySet());
+        }
+
         Path audioFile = null;
         try {
-            audioFile = audioGenerator.generate(speechText);
+            audioFile = generator.generate(speechText);
             String serviceDir = "/question/audio/admin/question-" + questionId;
             String fileName = FILE_TIME.format(LocalDateTime.now()) + ".wav";
             try (InputStream inputStream = Files.newInputStream(audioFile)) {

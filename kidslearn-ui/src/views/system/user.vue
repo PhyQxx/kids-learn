@@ -9,7 +9,8 @@
         </div>
       </div>
     </template>
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="username" label="用户名" />
       <el-table-column prop="nickname" label="昵称" />
       <el-table-column prop="userType" label="类型" width="80">
@@ -37,6 +38,7 @@
     </el-table>
     <el-pagination v-if="total > 0" style="margin-top:16px;justify-content:flex-end" :total="total" :page-size="pageSize"
       v-model:current-page="currentPage" layout="total, prev, pager, next" @current-change="fetchData" />
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑用户' : '新增用户'" width="500">
       <el-form :model="form" label-width="80px">
@@ -77,6 +79,9 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUserList, saveUser, updateUserStatus } from '@/api/request'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const loading = ref(false)
 const saving = ref(false)

@@ -6,7 +6,8 @@
         <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增角色</el-button>
       </div>
     </template>
-    <el-table :data="tableData" stripe v-loading="loading">
+    <div ref="tableBox">
+    <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
       <el-table-column prop="roleName" label="角色名称" />
       <el-table-column prop="roleCode" label="角色代码" />
       <el-table-column prop="permissions" label="权限码" min-width="220" show-overflow-tooltip />
@@ -18,6 +19,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑角色' : '新增角色'" width="640">
       <el-form :model="form" label-width="80px">
@@ -60,6 +62,9 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getRoleList, saveRole, deleteRole } from '@/api/request'
 import { ROLE_PERMISSION_PRESETS, mergePermissionCodes } from '@/utils/adminPermissions'
+import { useTableHeight } from '@/composables/useTableHeight'
+
+const { tableBox, tableMaxHeight } = useTableHeight()
 
 const loading = ref(false)
 const saving = ref(false)

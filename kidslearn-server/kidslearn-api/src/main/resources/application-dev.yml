@@ -1,7 +1,7 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/kids_learn?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8}
+    url: ${DB_URL:jdbc:mysql://mysql.pnkx.top:13306/kids_learn?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:123456}
 
@@ -12,3 +12,11 @@ mybatis-plus:
 logging:
   level:
     com.kidslearn: debug
+
+ftp:
+  host: ${FTP_HOST:ftp.pnkx.top}
+  port: ${FTP_PORT:21}
+  username: ${FTP_USERNAME:admin}
+  password: ${FTP_PASSWORD:phy0316.}
+  path: ${FTP_PATH:/ftp/kids-learn}
+  site-url: ${FTP_SITE_URL:https://ftp.pnkx.top:8/ftp/kids-learn}
