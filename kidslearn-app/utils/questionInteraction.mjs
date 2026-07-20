@@ -67,7 +67,18 @@ function normalizeOption(option = {}, index, questionType) {
   const text = option.optionText || pair?.right || richContentToText(option.optionContent) || ''
   
   // answerValue 决定了前端选中该项时提交的值
-  const answerValue = questionType === 5 ? label : (option.answerValue || label || text)
+  // 排序题：当 optionLabel 为空时，后端 evaluateOrder 会回退到 optionContent，
+  // 所以这里也要优先用 text（内容文字）而非 label（位置标签 A/B/C），否则前后端比对基准不一致
+  let answerValue
+  if (questionType === 5) {
+    answerValue = label
+  } else if (option.answerValue) {
+    answerValue = option.answerValue
+  } else if (questionType === 4) {
+    answerValue = text || label
+  } else {
+    answerValue = label || text
+  }
 
   return {
     label,

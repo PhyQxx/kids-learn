@@ -5,11 +5,18 @@
         <span style="font-size:16px;font-weight:600">题库管理</span>
         <div style="display:flex;gap:10px;align-items:center">
           <el-button
-            v-if="selectedRows.length > 0 && !batchGenerating"
+            v-if="selectedRows.length > 0 && !batchGenerating && !batchAnalysisGenerating"
             type="success"
             @click="handleBatchGenerateAudio"
           >
             🗣️ 批量生成语音 ({{ selectedRows.length }})
+          </el-button>
+          <el-button
+            v-if="selectedRows.length > 0 && !batchAnalysisGenerating && !batchGenerating"
+            type="warning"
+            @click="handleBatchGenerateAnalysis"
+          >
+            📝 批量生成解析 ({{ selectedRows.length }})
           </el-button>
           <div v-if="batchGenerating" style="display:flex;align-items:center;gap:12px">
             <el-progress
@@ -18,6 +25,16 @@
               style="width: 200px"
             />
             <el-button type="danger" size="small" @click="batchCancelled = true">停止</el-button>
+          </div>
+          <div v-if="batchAnalysisGenerating" style="display:flex;align-items:center;gap:12px">
+            <el-progress
+              :percentage="batchAnalysisProgress"
+              :format="() => `${batchAnalysisDone}/${batchAnalysisTotal}`"
+              style="width: 200px"
+              color="#E6A23C"
+            />
+            <el-text size="small" type="warning">{{ batchAnalysisStatus }}</el-text>
+            <el-button type="danger" size="small" @click="batchAnalysisCancelled = true">停止</el-button>
           </div>
           <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增题目</el-button>
         </div>
@@ -63,6 +80,12 @@
           <el-tag v-else type="info" size="small">未生成</el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="解析" width="90">
+        <template #default="{ row }">
+          <el-tag v-if="hasAnalysis(row.analysis)" type="success" size="small">已有</el-tag>
+          <el-tag v-else type="warning" size="small">缺失</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="score" label="分值" width="80" />
       <el-table-column label="操作" width="180">
         <template #default="{ row }">
@@ -85,7 +108,7 @@
     />
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑题目' : '新增题目'" top="1vh" width="60vw">
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑题目' : '新增题目'" top="1vh" width="60vw" destroy-on-close>
       <div class="ai-tools">
         <el-input
           v-model="aiKnowledgePoint"
@@ -121,7 +144,7 @@
         </el-form-item>
 
         <el-form-item label="题目内容">
-          <RichContentEditor v-model="form.questionContent" />
+          <RichContentEditor v-model="form.questionContent" :context="questionEditorContext" />
           <div v-if="form.questionType === 3" style="font-size:12px;color:#999;margin-top:4px">
             提示：填空题可在上方内容中使用 ____ 或 [ ] 表示需要填空的位置。
           </div>
@@ -161,7 +184,7 @@
           <div v-if="form.questionType === 1" class="option-list">
             <div v-for="(opt, index) in form.options" :key="index" class="option-row choice-row">
               <el-input v-model="opt.optionLabel" class="option-label" placeholder="标签(A/B/C)" />
-              <RichContentEditor v-model="opt.optionContent" class="option-editor" compact />
+              <RichContentEditor v-model="opt.optionContent" class="option-editor" compact :context="optionEditorContext" />
               <el-switch v-model="opt.isCorrect" :active-value="1" :inactive-value="0" active-text="正确答案" />
               <el-button link type="danger" @click="removeOption(index)">删除</el-button>
             </div>
@@ -191,7 +214,7 @@
           <div v-if="form.questionType === 4" class="option-list">
             <div v-for="(opt, index) in form.options" :key="index" class="option-row order-row">
               <div class="order-handle">顺序 {{ index + 1 }}</div>
-              <RichContentEditor v-model="opt.optionContent" class="option-editor" compact />
+              <RichContentEditor v-model="opt.optionContent" class="option-editor" compact :context="optionEditorContext" />
               <div style="display:flex;flex-direction:column;gap:4px">
                 <el-button size="small" :disabled="index === 0" @click="moveOption(index, -1)">上移</el-button>
                 <el-button size="small" :disabled="index === form.options.length - 1" @click="moveOption(index, 1)">下移</el-button>
@@ -212,7 +235,7 @@
               <div style="width: 40px; text-align:center; color:#999;">连线</div>
               <div style="flex:1">
                 <div style="margin-bottom:4px;font-size:12px;color:#666">右侧匹配元素 (富文本)</div>
-                <RichContentEditor v-model="opt.optionContent" class="option-editor" compact />
+                <RichContentEditor v-model="opt.optionContent" class="option-editor" compact :context="optionEditorContext" />
               </div>
               <el-button link type="danger" @click="removeOption(index)" style="margin-top:24px">删除</el-button>
             </div>
@@ -246,7 +269,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import RichContentEditor from '@/components/RichContentEditor.vue'
+import RichContentEditor, { type RichEditorContext } from '@/components/RichContentEditor.vue'
 import { useTableHeight } from '@/composables/useTableHeight'
 
 const { tableBox, tableMaxHeight } = useTableHeight()
@@ -283,6 +306,12 @@ const batchProgress = ref(0)
 const batchDone = ref(0)
 const batchTotal = ref(0)
 const batchCancelled = ref(false)
+const batchAnalysisGenerating = ref(false)
+const batchAnalysisProgress = ref(0)
+const batchAnalysisDone = ref(0)
+const batchAnalysisTotal = ref(0)
+const batchAnalysisCancelled = ref(false)
+const batchAnalysisStatus = ref('')
 const selectedRows = ref<any[]>([])
 const aiGenerating = ref(false)
 const aiAnalysisLoading = ref(false)
@@ -326,6 +355,24 @@ const speechNeedsUpdate = computed(() => (
   Boolean(form.audioUrl && form.speechText && form.savedSpeechText && form.speechText !== form.savedSpeechText)
 ))
 
+// AI图片生成上下文
+const questionTypeNameMap: Record<number, string> = { 1: '选择题', 2: '判断题', 3: '填空题', 4: '排序题', 5: '连线题' }
+const questionEditorContext = computed<RichEditorContext>(() => ({
+  subjectName: subjects.value.find(s => s.id === form.subjectId)?.subjectName,
+  gradeName: grades.value.find(g => g.id === form.gradeLevelId)?.levelName,
+  questionType: questionTypeNameMap[form.questionType],
+  knowledgePoint: aiKnowledgePoint.value,
+  usage: 'question',
+}))
+const optionEditorContext = computed<RichEditorContext>(() => ({
+  subjectName: subjects.value.find(s => s.id === form.subjectId)?.subjectName,
+  gradeName: grades.value.find(g => g.id === form.gradeLevelId)?.levelName,
+  questionType: questionTypeNameMap[form.questionType],
+  questionContent: form.questionContent,
+  knowledgePoint: aiKnowledgePoint.value,
+  usage: 'option',
+}))
+
 function defaultOptionsForType(type: number): QuestionOptionForm[] {
   if (type === 1) {
     return [
@@ -345,9 +392,9 @@ function defaultOptionsForType(type: number): QuestionOptionForm[] {
     ]
   } else if (type === 4) {
     return [
-      { optionLabel: '', optionContent: '步骤 1', isCorrect: 1, sortOrder: 0 },
-      { optionLabel: '', optionContent: '步骤 2', isCorrect: 1, sortOrder: 1 },
-      { optionLabel: '', optionContent: '步骤 3', isCorrect: 1, sortOrder: 2 },
+      { optionLabel: 'A', optionContent: '步骤 1', isCorrect: 1, sortOrder: 0 },
+      { optionLabel: 'B', optionContent: '步骤 2', isCorrect: 1, sortOrder: 1 },
+      { optionLabel: 'C', optionContent: '步骤 3', isCorrect: 1, sortOrder: 2 },
     ]
   } else if (type === 5) {
     return [
@@ -412,6 +459,22 @@ async function fetchData() {
 }
 
 async function openDialog(row?: any) {
+  // 先重置表单，防止上次数据残留
+  Object.assign(form, {
+    subjectId: null,
+    gradeLevelId: null,
+    questionType: 1,
+    questionContent: '',
+    score: 10,
+    timeLimit: 0,
+    analysis: '',
+    sortOrder: 0,
+    speechText: '',
+    audioUrl: '',
+    savedSpeechText: '',
+    options: [],
+  })
+
   if (row) {
     editingId.value = row.id
     let existingOptions: QuestionOptionForm[] = []
@@ -460,6 +523,10 @@ async function handleSave() {
       // Fill-in, Order, Match types implicitly have isCorrect = 1 for their entries
       if ([3, 4, 5].includes(form.questionType)) {
         option.isCorrect = 1
+      }
+      // 排序题自动生成 optionLabel（A/B/C/...），确保后端比对基准一致
+      if (form.questionType === 4 && !option.optionLabel) {
+        option.optionLabel = String.fromCharCode(65 + index)
       }
     })
     const res = await saveQuestion({ ...form, id: editingId.value })
@@ -655,13 +722,118 @@ async function handleBatchGenerateAudio() {
   }
 }
 
+async function handleBatchGenerateAnalysis() {
+  const targets = selectedRows.value.filter(row => row.id)
+  if (targets.length === 0) {
+    ElMessage.warning('请先选择题目')
+    return
+  }
+
+  // 统计已有解析的数量
+  const alreadyHasAnalysis = targets.filter(row => hasAnalysis(row.analysis))
+  const toGenerate = targets.filter(row => !hasAnalysis(row.analysis))
+
+  if (toGenerate.length === 0) {
+    ElMessage.info('所有选中的题目已有解析，无需生成')
+    return
+  }
+
+  let confirmMsg = `共选择 ${targets.length} 道题目，其中 ${toGenerate.length} 道缺少解析。`
+  if (alreadyHasAnalysis.length > 0) {
+    confirmMsg += `\n${alreadyHasAnalysis.length} 道已有解析将跳过。`
+  }
+  confirmMsg += '\n确认开始批量生成？'
+
+  await ElMessageBox.confirm(confirmMsg, '批量生成解析', {
+    type: 'info',
+    confirmButtonText: '开始生成',
+  })
+
+  batchAnalysisGenerating.value = true
+  batchAnalysisCancelled.value = false
+  batchAnalysisTotal.value = toGenerate.length
+  batchAnalysisDone.value = 0
+  batchAnalysisProgress.value = 0
+  let success = 0
+  let failed = 0
+
+  try {
+    for (let i = 0; i < toGenerate.length; i++) {
+      if (batchAnalysisCancelled.value) break
+
+      const row = toGenerate[i]
+      batchAnalysisStatus.value = `正在生成第 ${i + 1}/${toGenerate.length} 题...`
+
+      try {
+        // 1. 获取题目选项
+        let options: string[] = []
+        let correctAnswer = ''
+        try {
+          const optRes = await getQuestionOptions(row.id)
+          if (optRes.code === 200 && Array.isArray(optRes.data)) {
+            options = optRes.data
+              .map((opt: any) => richContentSummary(opt.optionContent, 120))
+              .filter(Boolean)
+            correctAnswer = optRes.data
+              .filter((opt: any) => opt.isCorrect === 1)
+              .map((opt: any) => opt.optionLabel || richContentSummary(opt.optionContent, 120))
+              .filter(Boolean)
+              .join('；')
+          }
+        } catch {
+          // 选项获取失败，继续用空值生成
+        }
+
+        // 2. 调用 AI 生成解析
+        const res = await generateAiQuestionAnalysis({
+          questionContent: richContentSummary(row.questionContent, 300),
+          correctAnswer,
+          options,
+          existingAnalysis: '',
+        })
+
+        if (res.code === 200 && res.data?.analysis) {
+          // 3. 保存到服务端
+          const saveRes = await saveQuestion({
+            id: row.id,
+            analysis: res.data.analysis,
+          })
+          if (saveRes.code === 200) {
+            success++
+            row.analysis = res.data.analysis
+          } else {
+            failed++
+          }
+        } else {
+          failed++
+        }
+      } catch {
+        failed++
+      }
+
+      batchAnalysisDone.value = i + 1
+      batchAnalysisProgress.value = Math.round(((i + 1) / toGenerate.length) * 100)
+    }
+
+    const msg = []
+    if (batchAnalysisCancelled.value) msg.push('已停止')
+    msg.push(`完成！成功 ${success}`)
+    if (failed > 0) msg.push(`失败 ${failed}`)
+    ElMessage.success(msg.join('，'))
+    fetchData()
+  } finally {
+    batchAnalysisGenerating.value = false
+    batchAnalysisStatus.value = ''
+  }
+}
+
 function addOption(type: number) {
   if (type === 1) {
     form.options.push({ optionLabel: String.fromCharCode(65 + form.options.length), optionContent: '', isCorrect: 0, sortOrder: form.options.length })
   } else if (type === 3) {
     form.options.push({ optionLabel: '', optionContent: '', isCorrect: 1, sortOrder: form.options.length })
   } else if (type === 4) {
-    form.options.push({ optionLabel: '', optionContent: `步骤 ${form.options.length + 1}`, isCorrect: 1, sortOrder: form.options.length })
+    form.options.push({ optionLabel: String.fromCharCode(65 + form.options.length), optionContent: `步骤 ${form.options.length + 1}`, isCorrect: 1, sortOrder: form.options.length })
   } else if (type === 5) {
     form.options.push({ optionLabel: `左侧${form.options.length + 1}`, optionContent: `右侧${form.options.length + 1}`, isCorrect: 1, sortOrder: form.options.length })
   }
@@ -709,6 +881,12 @@ function syncSpeechToContent() {
 
 function hasQuestionAudio(questionContent?: string) {
   return Boolean(richContentSpeech(questionContent).audioUrl)
+}
+
+function hasAnalysis(analysis?: string) {
+  if (!analysis) return false
+  const text = richContentSummary(analysis, 200)
+  return text.trim().length > 0
 }
 
 function collectCorrectAnswer() {

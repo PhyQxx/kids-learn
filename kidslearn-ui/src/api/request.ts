@@ -92,12 +92,13 @@ export type AiProviderConfig = {
   provider: string
   name?: string
   category?: string
-  enabled: boolean
+  enabled?: boolean
   baseUrl: string
   model: string
   apiKey: string
   apiKeyConfigured?: boolean
   voice?: string
+  maxTokens?: number
 }
 
 export type AiConfigPayload = {
@@ -193,6 +194,9 @@ export function uploadQuestionImage(file: File) {
   form.append('file', file)
   return post<{ url: string }>('/admin/file/upload-image', form, { headers: { 'Content-Type': 'multipart/form-data' } })
 }
+export function aiGenerateImage(prompt: string, size?: string) {
+  return post<{ imageUrl: string }>('/admin/image/ai-generate', { prompt, size })
+}
 
 // ==================== 内容审核 ====================
 export function getContentAuditList(params: PageQuery & { status?: number; targetType?: string }) {
@@ -263,6 +267,14 @@ export function getConfigList(params: PageQuery) { return get<PageResult<AdminRe
 export function saveConfig(data: AdminRecord) { return post<void>('/admin/config/save', data) }
 export function getAiConfig() { return get<{ provider: string; imageProvider: string; ttsProvider: string; timeout: number; categories: AiCategoryGroup[] }>('/admin/ai/config') }
 export function saveAiConfig(data: AiConfigPayload) { return post<void>('/admin/ai/config', data) }
+
+// ==================== 反馈语音配置 ====================
+export interface FeedbackAudioConfig { baseUrl: string; correctList: string; wrongList: string; aiMaxTokens: number }
+export function getFeedbackAudioConfig() { return get<FeedbackAudioConfig>('/admin/feedback-audio/config') }
+export function saveFeedbackAudioConfig(data: FeedbackAudioConfig) { return post<void>('/admin/feedback-audio/config', data) }
+export interface GenerateFeedbackAudioRequest { type: 'correct' | 'wrong'; subject?: string; text?: string }
+export interface GenerateFeedbackAudioResult { text: string; audioUrl: string }
+export function generateFeedbackAudio(data: GenerateFeedbackAudioRequest) { return post<GenerateFeedbackAudioResult>('/admin/feedback-audio/generate', data) }
 
 // ==================== 操作日志 ====================
 export function getLogList(params: PageQuery & { module?: string }) { return get<PageResult<AdminRecord>>('/admin/log/list', params) }

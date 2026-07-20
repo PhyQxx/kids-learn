@@ -111,10 +111,10 @@ public class AiService {
             optionStr.append((char) ('A' + i)).append(". ").append(options.get(i)).append("\n");
         }
 
-        String systemPrompt = "你是一位耐心的儿童教育老师，正在给小学生讲解错题。请用简单易懂的语言解释为什么正确答案是对的，错误答案为什么不对。回答控制在100字以内，语气亲切鼓励。";
+        String systemPrompt = "你是一位耐心的儿童教育老师，正在给小学生讲解错题。请用简单易懂的语言解释为什么正确答案是对的，错误答案为什么不对。回答控制在100字以内，语气亲切鼓励。只输出解析正文，不要输出思考过程。";
 
         String userPrompt = String.format(
-            "题目：%s\n选项：\n%s学生选了：%s\n正确答案是：%s\n请解释这道题。",
+            "题目：%s\n选项：\n%s学生选了：%s\n正确答案是：%s\n请直接解释这道题，不要输出思考过程。",
             questionText, optionStr, userAnswer, correctAnswer
         );
 
@@ -122,7 +122,7 @@ public class AiService {
             return chatCompletion(List.of(
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)
-            ), 300, 0.7);
+            ), 2048, 0.7);
         } catch (Exception e) {
             log.error("AI explanation failed", e);
             return null;
@@ -182,20 +182,20 @@ public class AiService {
         }
 
         String optionText = options == null || options.isEmpty() ? "无" : String.join("；", options);
-        String systemPrompt = "你是一位耐心的儿童教育老师。请把题目解析写得简短、准确、鼓励孩子理解，不要直接责备。";
+        String systemPrompt = "你是一位耐心的儿童教育老师。请把题目解析写得简短、准确、鼓励孩子理解，不要直接责备。只输出解析正文，不要输出思考过程。";
         String userPrompt = """
             题目：%s
             选项：%s
             正确答案：%s
             原解析：%s
-            请输出100字以内解析，只返回解析正文。
+            请直接输出100字以内的解析正文，不要输出你的思考过程。
             """.formatted(blankDefault(questionContent, "未提供"), optionText, blankDefault(correctAnswer, "未提供"), blankDefault(existingAnalysis, "无"));
 
         try {
             return chatCompletion(List.of(
                 Map.of("role", "system", "content", systemPrompt),
                 Map.of("role", "user", "content", userPrompt)
-            ), 300, 0.5);
+            ), 2048, 0.5);
         } catch (Exception e) {
             log.error("AI analysis generation failed", e);
             return null;
@@ -285,6 +285,40 @@ public class AiService {
         }
     }
 
+    /**
+     * 生成答题反馈文字（答对/答错）
+     * @param type "correct" 或 "wrong"
+     * @param subject 学科，如 "数学"、"英语"
+     * @return 生成的反馈文字，如 "太棒了！"、"加油，再想想！"
+     */
+    public String generateFeedbackText(String type, String subject) {
+        if (!isAvailable()) {
+            throw new BusinessException("AI 服务暂不可用");
+        }
+
+        boolean isCorrect = "correct".equals(type);
+        String systemPrompt = "你是儿童学习平台的语音反馈助手。请生成简短、活泼、鼓励性的语音反馈文字，适合播放给小朋友听。只返回文字内容，不要输出任何其他内容。";
+        String userPrompt = isCorrect
+            ? "请为%s课答对题目的小朋友生成一句庆祝语音反馈。要求：5-15字，活泼兴奋，用庆祝类emoji（🎉👏✨🌟），比如'太棒了！🎉'、'答对啦！👏'、'你真聪明！✨'。语气要欢快。不要重复，随机生成一句。".formatted(subject != null ? subject : "")
+            : "请为%s课答错题目的小朋友生成一句安慰语音反馈。要求：5-15字，语气温柔但要明确表示答错了，用加油类emoji（💪🤔😊），比如'答错啦，再想想！🤔'、'不对哦，加油！💪'、'嗯？不太对，再试一次！'。必须让小朋友听出是答错了，不能和答对的反馈混淆。不要重复，随机生成一句。".formatted(subject != null ? subject : "");
+
+        try {
+            String response = chatCompletion(List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
+            ), 800, 0.9);
+            if (response == null || response.isBlank()) {
+                // AI 返回为空，使用默认文案
+                return isCorrect ? "太棒了！🎉" : "答错啦，再想想！🤔";
+            }
+            // 清理可能的引号和多余空白
+            return response.replaceAll("^[\"'\u201C\u201D]|[\u201C\u201D\"']$", "").trim();
+        } catch (Exception e) {
+            log.error("AI feedback text generation failed, using default", e);
+            return isCorrect ? "太棒了！🎉" : "答错啦，再想想！🤔";
+        }
+    }
+
     private String chatCompletion(List<Map<String, String>> messages, int maxTokens, double temperature) throws Exception {
         String provider = getProvider();
         String apiKey = getConfig("ai." + provider + ".api_key");
@@ -292,12 +326,38 @@ public class AiService {
         String model = getConfig("ai." + provider + ".model");
         int timeout = getTimeout();
 
-        Map<String, Object> body = Map.of(
-            "model", model,
-            "messages", messages,
-            "max_tokens", maxTokens,
-            "temperature", temperature
-        );
+        // 服务商配置的 max_tokens 作为上限，取较小值
+        String configuredMaxTokens = getConfig("ai." + provider + ".max_tokens");
+        if (configuredMaxTokens != null && !configuredMaxTokens.isBlank()) {
+            try {
+                int parsed = Integer.parseInt(configuredMaxTokens.trim());
+                if (parsed > 0) maxTokens = Math.min(maxTokens, parsed);
+            } catch (NumberFormatException ignored) {}
+        }
+
+        // 推理模型需要更大的 token 预算，因为 reasoning_tokens 也计入 max_tokens
+        // 可通过 ai.{provider}.reasoning_model 配置是否为推理模型，默认 false
+        boolean isReasoningModel = "true".equalsIgnoreCase(getConfig("ai." + provider + ".reasoning_model"));
+        if (isReasoningModel && maxTokens < 4096) {
+            // 为推理模型自动增加 token 预算，确保有足够空间输出最终答案
+            maxTokens = Math.min(maxTokens * 3, 8192);
+            log.debug("推理模型自动增加 maxTokens 到 {}", maxTokens);
+        }
+
+        // 使用 HashMap 以便动态添加 reasoning_effort 参数
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", model);
+        body.put("messages", messages);
+        body.put("max_tokens", maxTokens);
+        body.put("temperature", temperature);
+
+        // 推理模型支持 reasoning_effort 参数，限制思考 token 消耗
+        // 可通过 ai.{provider}.reasoning_effort 配置，默认 "low"
+        String reasoningEffort = getConfig("ai." + provider + ".reasoning_effort");
+        if (reasoningEffort == null || reasoningEffort.isBlank()) {
+            reasoningEffort = "low";
+        }
+        body.put("reasoning_effort", reasoningEffort);
 
         String jsonBody = objectMapper.writeValueAsString(body);
 
@@ -327,6 +387,16 @@ public class AiService {
                     if (!content.isBlank()) {
                         return content;
                     }
+                    // 推理模型可能把所有 token 用于 reasoning_content，导致 content 为空
+                    // 降级：从 reasoning_content 中提取最后的结论部分
+                    String reasoningContent = message.path("reasoning_content").asText("");
+                    if (!reasoningContent.isBlank()) {
+                        String extracted = extractFromReasoning(reasoningContent);
+                        if (extracted != null) {
+                            log.warn("AI content empty, using reasoning_content fallback (length={})", extracted.length());
+                            return extracted;
+                        }
+                    }
                     String finishReason = choice.path("finish_reason").asText("");
                     log.error("AI API returned empty assistant content, finish_reason={} body={}", finishReason, responseBody);
                     return null;
@@ -335,6 +405,123 @@ public class AiService {
         }
         log.error("AI API returned invalid response, status: {} body: {}", response.getStatus(), responseBody);
         return null;
+    }
+
+    /**
+     * 从推理模型的 reasoning_content 中提取最终结论。
+     * 推理模型可能将所有 token 用于内部思考，导致 content 为空。
+     * 此方法尝试从冗长的推理过程中提取结论性内容。
+     */
+    private String extractFromReasoning(String reasoning) {
+        if (reasoning == null || reasoning.isBlank()) return null;
+        String text = reasoning.strip();
+
+        // 策略1：查找明确的输出标记后的内容
+        String[] outputMarkers = {"输出：", "最终解析：", "解析正文：", "答案：", "结论："};
+        for (String marker : outputMarkers) {
+            int idx = text.lastIndexOf(marker);
+            if (idx >= 0) {
+                String afterMarker = text.substring(idx + marker.length()).trim();
+                // 取到下一个思考标记或段落结束
+                String extracted = cutUntilThinking(afterMarker);
+                if (extracted != null && extracted.length() >= 10) {
+                    return truncate(extracted, 500);
+                }
+            }
+        }
+
+        // 策略2：查找包含结论性词汇的句子
+        String[] conclusionPatterns = {
+            "所以答案是", "答案是", "因此", "所以", "总的来说", "综上所述",
+            "正确答案是", "答案为", "结果是"
+        };
+        for (String pattern : conclusionPatterns) {
+            int idx = text.lastIndexOf(pattern);
+            if (idx >= 0) {
+                // 从这个位置往前找句子开头，往后找句子结尾
+                String sentence = extractSentence(text, idx);
+                if (sentence != null && sentence.length() >= 5 && sentence.length() <= 300) {
+                    // 检查是否包含实质内容（数字、关键词等）
+                    if (sentence.matches(".*\\d.*") || containsSubstantiveContent(sentence)) {
+                        return sentence;
+                    }
+                }
+            }
+        }
+
+        // 策略3：如果整个内容都很短，可能本身就是结论
+        if (text.length() <= 200) {
+            return text;
+        }
+
+        // 策略4：无法提取有效结论，返回 null 让调用方使用默认值
+        log.debug("无法从推理内容中提取有效结论，内容长度={}", text.length());
+        return null;
+    }
+
+    /**
+     * 切割到下一个思考过程标记
+     */
+    private String cutUntilThinking(String text) {
+        String[] thinkingPatterns = {
+            "\n让我", "\n我需要", "\n我应该", "\n为了更准确", "\n或许这样",
+            "\n既然用户", "\n回顾原解析", "\n草拟解析", "\n检查", "\n决定：",
+            "\n最终，我需要", "\n但这样", "\n为了鼓励"
+        };
+        int earliest = text.length();
+        for (String pattern : thinkingPatterns) {
+            int idx = text.indexOf(pattern);
+            if (idx >= 0 && idx < earliest) {
+                earliest = idx;
+            }
+        }
+        return text.substring(0, earliest).trim();
+    }
+
+    /**
+     * 从指定位置提取完整句子
+     */
+    private String extractSentence(String text, int markerIdx) {
+        // 往前找句子开头（句号、换行或开头）
+        int start = markerIdx;
+        for (int i = markerIdx - 1; i >= 0 && i >= markerIdx - 100; i--) {
+            char c = text.charAt(i);
+            if (c == '。' || c == '\n' || c == '！' || c == '？') {
+                start = i + 1;
+                break;
+            }
+            if (i == 0) {
+                start = 0;
+            }
+        }
+
+        // 往后找句子结尾
+        int end = markerIdx;
+        for (int i = markerIdx; i < text.length() && i < markerIdx + 300; i++) {
+            char c = text.charAt(i);
+            if (c == '。' || c == '\n' || c == '！' || c == '？') {
+                end = i + 1;
+                break;
+            }
+            end = i + 1;
+        }
+
+        return text.substring(start, end).trim();
+    }
+
+    /**
+     * 检查是否包含实质性内容
+     */
+    private boolean containsSubstantiveContent(String text) {
+        // 检查是否包含数字、常见关键词
+        return text.matches(".*\\d.*") ||
+               text.contains("次") || text.contains("个") || text.contains("正确") ||
+               text.contains("答案") || text.contains("是");
+    }
+
+    private String truncate(String text, int maxLen) {
+        if (text == null) return null;
+        return text.length() <= maxLen ? text : text.substring(0, maxLen);
     }
 
     private Map<String, Object> normalizePrecheckResult(String content) throws Exception {
@@ -500,19 +687,37 @@ public class AiService {
         return value == null || value.isBlank() ? fallback : value.trim();
     }
 
-    // ---- AI 图片生成 (智谱 CogView) ----
+    // ---- AI 图片生成 ----
 
     private static final String ZHIPU_IMAGE_URL = "https://open.bigmodel.cn/api/paas/v4/images/generations";
     private static final String ZHIPU_DEFAULT_MODEL = "cogview-3-flash";
 
+    private static final String SENSENOVA_IMAGE_URL = "https://token.sensenova.cn/v1/images/generations";
+    private static final String SENSENOVA_DEFAULT_MODEL = "sensenova-u1-fast";
+
     /**
-     * 调用智谱 CogView 生成图片，下载后上传到 FTP，返回永久可访问 URL。
+     * AI 图片生成，支持智谱 CogView 和 SenseNova U1 Fast。
+     * 根据 ai.image.provider 配置决定使用哪个服务商。
      *
      * @param prompt 图片描述
-     * @param size   图片尺寸，如 "1024x1024"，null 则默认 1024x1024
+     * @param size   图片尺寸，如 "1024x1024"，null 则使用默认尺寸
      * @return FTP 上的公开图片 URL
      */
     public String generateImage(String prompt, String size) {
+        String provider = getConfig("ai.image.provider");
+        if (provider == null || provider.isBlank() || "zhipu".equals(provider)) {
+            return generateImageZhipu(prompt, size);
+        } else if ("sensenova".equals(provider)) {
+            return generateImageSenseNova(prompt, size);
+        } else {
+            throw new BusinessException("不支持的图片生成服务商: " + provider);
+        }
+    }
+
+    /**
+     * 调用智谱 CogView 生成图片
+     */
+    private String generateImageZhipu(String prompt, String size) {
         String apiKey = getConfig("ai.zhipu.api_key");
         if (apiKey == null || apiKey.isBlank()) {
             throw new BusinessException("智谱 API Key 未配置 (ai.zhipu.api_key)");
@@ -526,7 +731,6 @@ public class AiService {
         }
 
         try {
-            // 1. 调用智谱图片生成 API
             Map<String, Object> body = Map.of("model", model, "prompt", prompt, "size", size);
             String jsonBody = objectMapper.writeValueAsString(body);
             log.info("Zhipu image request model={} size={} prompt={}", model, size, prompt);
@@ -553,30 +757,116 @@ public class AiService {
                 throw new BusinessException("AI 图片生成失败: 未返回图片 URL");
             }
 
-            // 2. 下载图片
-            HttpResponse imgResponse = HttpRequest.get(imageUrl)
-                .timeout(30_000)
-                .execute();
-            if (!imgResponse.isOk()) {
-                throw new BusinessException("AI 图片下载失败: HTTP " + imgResponse.getStatus());
-            }
-            byte[] imageBytes = imgResponse.bodyBytes();
-
-            // 3. 上传到 FTP
-            String serviceDir = "/question/images/ai";
-            String fileName = FILE_TIME.format(LocalDateTime.now()) + ".png";
-            try (InputStream is = new ByteArrayInputStream(imageBytes)) {
-                fileName = ftpTool.upload(serviceDir, fileName, is);
-            }
-            String publicUrl = ftpTool.buildPublicUrl(serviceDir, fileName);
-            log.info("AI image saved to FTP: {}", publicUrl);
-            return publicUrl;
+            return downloadAndUpload(imageUrl);
 
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("AI image generation failed", e);
+            log.error("Zhipu image generation failed", e);
             throw new BusinessException("AI 图片生成失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 调用 SenseNova U1 Fast 生成图片
+     */
+    private String generateImageSenseNova(String prompt, String size) {
+        String apiKey = getConfig("ai.sensenova.api_key");
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new BusinessException("SenseNova API Key 未配置 (ai.sensenova.api_key)");
+        }
+        String model = getConfig("ai.sensenova.image_model");
+        if (model == null || model.isBlank()) {
+            model = SENSENOVA_DEFAULT_MODEL;
+        }
+        // SenseNova U1 Fast 默认尺寸为 2752x1536 (16:9)
+        if (size == null || size.isBlank()) {
+            size = "2752x1536";
+        } else {
+            // 将通用尺寸映射到 SenseNova 支持的尺寸
+            size = mapSizeToSenseNova(size);
+        }
+
+        try {
+            Map<String, Object> body = Map.of("model", model, "prompt", prompt, "size", size);
+            String jsonBody = objectMapper.writeValueAsString(body);
+            log.info("SenseNova image request model={} size={} prompt={}", model, size, prompt);
+
+            HttpResponse response = HttpRequest.post(SENSENOVA_IMAGE_URL)
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
+                .body(jsonBody)
+                .timeout(60_000)
+                .execute();
+
+            String responseBody = response.body();
+            log.info("SenseNova image response status={}", response.getStatus());
+
+            if (!response.isOk()) {
+                log.error("SenseNova image API error, status={} body={}", response.getStatus(), responseBody);
+                throw new BusinessException("AI 图片生成失败: HTTP " + response.getStatus());
+            }
+
+            JsonNode root = objectMapper.readTree(responseBody);
+            String imageUrl = root.path("data").path(0).path("url").asText("");
+            if (imageUrl.isBlank()) {
+                log.error("SenseNova image response missing url, body={}", responseBody);
+                throw new BusinessException("AI 图片生成失败: 未返回图片 URL");
+            }
+
+            // SenseNova 返回的 URL 是临时链接（1小时有效），需要尽快下载
+            return downloadAndUpload(imageUrl);
+
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("SenseNova image generation failed", e);
+            throw new BusinessException("AI 图片生成失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 将通用尺寸映射到 SenseNova 支持的 2K 分辨率尺寸
+     * SenseNova 支持的尺寸：
+     *   1664x2496 (2:3), 2496x1664 (3:2)
+     *   1760x2368 (3:4), 2368x1760 (4:3)
+     *   1824x2272 (4:5), 2272x1824 (5:4)
+     *   2048x2048 (1:1)
+     *   2752x1536 (16:9), 1536x2752 (9:16)
+     *   3072x1376 (21:9), 1344x3136 (9:21)
+     */
+    private String mapSizeToSenseNova(String size) {
+        switch (size) {
+            case "1024x1024": return "2048x2048";  // 1:1
+            case "1024x768":  return "2368x1760";  // 4:3
+            case "768x1024":  return "1760x2368";  // 3:4
+            case "1920x1080": return "2752x1536";  // 16:9
+            case "1080x1920": return "1536x2752";  // 9:16
+            default: return "2048x2048";  // 默认 1:1
+        }
+    }
+
+    /**
+     * 下载图片并上传到 FTP
+     */
+    private String downloadAndUpload(String imageUrl) throws Exception {
+        // 下载图片
+        HttpResponse imgResponse = HttpRequest.get(imageUrl)
+            .timeout(30_000)
+            .execute();
+        if (!imgResponse.isOk()) {
+            throw new BusinessException("AI 图片下载失败: HTTP " + imgResponse.getStatus());
+        }
+        byte[] imageBytes = imgResponse.bodyBytes();
+
+        // 上传到 FTP
+        String serviceDir = "/question/images/ai";
+        String fileName = FILE_TIME.format(LocalDateTime.now()) + ".png";
+        try (InputStream is = new ByteArrayInputStream(imageBytes)) {
+            fileName = ftpTool.upload(serviceDir, fileName, is);
+        }
+        String publicUrl = ftpTool.buildPublicUrl(serviceDir, fileName);
+        log.info("AI image saved to FTP: {}", publicUrl);
+        return publicUrl;
     }
 }

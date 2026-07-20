@@ -2,6 +2,7 @@ package com.kidslearn.api.controller.admin;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kidslearn.api.entity.AppConfig;
+import lombok.extern.slf4j.Slf4j;
 import com.kidslearn.api.mapper.AppConfigMapper;
 import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.impl.AdminOperationLogService;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @Tag(name = "管理后台-AI配置")
 @RestController
 @RequestMapping("/api/v1/admin/ai")
@@ -95,6 +97,7 @@ public class AdminAiConfigController {
                     return R.fail("服务商标识只能包含字母、数字、下划线和短横线");
                 }
                 String category = provider.getCategory() != null ? provider.getCategory().trim() : "text";
+                log.info("Saving provider: key={}, category={}, name={}", providerKey, category, provider.getName());
                 String prefix;
                 if ("tts".equals(category)) {
                     prefix = TTS_PREFIX + providerKey + ".";
@@ -106,12 +109,24 @@ public class AdminAiConfigController {
                 upsert(existing, prefix + "enabled", provider.isEnabled() ? "1" : "0", providerKey + " 启用状态");
                 upsert(existing, prefix + "base_url", trim(provider.getBaseUrl()), providerKey + " API地址");
                 upsert(existing, prefix + "model", trim(provider.getModel()), providerKey + " 模型名称");
+                // 保存分类信息（用于动态发现时判断归属）
+                if (!"tts".equals(category)) {
+                    upsert(existing, prefix + "category", category, providerKey + " 分类");
+                }
+                // 保存名称
+                if (!isBlank(provider.getName())) {
+                    upsert(existing, prefix + "name", provider.getName().trim(), providerKey + " 显示名称");
+                }
                 if (!isBlank(provider.getApiKey()) && !"******".equals(provider.getApiKey().trim())) {
                     upsert(existing, prefix + "api_key", provider.getApiKey().trim(), providerKey + " API Key");
                 }
                 // TTS 专有字段
                 if ("tts".equals(category) && !isBlank(provider.getVoice())) {
                     upsert(existing, prefix + "voice", provider.getVoice().trim(), providerKey + " 语音");
+                }
+                // 文字生成专有字段
+                if ("text".equals(category) && provider.getMaxTokens() != null && provider.getMaxTokens() > 0) {
+                    upsert(existing, prefix + "max_tokens", String.valueOf(provider.getMaxTokens()), providerKey + " 最大Token数");
                 }
             }
         }
@@ -152,27 +167,58 @@ public class AdminAiConfigController {
             if ("tts".equals(seed.type())) {
                 p.setVoice(val(configs, prefix + seed.provider() + ".voice", seed.extra()));
             }
+            // 文字生成专有字段
+            if ("text".equals(seed.type())) {
+                p.setMaxTokens(parseIntSafe(val(configs, prefix + seed.provider() + ".max_tokens", ""), 0));
+            }
             builtKeys.put(seed.type() + ":" + seed.provider(), seed.type());
             grouped.get(seed.type()).add(p);
         }
 
         // 动态发现的 ai.* provider（文字/图片）
+        // 第一步：收集所有 ai.* provider 的 key
+        String imageDefaultProvider = val(configs, aiImgProviderKey(), "zhipu");
+        Map<String, String> discoveredProviders = new LinkedHashMap<>();
         for (String configKey : configs.keySet()) {
             if (!configKey.startsWith(AI_PREFIX)) continue;
             String providerKey = parseProviderKey(configKey, AI_PREFIX);
             if (providerKey == null) continue;
-            String lookup = "text:" + providerKey;
-            if (builtKeys.containsKey(lookup) || builtKeys.containsKey("image:" + providerKey)) continue;
+            String lookupText = "text:" + providerKey;
+            String lookupImage = "image:" + providerKey;
+            if (builtKeys.containsKey(lookupText) || builtKeys.containsKey(lookupImage)) continue;
+            discoveredProviders.put(providerKey, providerKey);
+        }
+        
+        // 第二步：为每个发现的 provider 确定分类并添加
+        log.info("Dynamic AI providers discovered: {}, imageDefaultProvider={}", discoveredProviders.keySet(), imageDefaultProvider);
+        for (String providerKey : discoveredProviders.keySet()) {
+            // 判断分类：检查 category 配置，或者是图片默认服务商
+            String savedCategory = val(configs, AI_PREFIX + providerKey + ".category", "");
+            log.info("Provider '{}': savedCategory='{}', isImageDefault={}", providerKey, savedCategory, providerKey.equals(imageDefaultProvider));
+            String category;
+            if ("image".equals(savedCategory)) {
+                category = "image";
+            } else if (providerKey.equals(imageDefaultProvider)) {
+                category = "image";
+            } else {
+                category = "text";
+            }
+            log.info("Provider '{}' assigned to category: {}", providerKey, category);
+            
             ProviderConfig p = new ProviderConfig();
             p.setProvider(providerKey);
-            p.setName(providerKey);
-            p.setCategory("text");
+            p.setName(val(configs, AI_PREFIX + providerKey + ".name", providerKey));
+            p.setCategory(category);
             p.setBaseUrl(val(configs, AI_PREFIX + providerKey + ".base_url", ""));
             p.setModel(val(configs, AI_PREFIX + providerKey + ".model", ""));
             p.setEnabled("1".equals(val(configs, AI_PREFIX + providerKey + ".enabled", "0")));
             p.setApiKey("");
             p.setApiKeyConfigured(!isBlank(val(configs, AI_PREFIX + providerKey + ".api_key", "")));
-            grouped.get("text").add(p);
+            if ("text".equals(category)) {
+                p.setMaxTokens(parseIntSafe(val(configs, AI_PREFIX + providerKey + ".max_tokens", ""), 0));
+            }
+            grouped.get(category).add(p);
+            builtKeys.put(category + ":" + providerKey, category);
         }
 
         // 动态发现的 tts.* provider
@@ -250,6 +296,11 @@ public class AdminAiConfigController {
         try { return Integer.parseInt(value); } catch (NumberFormatException e) { return DEFAULT_TIMEOUT; }
     }
 
+    private static int parseIntSafe(String value, int defaultValue) {
+        if (value == null || value.isBlank()) return defaultValue;
+        try { return Integer.parseInt(value.trim()); } catch (NumberFormatException e) { return defaultValue; }
+    }
+
     private static String parseProviderKey(String configKey, String prefix) {
         if (configKey == null || !configKey.startsWith(prefix)) return null;
         String suffix = configKey.substring(prefix.length());
@@ -301,5 +352,6 @@ public class AdminAiConfigController {
         private String apiKey;
         private boolean apiKeyConfigured;
         private String voice;      // TTS 专有
+        private Integer maxTokens; // 文字生成最大 token
     }
 }

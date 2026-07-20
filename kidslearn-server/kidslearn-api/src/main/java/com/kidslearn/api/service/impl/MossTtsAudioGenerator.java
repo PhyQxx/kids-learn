@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 
 @Component("moss")
 @RequiredArgsConstructor
-class MossTtsAudioGenerator implements QuestionAudioGenerator {
+public class MossTtsAudioGenerator implements QuestionAudioGenerator {
 
     private final QuestionAudioProperties properties;
 

@@ -98,6 +98,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'AI配置' },
       },
       {
+        path: 'system/feedback-audio',
+        name: 'SystemFeedbackAudio',
+        component: () => import('@/views/system/FeedbackAudioConfig.vue'),
+        meta: { title: '反馈语音配置' },
+      },
+      {
         path: 'system/log',
         name: 'SystemLog',
         component: () => import('@/views/system/log.vue'),

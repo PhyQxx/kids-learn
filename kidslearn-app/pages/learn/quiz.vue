@@ -246,6 +246,7 @@ import { usePetStore } from '@/store/pet'
 import { getQuestions, submitAnswer, completeLevel, getHint, startPractice, getExplainWrong } from '@/api/learn'
 import { submitChallengeResult } from '@/api/challenge'
 import { getUserInfo } from '@/api/user'
+import { getFeedbackAudioConfig } from '@/api/app'
 import { resolveQuestionSpeech } from '@/utils/questionSpeech.mjs'
 import {
   loadQuestionsWithOfflineCache,
@@ -263,15 +264,30 @@ const learnStore = useLearnStore()
 const userStore = useUserStore()
 const petStore = usePetStore()
 
-const FEEDBACK_AUDIO_BASE = 'https://ftp.pnkx.top:8/ftp/kids-learn/question/audio/seed/feedback'
-const CORRECT_FEEDBACKS = ['correct-1', 'correct-2', 'correct-3', 'correct-4', 'correct-5']
-const WRONG_FEEDBACKS = ['wrong-1', 'wrong-2', 'wrong-3']
+// 反馈语音配置（从 API 加载，默认值与之前一致）
+const FEEDBACK_AUDIO_BASE_DEFAULT = 'https://ftp.pnkx.top:8/ftp/kids-learn/question/audio/seed/feedback'
+let feedbackBaseUrl = FEEDBACK_AUDIO_BASE_DEFAULT
+let correctFeedbacks = ['correct-1', 'correct-2', 'correct-3', 'correct-4', 'correct-5']
+let wrongFeedbacks = ['wrong-1', 'wrong-2', 'wrong-3']
 let lastCorrectIdx = -1
 let lastWrongIdx = -1
 let feedbackAudio = null
 
+async function loadFeedbackAudioConfig() {
+  try {
+    const res = await getFeedbackAudioConfig()
+    if (res) {
+      if (res.baseUrl) feedbackBaseUrl = res.baseUrl.replace(/\/+$/, '')
+      if (res.correctList) correctFeedbacks = res.correctList.split(',').map(s => s.trim()).filter(Boolean)
+      if (res.wrongList) wrongFeedbacks = res.wrongList.split(',').map(s => s.trim()).filter(Boolean)
+    }
+  } catch (e) {
+    // 使用默认值
+  }
+}
+
 function feedbackAudioUrl(name) {
-  return `${FEEDBACK_AUDIO_BASE}/${name}.wav`
+  return `${feedbackBaseUrl}/${name}.wav`
 }
 
 function preloadFeedbackAudio() {
@@ -283,8 +299,8 @@ function preloadFeedbackAudio() {
     a.onCanplay(() => { a.destroy() })
     a.onError(() => { a.destroy() })
   }
-  CORRECT_FEEDBACKS.forEach(preload)
-  WRONG_FEEDBACKS.forEach(preload)
+  correctFeedbacks.forEach(preload)
+  wrongFeedbacks.forEach(preload)
 }
 
 function stopFeedbackAudio() {
@@ -297,7 +313,7 @@ function stopFeedbackAudio() {
 
 async function playFeedbackAudio(type) {
   if (typeof uni.createInnerAudioContext !== 'function') return
-  const list = type === 'correct' ? CORRECT_FEEDBACKS : WRONG_FEEDBACKS
+  const list = type === 'correct' ? correctFeedbacks : wrongFeedbacks
   let prevIdx = type === 'correct' ? lastCorrectIdx : lastWrongIdx
   let idx = Math.floor(Math.random() * list.length)
   if (idx === prevIdx && list.length > 1) idx = (idx + 1) % list.length
@@ -455,6 +471,9 @@ const questionToSpeech = async (question = currentQuestion.value) => {
 }
 
 onMounted(async () => {
+  // 加载反馈语音配置（异步，不阻塞页面渲染）
+  loadFeedbackAudioConfig()
+
   const pages = getCurrentPages()
   const page = pages[pages.length - 1]
   const options = page.$page?.options || {}

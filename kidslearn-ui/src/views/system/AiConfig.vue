@@ -46,11 +46,6 @@
           </div>
 
           <el-table :data="cat.providers" stripe :max-height="500">
-            <el-table-column label="启用" width="70" align="center">
-              <template #default="{ row }">
-                <el-switch v-model="row.enabled" />
-              </template>
-            </el-table-column>
             <el-table-column label="服务商" min-width="150">
               <template #default="{ row }">
                 <el-input v-model="row.name" placeholder="显示名称" style="margin-bottom:4px" />
@@ -92,6 +87,11 @@
             <el-table-column label="语音" min-width="120" v-if="cat.type === 'tts'">
               <template #default="{ row }">
                 <el-input v-model="row.voice" placeholder="语音名称" />
+              </template>
+            </el-table-column>
+            <el-table-column label="最大Token" min-width="130" v-if="cat.type === 'text'">
+              <template #default="{ row }">
+                <el-input-number v-model="row.maxTokens" :min="0" :max="32768" :step="100" controls-position="right" size="small" placeholder="默认" style="width:110px" />
               </template>
             </el-table-column>
             <el-table-column label="操作" width="70" align="center">
@@ -183,7 +183,7 @@ async function handleSave() {
     const allProviders: AiProviderConfig[] = []
     for (const cat of categories.value) {
       for (const p of cat.providers) {
-        allProviders.push({ ...p, category: cat.type })
+        allProviders.push({ ...p, category: cat.type, enabled: true })
       }
     }
 

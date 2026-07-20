@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component("mimo")
 @RequiredArgsConstructor
-class MimoTtsAudioGenerator implements QuestionAudioGenerator {
+public class MimoTtsAudioGenerator implements QuestionAudioGenerator {
 
     private final QuestionAudioProperties properties;
     private final ObjectMapper objectMapper;
@@ -35,7 +35,7 @@ class MimoTtsAudioGenerator implements QuestionAudioGenerator {
 
         String apiKey = properties.getMimoApiKey();
         if (apiKey == null || apiKey.isBlank()) {
-            throw new BusinessException("MiMo API key is not configured (question.audio.mimo-api-key)");
+            throw new BusinessException("MiMo API key is not configured, please set tts.mimo.api_key in admin panel");
         }
 
         String baseUrl = properties.getMimoBaseUrl();
