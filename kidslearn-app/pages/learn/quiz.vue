@@ -140,6 +140,39 @@
             <text class="nav-arrow">›</text>
           </view>
         </view>
+
+        <!-- 练习模式：答题卡弹窗（驾考宝典风格题号网格） -->
+        <view v-if="isPractice && showQuestionCardPopup" class="question-card-mask" @tap="showQuestionCardPopup = false">
+          <view class="question-card-popup" @tap.stop>
+            <view class="card-popup-header">
+              <text class="card-popup-title">答题卡</text>
+              <text class="card-popup-close" @tap="showQuestionCardPopup = false">✕</text>
+            </view>
+            <view class="card-popup-stats">
+              <view class="qs-item"><view class="qs-dot answered-correct"></view><text>答对 {{ practiceCorrectCount }}</text></view>
+              <view class="qs-item"><view class="qs-dot answered-wrong"></view><text>答错 {{ practiceWrongCount }}</text></view>
+              <view class="qs-item"><view class="qs-dot unanswered"></view><text>未做 {{ totalQuestions - practiceAnsweredCount }}</text></view>
+            </view>
+            <scroll-view scroll-y class="card-grid-scroll">
+              <view class="card-grid">
+                <view
+                  v-for="(q, idx) in questions"
+                  :key="q.id || idx"
+                  class="grid-cell"
+                  :class="getGridCellClass(idx)"
+                  @tap="goToQuestion(idx)"
+                >
+                  <text>{{ idx + 1 }}</text>
+                </view>
+              </view>
+            </scroll-view>
+            <view class="card-popup-footer">
+              <tn-button type="primary" size="lg" shape="round" block @click="finishQuizFromCard">
+                交卷（{{ practiceAnsweredCount }}/{{ totalQuestions }}）
+              </tn-button>
+            </view>
+          </view>
+        </view>
       </view>
 
       <!-- 结果屏 -->
@@ -253,7 +286,7 @@ import { soundManager } from '@/utils/sound'
 import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
 import { usePetStore } from '@/store/pet'
-import { getQuestions, submitAnswer, completeLevel, getHint, startPractice, getExplainWrong } from '@/api/learn'
+import { getQuestions, submitAnswer, completeLevel, getHint, startPractice, resumePractice, submitPracticeAnswer, completePracticeSession, getExplainWrong } from '@/api/learn'
 import { submitChallengeResult } from '@/api/challenge'
 import { getUserInfo } from '@/api/user'
 import { getFeedbackAudioConfig } from '@/api/app'
@@ -380,6 +413,10 @@ const challengeId = ref(null)
 const opponentId = ref(null)
 const isPractice = ref(false)
 const practiceModeId = ref(null)
+// 练习模式：后端会话ID（断点续做核心）
+const practiceSessionId = ref(null)
+// 练习模式：题目顺序快照中的每题ID（用于答题卡网格定位）
+const practiceQuestionIds = ref([])
 const levelName = ref(learnStore.currentLevel?.name || '第 1 关')
 const levelEmoji = ref('🎮')
 
@@ -502,20 +539,52 @@ onMounted(async () => {
     practiceModeId.value = options.practiceModeId
     timeLimit.value = parseInt(options.timeLimit) || 0
     try {
-      const res = await startPractice(practiceModeId.value)
+      let res
+      if (options.sessionId) {
+        // 断点续做：恢复题目顺序 + 已答记录 + 当前进度
+        res = await resumePractice(options.sessionId)
+        practiceSessionId.value = res.sessionId || options.sessionId
+        // 从后端返回的 userRecords 还原每题答案状态
+        if (res.userRecords) {
+          const restored = {}
+          res.questions.forEach((q, idx) => {
+            const r = res.userRecords[q.id]
+            if (r) {
+              restored[idx] = {
+                answer: r.userAnswer || '',
+                displayAnswer: r.userAnswer || '',
+                isCorrect: r.isCorrect === 1 || r.isCorrect === true,
+                correctAnswer: '',
+                analysis: q.analysisText || ''
+              }
+            }
+          })
+          userAnswers.value = restored
+        }
+        currentIndex.value = res.currentIndex || 0
+      } else {
+        // 新建会话
+        res = await startPractice(practiceModeId.value)
+        practiceSessionId.value = res.sessionId || res.practiceSessionId
+      }
       levelName.value = res.modeName || '专项练习'
       levelEmoji.value = '📝'
       if (res.questions && Array.isArray(res.questions) && res.questions.length > 0) {
         questions.value = res.questions.map(q => normalizeQuizQuestion(q))
-        if (questions.value[0]) {
-          preloadQuestionAudio(questions.value[0])
+        practiceQuestionIds.value = questions.value.map(q => q.id)
+        // 同步已有统计（续做场景）
+        if (typeof res.correctCount === 'number') correctCount.value = res.correctCount
+        totalScore.value = Object.values(userAnswers.value).filter(a => a.isCorrect).length * 10
+        if (questions.value[currentIndex.value]) {
+          preloadQuestionAudio(questions.value[currentIndex.value])
           resetInteractionState()
+          restoreQuestionState()
         }
       } else {
         uni.showToast({ title: '该练习下没有题目', icon: 'none' })
       }
     } catch (e) {
-      uni.showToast({ title: '加载练习失败', icon: 'none' })
+      uni.showToast({ title: e?.message || '加载练习失败', icon: 'none' })
     }
   } else {
     levelId.value = options.levelId || learnStore.currentLevel?.id
@@ -577,6 +646,25 @@ const petExpGained = ref(0)
 const accuracy = computed(() =>
   totalQuestions.value ? Math.round(correctCount.value / totalQuestions.value * 100) : 0
 )
+
+// 练习模式：答题卡统计（基于 userAnswers 动态计算，避免与 correctCount 不同步）
+const practiceAnsweredCount = computed(() => Object.keys(userAnswers.value).length)
+const practiceCorrectCount = computed(() => Object.values(userAnswers.value).filter(a => a.isCorrect).length)
+const practiceWrongCount = computed(() => Object.values(userAnswers.value).filter(a => !a.isCorrect).length)
+
+// 练习模式：答题卡单元格状态 class
+function getGridCellClass(idx) {
+  if (idx === currentIndex.value) return 'cell-current'
+  const saved = userAnswers.value[idx]
+  if (!saved) return 'cell-unanswered'
+  return saved.isCorrect ? 'cell-correct' : 'cell-wrong'
+}
+
+// 练习模式：从答题卡交卷
+function finishQuizFromCard() {
+  showQuestionCardPopup.value = false
+  finishQuiz()
+}
 const matchedRightValues = computed(() => new Set(Object.values(matchPairs.value)))
 const canSubmitMatch = computed(() =>
   currentQuestion.value.options.length > 0
@@ -808,13 +896,25 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
   const answerTime = Math.round((Date.now() - (questionStartTime.value || startTime.value)) / 1000)
 
   if (q.id) {
-    submitAnswer({ questionId: q.id, answer, answerTime }).then(res => {
+    // 练习模式走专门的会话接口（同步 user_question_record + 推进 session 进度）
+    const submitPromise = isPractice.value && practiceSessionId.value
+      ? submitPracticeAnswer(practiceSessionId.value, { questionId: q.id, answer, answerTime })
+      : submitAnswer({ questionId: q.id, answer, answerTime })
+    submitPromise.then(res => {
       const isCorrect = res?.correct || false
       const correctAnswer = res?.correctAnswer || ''
       const analysis = res?.explanationText || ''
 
       if (isPractice.value) {
         // 练习模式：存储答案，显示对错+解析，不自动跳转
+        // 注意：同一题重新作答时先扣除旧统计再加新统计，避免重复计数
+        const old = userAnswers.value[currentIndex.value]
+        if (old) {
+          if (old.isCorrect) {
+            correctCount.value = Math.max(0, correctCount.value - 1)
+            totalScore.value = Math.max(0, totalScore.value - (q.score || 10))
+          }
+        }
         userAnswers.value[currentIndex.value] = { answer, displayAnswer, isCorrect, correctAnswer, analysis }
         if (isCorrect) {
           correctCount.value++
@@ -935,6 +1035,14 @@ function prevQuestion() {
   restoreQuestionState()
 }
 
+// 练习模式：从答题卡跳转到指定题
+function goToQuestion(idx) {
+  if (idx < 0 || idx >= totalQuestions.value) return
+  currentIndex.value = idx
+  showQuestionCardPopup.value = false
+  restoreQuestionState()
+}
+
 // 练习模式：切换题目后恢复已答状态
 function restoreQuestionState() {
   showAnalysis.value = false
@@ -1049,6 +1157,14 @@ async function finishQuiz() {
     }
   } else {
     // 专项练习结算
+    // 通知后端完成会话（置为 COMPLETED，下次进入会新建会话而非续做）
+    if (practiceSessionId.value) {
+      try {
+        await completePracticeSession(practiceSessionId.value)
+      } catch (e) {
+        console.log('完成练习会话失败', e)
+      }
+    }
     const practiceGold = Math.floor(correctCount.value * 2)
     const practiceExp = Math.floor(correctCount.value * 2)
     rewards.value = {
@@ -1897,6 +2013,146 @@ onUnmounted(() => {
   color: $learn-blue;
 }
 
+/* ===== 练习模式：答题卡弹窗（驾考宝典风格） ===== */
+.question-card-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fade-in 0.2s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.question-card-popup {
+  width: 100%;
+  max-width: 480px;
+  max-height: 70vh;
+  background: $white;
+  border-radius: 24px 24px 0 0;
+  display: flex;
+  flex-direction: column;
+  animation: slide-up-card 0.25s ease;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@keyframes slide-up-card {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.card-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px 12px;
+  border-bottom: 1px solid #F0F0F0;
+}
+
+.card-popup-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: $text;
+}
+
+.card-popup-close {
+  font-size: 20px;
+  color: $text-secondary;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.card-popup-stats {
+  display: flex;
+  gap: 20px;
+  padding: 14px 22px;
+  flex-wrap: wrap;
+}
+
+.qs-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: $text-secondary;
+}
+
+.qs-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.qs-dot.answered-correct { background: $success; }
+.qs-dot.answered-wrong { background: $error; }
+.qs-dot.unanswered { background: #E8EAED; }
+
+.card-grid-scroll {
+  flex: 1;
+  padding: 8px 22px 16px;
+  overflow-y: auto;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.grid-cell {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  user-select: none;
+
+  &:active { transform: scale(0.92); }
+}
+
+/* 未答：灰色边框 */
+.grid-cell.cell-unanswered {
+  background: #F5F7FA;
+  color: $text-secondary;
+  border: 1px solid #E8EAED;
+}
+
+/* 答对：绿色填充 */
+.grid-cell.cell-correct {
+  background: $success;
+  color: $white;
+}
+
+/* 答错：红色填充 */
+.grid-cell.cell-wrong {
+  background: $error;
+  color: $white;
+}
+
+/* 当前题：蓝色描边高亮 */
+.grid-cell.cell-current {
+  background: #F0F4FF;
+  color: $learn-blue;
+  border: 2px solid $learn-blue;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
+.card-popup-footer {
+  padding: 14px 22px 18px;
+  border-top: 1px solid #F0F0F0;
+}
+
 @include respond-sm {
   .screen { padding: 16px; }
   .start-emoji { font-size: 76px; }
@@ -1913,5 +2169,7 @@ onUnmounted(() => {
   .result-stats { width: 100%; }
   .challenge-result { width: 100%; }
   .result-actions { width: 100%; flex-direction: column; }
+  .card-grid { grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .grid-cell { font-size: 14px; }
 }
 </style>

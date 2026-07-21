@@ -74,8 +74,8 @@ export default {
       const learnStore = useLearnStore()
       learnStore.setSubject(item)
       if (this.isPractice) {
-        // 直接跳转到答题页，传递 practiceModeId
-        uni.navigateTo({ url: `/pages/learn/quiz?practiceModeId=${item.id}&timeLimit=0` })
+        // 跳转到练习模式选择页（顺序练习/随机练习/模拟考试）
+        uni.navigateTo({ url: `/pages/learn/practice/index?subjectId=${item.id}&subjectName=${encodeURIComponent(item.name)}` })
       } else {
         uni.navigateTo({ url: `/pages/learn/levels?subjectId=${item.id}&subjectName=${encodeURIComponent(item.name)}` })
       }

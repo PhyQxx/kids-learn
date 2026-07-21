@@ -17,6 +17,7 @@
         { "path": "pages/learn/quiz", "style": { "navigationStyle": "custom", "navigationBarTitleText": "答题" } },
         { "path": "pages/learn/result", "style": { "navigationStyle": "custom", "navigationBarTitleText": "结果" } },
         { "path": "pages/learn/adaptive", "style": { "navigationStyle": "custom", "navigationBarTitleText": "薄弱点练习" } },
+        { "path": "pages/learn/practice/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "专项练习" } },
         { "path": "pages/pet/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "我的宠物" } },
         { "path": "pages/pet/dress", "style": { "navigationStyle": "custom", "navigationBarTitleText": "换装" } },
         { "path": "pages/pet/shop", "style": { "navigationStyle": "custom", "navigationBarTitleText": "商店" } },

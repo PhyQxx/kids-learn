@@ -150,8 +150,8 @@ async function goSubject(subject) {
   if (!allowed) return
 
   learnStore.setSubject(subject)
-  // 移动端首页今日学习进入专项练习，不再是闯关
-  uni.navigateTo({ url: `/pages/learn/quiz?practiceModeId=${subject.id}&timeLimit=0` })
+  // 进入专项练习模式选择页（顺序练习/随机练习/模拟考试）
+  uni.navigateTo({ url: `/pages/learn/practice/index?subjectId=${subject.id}&subjectName=${encodeURIComponent(subject.name)}` })
 }
 
 function goCourses(subject) {

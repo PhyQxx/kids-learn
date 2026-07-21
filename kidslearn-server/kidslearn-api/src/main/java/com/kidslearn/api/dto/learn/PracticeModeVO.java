@@ -19,7 +19,7 @@ public class PracticeModeVO {
     @Schema(description = "图标或Emoji", example = "➕")
     private String icon;
 
-    @Schema(description = "类型: ENDLESS(无尽), TIMED(限时)", example = "ENDLESS")
+    @Schema(description = "类型: SEQUENTIAL(顺序练习), RANDOM(随机练习), MOCK_EXAM(模拟考试), ENDLESS/TIMED(兼容旧值)", example = "SEQUENTIAL")
     private String type;
 
     @Schema(description = "限时模式的时间限制(秒)", example = "60")
@@ -27,4 +27,13 @@ public class PracticeModeVO {
 
     @Schema(description = "标签，逗号分隔", example = "HOT")
     private String tags;
+
+    @Schema(description = "所属学科ID")
+    private Long subjectId;
+
+    @Schema(description = "排序")
+    private Integer sortOrder;
+
+    @Schema(description = "该模式下题库总题数")
+    private Integer questionCount;
 }

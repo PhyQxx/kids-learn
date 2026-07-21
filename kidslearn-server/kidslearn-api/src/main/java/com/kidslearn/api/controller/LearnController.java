@@ -207,6 +207,42 @@ public class LearnController {
         return R.ok(learnService.submitPracticeAnswer(userId, practiceSessionId, dto));
     }
 
+    @Operation(summary = "断点续做：恢复练习会话")
+    @PostMapping("/practice/resume")
+    public R<Map<String, Object>> resumePractice(
+            HttpServletRequest request,
+            @RequestParam Long sessionId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.resumePractice(userId, sessionId));
+    }
+
+    @Operation(summary = "获取练习模式进度")
+    @GetMapping("/practice/progress")
+    public R<Map<String, Object>> getPracticeProgress(
+            HttpServletRequest request,
+            @RequestParam Long practiceModeId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getPracticeProgress(userId, practiceModeId));
+    }
+
+    @Operation(summary = "放弃练习会话")
+    @PostMapping("/practice/abandon")
+    public R<Map<String, Object>> abandonPractice(
+            HttpServletRequest request,
+            @RequestParam Long sessionId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.abandonPractice(userId, sessionId));
+    }
+
+    @Operation(summary = "完成练习会话")
+    @PostMapping("/practice/complete")
+    public R<Map<String, Object>> completePracticeSession(
+            HttpServletRequest request,
+            @RequestParam Long sessionId) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.completePracticeSession(userId, sessionId));
+    }
+
     @Operation(summary = "获取智能复习组卷")
     @GetMapping("/review/smart-quiz")
     public R<SmartReviewQuizVO> getSmartReviewQuiz(

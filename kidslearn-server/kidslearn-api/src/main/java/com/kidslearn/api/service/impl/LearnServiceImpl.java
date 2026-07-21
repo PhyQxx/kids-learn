@@ -53,6 +53,8 @@ public class LearnServiceImpl implements LearnService {
     private final PracticeModeMapper practiceModeMapper;
     private final SubscriptionService subscriptionService;
     private final TimeControlMapper timeControlMapper;
+    private final PracticeSessionMapper practiceSessionMapper;
+    private final UserQuestionRecordMapper userQuestionRecordMapper;
 
     @Override
     public DailyTaskVO getDailyTasks(Long userId) {
@@ -1285,51 +1287,297 @@ public class LearnServiceImpl implements LearnService {
                 .orderByAsc(PracticeMode::getId)
         );
         if (!configuredModes.isEmpty()) {
-            return configuredModes.stream().map(this::toPracticeModeVO).collect(Collectors.toList());
+            return configuredModes.stream().map(m -> toPracticeModeVO(m, userId)).collect(Collectors.toList());
         }
-        return List.of(defaultPracticeMode(subjectId));
+        // 数据库未配置时兜底返回 3 种标准模式（驾考宝典风格）
+        Long baseId = subjectId != null ? subjectId * 1000L : 1000L;
+        Long userGradeLevelId = resolveGradeLevelId(userId);
+        Integer questionCount = countAvailableQuestions(subjectId, userGradeLevelId);
+        return List.of(
+            buildStandardMode(baseId + 1, subjectId, "SEQUENTIAL", "顺序练习", "按顺序逐题练习，可随时回看，支持断点续做", "📋", 1, questionCount),
+            buildStandardMode(baseId + 2, subjectId, "RANDOM", "随机练习", "打乱顺序刷题，巩固薄弱知识点", "🎲", 2, questionCount),
+            buildStandardMode(baseId + 3, subjectId, "MOCK_EXAM", "模拟考试", "模拟真实考试，限时作答检验水平", "📝", 3, questionCount)
+        );
     }
 
     @Override
+    @Transactional
     public Map<String, Object> startPractice(Long userId, Long practiceModeId) {
         PracticeMode mode = practiceModeMapper.selectById(practiceModeId);
+        // 兜底模式（id 未在 practice_mode 表中）解析出标准模式和学科
+        StandardModeInfo stdInfo = mode == null ? parseStandardModeId(practiceModeId) : null;
+        if (mode == null && stdInfo == null) {
+            throw new BusinessException("练习模式不存在");
+        }
         if (mode != null && !Integer.valueOf(1).equals(mode.getStatus())) {
             throw new BusinessException("练习模式已下线");
         }
-        Long subjectId = mode != null ? mode.getSubjectId() : practiceModeId;
 
-        User user = userMapper.selectById(userId);
-        ChildProfile profile = childProfileMapper.selectOne(new LambdaQueryWrapper<ChildProfile>().eq(ChildProfile::getUserId, userId));
-        Long gradeLevelId = profile != null && profile.getGradeLevel() != null ? profile.getGradeLevel().longValue() : null;
+        Long subjectId = mode != null ? mode.getSubjectId() : stdInfo.subjectId;
+        String modeType = mode != null && mode.getType() != null ? mode.getType() : (stdInfo != null ? stdInfo.type : "SEQUENTIAL");
+        String modeName = mode != null ? mode.getName() : (stdInfo != null ? stdInfo.name : "专项练习");
 
-        LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>();
-        wrapper.eq(Question::getSubjectId, subjectId);
+        Long gradeLevelId = resolveGradeLevelId(userId);
+
+        // 若该模式下已有 IN_PROGRESS 会话，直接走续做路径（断点续做核心）
+        PracticeSession existing = practiceSessionMapper.selectOne(
+            new LambdaQueryWrapper<PracticeSession>()
+                .eq(PracticeSession::getUserId, userId)
+                .eq(PracticeSession::getPracticeModeId, practiceModeId)
+                .eq(PracticeSession::getStatus, "IN_PROGRESS")
+                .orderByDesc(PracticeSession::getUpdateTime)
+                .last("LIMIT 1")
+        );
+        if (existing != null) {
+            return buildResumeResult(existing);
+        }
+
+        // 全量选题
+        LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>()
+            .eq(Question::getSubjectId, subjectId);
         if (gradeLevelId != null) {
             wrapper.eq(Question::getGradeLevelId, gradeLevelId);
         }
-
+        if ("SEQUENTIAL".equals(modeType)) {
+            // 顺序练习：按 sortOrder 稳定排序，若 sortOrder 全为 null 则按 id 升序（题目录入顺序）
+            wrapper.orderByAsc(Question::getSortOrder).orderByAsc(Question::getId);
+        }
         List<Question> questions = questionMapper.selectList(wrapper);
         if (questions.isEmpty()) {
             throw new BusinessException("该学科年级下暂无题目");
         }
+        if (!"SEQUENTIAL".equals(modeType)) {
+            // RANDOM / MOCK_EXAM：打乱顺序
+            Collections.shuffle(questions);
+        }
+        if ("MOCK_EXAM".equals(modeType) && questions.size() > 20) {
+            questions = questions.subList(0, 20);
+        }
 
-        Collections.shuffle(questions);
+        // 固化题目顺序到 session 快照
+        String questionIdsSnapshot = questions.stream().map(q -> String.valueOf(q.getId())).collect(Collectors.joining(","));
 
-        List<Map<String, Object>> formattedQuestions = questions.stream()
-            .map(this::formatQuestion)
-            .collect(Collectors.toList());
+        PracticeSession session = new PracticeSession();
+        session.setUserId(userId);
+        session.setPracticeModeId(practiceModeId);
+        session.setSubjectId(subjectId);
+        session.setGradeLevelId(gradeLevelId);
+        session.setQuestionIds(questionIdsSnapshot);
+        session.setTotalQuestions(questions.size());
+        session.setCurrentIndex(0);
+        session.setCorrectCount(0);
+        session.setWrongCount(0);
+        session.setStatus("IN_PROGRESS");
+        session.setLastActiveTime(java.time.LocalDateTime.now());
+        practiceSessionMapper.insert(session);
+
+        List<Map<String, Object>> formattedQuestions = questions.stream().map(this::formatQuestion).collect(Collectors.toList());
 
         Map<String, Object> result = new HashMap<>();
-        result.put("practiceSessionId", System.currentTimeMillis());
-        result.put("modeId", mode != null ? mode.getId() : subjectId);
-        result.put("modeName", mode != null ? mode.getName() : "专项练习");
-        result.put("type", mode != null && mode.getType() != null ? mode.getType() : "ENDLESS");
+        result.put("sessionId", session.getId());
+        result.put("practiceSessionId", session.getId()); // 兼容旧字段
+        result.put("modeId", practiceModeId);
+        result.put("modeName", modeName);
+        result.put("type", modeType);
         result.put("timeLimit", mode != null && mode.getTimeLimitSeconds() != null ? mode.getTimeLimitSeconds() : 0);
+        result.put("currentIndex", 0);
+        result.put("totalQuestions", questions.size());
         result.put("questions", formattedQuestions);
+        result.put("userRecords", new HashMap<>()); // 新会话无历史记录
         return result;
     }
 
-    private PracticeModeVO toPracticeModeVO(PracticeMode mode) {
+    @Override
+    @Transactional
+    public Map<String, Object> submitPracticeAnswer(Long userId, Long practiceSessionId, SubmitAnswerDTO dto) {
+        log.info("专项练习答题 - userId: {}, sessionId: {}, questionId: {}", userId, practiceSessionId, dto.getQuestionId());
+
+        PracticeSession session = practiceSessionMapper.selectById(practiceSessionId);
+        if (session == null || !userId.equals(session.getUserId())) {
+            throw new BusinessException("练习会话不存在");
+        }
+
+        // 复用 submitAnswer 判对错（保留原奖励、错题入库逻辑）
+        Map<String, Object> result = submitAnswer(userId, dto);
+        boolean isCorrect = Boolean.TRUE.equals(result.get("correct"));
+
+        // 计算该题在 session 中的位置（基于固化顺序）
+        int questionIndex = -1;
+        if (session.getQuestionIds() != null) {
+            String[] ids = session.getQuestionIds().split(",");
+            for (int i = 0; i < ids.length; i++) {
+                if (ids[i].equals(String.valueOf(dto.getQuestionId()))) {
+                    questionIndex = i;
+                    break;
+                }
+            }
+        }
+
+        // 写入 user_question_record（upsert：同一会话同一题只保留最新一次）
+        UserQuestionRecord existingRecord = userQuestionRecordMapper.selectOne(
+            new LambdaQueryWrapper<UserQuestionRecord>()
+                .eq(UserQuestionRecord::getSessionId, practiceSessionId)
+                .eq(UserQuestionRecord::getQuestionId, dto.getQuestionId())
+                .last("LIMIT 1")
+        );
+        if (existingRecord == null) {
+            UserQuestionRecord record = new UserQuestionRecord();
+            record.setUserId(userId);
+            record.setSessionId(practiceSessionId);
+            record.setQuestionId(dto.getQuestionId());
+            record.setPracticeModeId(session.getPracticeModeId());
+            record.setSource(session.getStatus());
+            record.setUserAnswer(dto.getAnswer());
+            record.setIsCorrect(isCorrect ? 1 : 0);
+            record.setAnswerTimeMs(dto.getAnswerTime() != null ? dto.getAnswerTime() * 1000 : null);
+            userQuestionRecordMapper.insert(record);
+            // 只有首次作答才累加计数，避免重复提交导致统计膨胀
+            session.setCorrectCount(session.getCorrectCount() + (isCorrect ? 1 : 0));
+            session.setWrongCount(session.getWrongCount() + (isCorrect ? 0 : 1));
+        } else {
+            // 更新已有记录（重新作答）
+            boolean wasCorrect = Integer.valueOf(1).equals(existingRecord.getIsCorrect());
+            existingRecord.setUserAnswer(dto.getAnswer());
+            existingRecord.setIsCorrect(isCorrect ? 1 : 0);
+            existingRecord.setAnswerTimeMs(dto.getAnswerTime() != null ? dto.getAnswerTime() * 1000 : null);
+            userQuestionRecordMapper.updateById(existingRecord);
+            // 同步修正统计（仅当正确性状态变化时调整）
+            if (wasCorrect && !isCorrect) {
+                session.setCorrectCount(Math.max(0, session.getCorrectCount() - 1));
+                session.setWrongCount(session.getWrongCount() + 1);
+            } else if (!wasCorrect && isCorrect) {
+                session.setWrongCount(Math.max(0, session.getWrongCount() - 1));
+                session.setCorrectCount(session.getCorrectCount() + 1);
+            }
+        }
+
+        // 推进当前进度（仅当提交的是当前题或之前的题时，currentIndex 取 max）
+        if (questionIndex >= 0) {
+            int nextIndex = questionIndex + 1;
+            if (nextIndex > session.getCurrentIndex()) {
+                session.setCurrentIndex(Math.min(nextIndex, session.getTotalQuestions()));
+            }
+        }
+        session.setLastActiveTime(java.time.LocalDateTime.now());
+        practiceSessionMapper.updateById(session);
+
+        result.put("questionIndex", questionIndex);
+        result.put("currentIndex", session.getCurrentIndex());
+        result.put("correctCount", session.getCorrectCount());
+        result.put("wrongCount", session.getWrongCount());
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> resumePractice(Long userId, Long sessionId) {
+        PracticeSession session = practiceSessionMapper.selectById(sessionId);
+        if (session == null || !userId.equals(session.getUserId())) {
+            throw new BusinessException("练习会话不存在");
+        }
+        return buildResumeResult(session);
+    }
+
+    @Override
+    public Map<String, Object> getPracticeProgress(Long userId, Long practiceModeId) {
+        PracticeSession session = practiceSessionMapper.selectOne(
+            new LambdaQueryWrapper<PracticeSession>()
+                .eq(PracticeSession::getUserId, userId)
+                .eq(PracticeSession::getPracticeModeId, practiceModeId)
+                .eq(PracticeSession::getStatus, "IN_PROGRESS")
+                .orderByDesc(PracticeSession::getUpdateTime)
+                .last("LIMIT 1")
+        );
+        Map<String, Object> result = new HashMap<>();
+        if (session == null) {
+            result.put("hasSession", false);
+            return result;
+        }
+        int answered = session.getCorrectCount() + session.getWrongCount();
+        result.put("hasSession", true);
+        result.put("sessionId", session.getId());
+        result.put("currentIndex", session.getCurrentIndex());
+        result.put("total", session.getTotalQuestions());
+        result.put("answered", answered);
+        result.put("correct", session.getCorrectCount());
+        result.put("wrong", session.getWrongCount());
+        result.put("lastActiveTime", session.getLastActiveTime());
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> abandonPractice(Long userId, Long sessionId) {
+        PracticeSession session = practiceSessionMapper.selectById(sessionId);
+        if (session == null || !userId.equals(session.getUserId())) {
+            throw new BusinessException("练习会话不存在");
+        }
+        session.setStatus("ABANDONED");
+        practiceSessionMapper.updateById(session);
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> completePracticeSession(Long userId, Long sessionId) {
+        PracticeSession session = practiceSessionMapper.selectById(sessionId);
+        if (session == null || !userId.equals(session.getUserId())) {
+            throw new BusinessException("练习会话不存在");
+        }
+        session.setStatus("COMPLETED");
+        session.setLastActiveTime(java.time.LocalDateTime.now());
+        practiceSessionMapper.updateById(session);
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+        result.put("correct", session.getCorrectCount());
+        result.put("wrong", session.getWrongCount());
+        result.put("total", session.getTotalQuestions());
+        return result;
+    }
+
+    /** 组装续做结果（题目顺序、用户答题记录、当前进度） */
+    private Map<String, Object> buildResumeResult(PracticeSession session) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("sessionId", session.getId());
+        result.put("practiceSessionId", session.getId());
+        result.put("modeId", session.getPracticeModeId());
+        result.put("currentIndex", session.getCurrentIndex());
+        result.put("totalQuestions", session.getTotalQuestions());
+        result.put("correctCount", session.getCorrectCount());
+        result.put("wrongCount", session.getWrongCount());
+
+        // 按固化顺序批量加载题目
+        List<Map<String, Object>> questions = new ArrayList<>();
+        if (session.getQuestionIds() != null && !session.getQuestionIds().isEmpty()) {
+            String[] idStrs = session.getQuestionIds().split(",");
+            List<Long> ids = new ArrayList<>();
+            for (String s : idStrs) {
+                if (!s.isEmpty()) ids.add(Long.parseLong(s.trim()));
+            }
+            if (!ids.isEmpty()) {
+                List<Question> qlist = questionMapper.selectBatchIds(ids);
+                Map<Long, Question> qmap = qlist.stream().collect(Collectors.toMap(Question::getId, q -> q));
+                for (Long id : ids) {
+                    Question q = qmap.get(id);
+                    if (q != null) questions.add(formatQuestion(q));
+                }
+            }
+        }
+        result.put("questions", questions);
+
+        // 加载该会话所有答题记录，组装为 { questionId: { answer, displayAnswer, isCorrect, correctAnswer } }
+        List<UserQuestionRecord> records = userQuestionRecordMapper.selectList(
+            new LambdaQueryWrapper<UserQuestionRecord>()
+                .eq(UserQuestionRecord::getSessionId, session.getId())
+        );
+        Map<Long, UserQuestionRecord> recordMap = records.stream()
+            .collect(Collectors.toMap(UserQuestionRecord::getQuestionId, r -> r, (a, b) -> b));
+        result.put("userRecords", recordMap);
+        return result;
+    }
+
+    private PracticeModeVO toPracticeModeVO(PracticeMode mode, Long userId) {
         PracticeModeVO vo = new PracticeModeVO();
         vo.setId(mode.getId());
         vo.setName(mode.getName());
@@ -1338,18 +1586,61 @@ public class LearnServiceImpl implements LearnService {
         vo.setType(mode.getType());
         vo.setTimeLimitSeconds(mode.getTimeLimitSeconds());
         vo.setTags(mode.getTags());
+        vo.setSubjectId(mode.getSubjectId());
+        vo.setSortOrder(mode.getSortOrder());
+        Long userGradeLevelId = resolveGradeLevelId(userId);
+        vo.setQuestionCount(countAvailableQuestions(mode.getSubjectId(), userGradeLevelId));
         return vo;
     }
 
-    private PracticeModeVO defaultPracticeMode(Long subjectId) {
+    private PracticeModeVO buildStandardMode(Long id, Long subjectId, String type, String name, String desc, String icon, int sortOrder, Integer questionCount) {
         PracticeModeVO vo = new PracticeModeVO();
-        vo.setId(subjectId != null ? subjectId : 1L);
-        vo.setName("综合练习");
-        vo.setDescription("涵盖所选学科所有知识点的大量题目练习");
-        vo.setIcon("📚");
-        vo.setType("ENDLESS");
-        vo.setTimeLimitSeconds(null);
+        vo.setId(id);
+        vo.setSubjectId(subjectId);
+        vo.setName(name);
+        vo.setDescription(desc);
+        vo.setIcon(icon);
+        vo.setType(type);
+        vo.setSortOrder(sortOrder);
+        vo.setQuestionCount(questionCount);
+        vo.setTimeLimitSeconds("MOCK_EXAM".equals(type) ? 600 : null);
         return vo;
+    }
+
+    /** 兜底模式 ID 解析：subjectId*1000 + N 反推学科与模式类型 */
+    private StandardModeInfo parseStandardModeId(Long practiceModeId) {
+        if (practiceModeId == null || practiceModeId < 1000) return null;
+        long subjectId = practiceModeId / 1000;
+        long suffix = practiceModeId % 1000;
+        String type;
+        String name;
+        if (suffix == 1) { type = "SEQUENTIAL"; name = "顺序练习"; }
+        else if (suffix == 2) { type = "RANDOM"; name = "随机练习"; }
+        else if (suffix == 3) { type = "MOCK_EXAM"; name = "模拟考试"; }
+        else return null;
+        return new StandardModeInfo(subjectId, type, name);
+    }
+
+    private static class StandardModeInfo {
+        final Long subjectId;
+        final String type;
+        final String name;
+        StandardModeInfo(Long subjectId, String type, String name) {
+            this.subjectId = subjectId; this.type = type; this.name = name;
+        }
+    }
+
+    private Long resolveGradeLevelId(Long userId) {
+        ChildProfile profile = childProfileMapper.selectOne(
+            new LambdaQueryWrapper<ChildProfile>().eq(ChildProfile::getUserId, userId));
+        return profile != null && profile.getGradeLevel() != null ? profile.getGradeLevel().longValue() : null;
+    }
+
+    private Integer countAvailableQuestions(Long subjectId, Long gradeLevelId) {
+        if (subjectId == null) return 0;
+        LambdaQueryWrapper<Question> w = new LambdaQueryWrapper<Question>().eq(Question::getSubjectId, subjectId);
+        if (gradeLevelId != null) w.eq(Question::getGradeLevelId, gradeLevelId);
+        return Math.toIntExact(questionMapper.selectCount(w));
     }
 
     private Map<String, Object> formatQuestion(Question q) {
@@ -1358,6 +1649,14 @@ public class LearnServiceImpl implements LearnService {
         map.put("questionType", q.getQuestionType());
         map.put("questionContent", q.getQuestionContent());
         map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
+        map.put("questionSpeechText", RichContentUtil.toSpeechText(q.getQuestionContent()));
+        map.put("questionAudioUrl", RichContentUtil.toSpeechAudioUrl(q.getQuestionContent()));
+        map.put("score", q.getScore());
+        map.put("timeLimit", q.getTimeLimit());
+        map.put("analysis", q.getAnalysis());
+        map.put("analysisText", RichContentUtil.toPlainText(q.getAnalysis()));
+        map.put("analysisSpeechText", RichContentUtil.toSpeechText(q.getAnalysis()));
+        map.put("analysisAudioUrl", RichContentUtil.toSpeechAudioUrl(q.getAnalysis()));
 
         List<QuestionOption> options = questionOptionMapper.selectList(
             new LambdaQueryWrapper<QuestionOption>()
@@ -1366,20 +1665,6 @@ public class LearnServiceImpl implements LearnService {
         );
         map.put("options", QuestionRandomizer.toRandomizedOptions(options, new Random(), q.getQuestionType()));
         return map;
-    }
-
-    @Override
-    public Map<String, Object> submitPracticeAnswer(Long userId, Long practiceSessionId, SubmitAnswerDTO dto) {
-        // 专项练习答题，复用submitAnswer的核心逻辑
-        log.info("专项练习答题 - userId: {}, practiceSessionId: {}, questionId: {}", userId, practiceSessionId, dto.getQuestionId());
-        Map<String, Object> result = submitAnswer(userId, dto);
-
-        // 记录专项练习来源，便于后续统计分析
-        if (result.containsKey("correct") && !Boolean.TRUE.equals(result.get("correct"))) {
-            log.info("专项练习答错 - userId: {}, practiceSessionId: {}, questionId: {}", userId, practiceSessionId, dto.getQuestionId());
-        }
-
-        return result;
     }
 
     @Override

@@ -326,7 +326,7 @@ function goPet() { switchTab('pet') }
 function goAchievement() { switchTab('achievement') }
 function goWrongTopics() { uni.navigateTo({ url: '/pages/mine/wrong' }) }
 function goAdaptivePractice(wp) {
-  uni.navigateTo({ url: `/pages/learn/quiz?practiceModeId=${wp.subjectId}&timeLimit=0` })
+  uni.navigateTo({ url: `/pages/learn/practice/index?subjectId=${wp.subjectId}&subjectName=${encodeURIComponent(wp.subjectName || '')}` })
 }
 </script>
 

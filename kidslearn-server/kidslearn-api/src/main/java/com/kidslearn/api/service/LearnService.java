@@ -92,4 +92,36 @@ public interface LearnService {
      * @return 更新结果
      */
     Map<String, Object> updateWrongTopicMastery(Long userId, Long wrongTopicId, boolean isCorrect);
+
+    /**
+     * 断点续做：恢复某个练习会话的题目顺序、答题记录、当前进度
+     * @param userId 用户ID
+     * @param sessionId 练习会话ID
+     * @return 会话信息（含题目列表、用户答题记录、当前题号）
+     */
+    Map<String, Object> resumePractice(Long userId, Long sessionId);
+
+    /**
+     * 获取某练习模式下的进行中会话进度（供模式选择页显示"继续答题"）
+     * @param userId 用户ID
+     * @param practiceModeId 练习模式ID
+     * @return 进度信息（含 sessionId、已做/总数、当前题号）
+     */
+    Map<String, Object> getPracticeProgress(Long userId, Long practiceModeId);
+
+    /**
+     * 放弃某个练习会话（重新开始时调用，把 IN_PROGRESS 置为 ABANDONED）
+     * @param userId 用户ID
+     * @param sessionId 练习会话ID
+     * @return 操作结果
+     */
+    Map<String, Object> abandonPractice(Long userId, Long sessionId);
+
+    /**
+     * 完成某个练习会话（把状态置为 COMPLETED）
+     * @param userId 用户ID
+     * @param sessionId 练习会话ID
+     * @return 操作结果
+     */
+    Map<String, Object> completePracticeSession(Long userId, Long sessionId);
 }

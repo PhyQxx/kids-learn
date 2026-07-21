@@ -59,12 +59,24 @@ export const getAssessmentQuestions = () => get('/learn/assessment')
 // 获取专项练习模式列表
 export const getPracticeModes = (subjectId) => get('/learn/practice/modes', { subjectId })
 
-// 开始专项练习
+// 开始专项练习 (返回 sessionId + 全量题目 + 题目顺序快照)
 export const startPractice = (practiceModeId) => post(`/learn/practice/start?practiceModeId=${practiceModeId}`)
 
 // 提交专项练习答案
-export const submitPracticeAnswer = (practiceSessionId, data) => 
+export const submitPracticeAnswer = (practiceSessionId, data) =>
   post(`/learn/practice/submit?practiceSessionId=${practiceSessionId}`, data)
+
+// 断点续做：恢复练习会话（返回题目顺序 + 用户答题记录 + 当前进度）
+export const resumePractice = (sessionId) => post(`/learn/practice/resume?sessionId=${sessionId}`)
+
+// 获取某练习模式的进行中进度（用于模式选择页显示"继续答题"）
+export const getPracticeProgress = (practiceModeId) => get('/learn/practice/progress', { practiceModeId })
+
+// 放弃练习会话（重新开始时调用）
+export const abandonPractice = (sessionId) => post(`/learn/practice/abandon?sessionId=${sessionId}`)
+
+// 完成练习会话
+export const completePracticeSession = (sessionId) => post(`/learn/practice/complete?sessionId=${sessionId}`)
 
 // 获取智能复习组卷
 export const getSmartReviewQuiz = (subjectId, questionCount = 15) => 

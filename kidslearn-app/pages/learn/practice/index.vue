@@ -1,112 +1,165 @@
 <template>
-  <view class="practice-page">
-    <view class="header">
-      <view class="back-btn" @click="goBack">返回</view>
-      <text class="title">专项练习</text>
+  <AppLayout theme="learn" :title="title" :show-back="true" active-nav="learn">
+    <view class="practice-page">
+      <!-- 顶部学科信息 -->
+      <view class="hero card">
+        <text class="hero-icon">{{ subjectInfo.icon || '📚' }}</text>
+        <view class="hero-info">
+          <text class="hero-name">{{ subjectInfo.name || '专项练习' }}</text>
+          <text class="hero-desc">{{ totalQuestions }} 道题 · 选择你喜欢的练习方式</text>
+        </view>
+      </view>
+
+      <!-- 模式列表（驾考宝典风格） -->
+      <view class="mode-list">
+        <view v-for="mode in modes" :key="mode.id" class="mode-card card">
+          <view class="mode-head">
+            <view class="mode-icon" :class="'icon-' + mode.type">{{ mode.icon }}</view>
+            <view class="mode-info">
+              <text class="mode-name">{{ mode.name }}</text>
+              <text class="mode-desc">{{ mode.description }}</text>
+            </view>
+          </view>
+
+          <!-- 进度信息 -->
+          <view class="mode-stats">
+            <view class="stat-line">
+              <text class="text-xs text-light">题库共 {{ mode.questionCount || 0 }} 题</text>
+              <text v-if="progressMap[mode.id] && progressMap[mode.id].hasSession" class="stat-tag">
+                已做 {{ progressMap[mode.id].answered }} / {{ progressMap[mode.id].total }}
+              </text>
+            </view>
+            <view v-if="progressMap[mode.id] && progressMap[mode.id].hasSession" class="progress-bar">
+              <view class="progress-fill" :style="{ width: progressPercent(mode.id) + '%' }" />
+            </view>
+          </view>
+
+          <!-- 操作按钮 -->
+          <view class="mode-actions">
+            <template v-if="progressMap[mode.id] && progressMap[mode.id].hasSession">
+              <tn-button type="primary" size="lg" shape="round" block @click="continueMode(mode)">
+                继续答题 · 第 {{ (progressMap[mode.id].currentIndex || 0) + 1 }} 题
+              </tn-button>
+              <view class="restart-btn" @click="restartMode(mode)">重新开始</view>
+            </template>
+            <tn-button v-else type="primary" size="lg" shape="round" block @click="startMode(mode)">
+              开始练习
+            </tn-button>
+          </view>
+        </view>
+
+        <view v-if="!loading && modes.length === 0" class="empty-state">
+          <text class="text-light">该学科下暂无题目</text>
+        </view>
+      </view>
     </view>
-
-    <scroll-view scroll-x class="subject-tabs" show-scrollbar="false">
-      <view class="tab" :class="{ active: currentSubject === null }" @click="switchSubject(null)">全部</view>
-      <view class="tab" v-for="sub in subjects" :key="sub.id" :class="{ active: currentSubject === sub.id }" @click="switchSubject(sub.id)">
-        {{ sub.name }}
-      </view>
-    </scroll-view>
-
-    <scroll-view scroll-y class="content-scroll">
-      <view class="section" v-if="endlessModes.length > 0">
-        <view class="section-title">基础巩固 (无尽模式)</view>
-        <view class="grid">
-          <view class="card" v-for="item in endlessModes" :key="item.id" @click="start(item)">
-            <view class="card-icon">{{ item.icon }}</view>
-            <view class="card-info">
-              <text class="card-name">{{ item.name }}</text>
-              <text class="card-desc">{{ item.description }}</text>
-            </view>
-            <view class="btn">开始</view>
-          </view>
-        </view>
-      </view>
-
-      <view class="section" v-if="timedModes.length > 0">
-        <view class="section-title">进阶挑战 (限时模式)</view>
-        <view class="grid">
-          <view class="card challenge" v-for="item in timedModes" :key="item.id" @click="start(item)">
-            <view class="tag" v-if="item.tags">{{ item.tags }}</view>
-            <view class="card-icon">{{ item.icon }}</view>
-            <view class="card-info">
-              <text class="card-name">{{ item.name }}</text>
-              <text class="card-desc">{{ item.description }}</text>
-            </view>
-            <view class="btn challenge-btn">挑战</view>
-          </view>
-        </view>
-      </view>
-
-      <view v-if="endlessModes.length === 0 && timedModes.length === 0" class="empty-state">
-        <text>暂无相关练习模式</text>
-      </view>
-    </scroll-view>
-  </view>
+  </AppLayout>
 </template>
 
 <script>
-import { getSubjects, getPracticeModes } from '@/api/learn'
-import { useUserStore } from '@/store/user'
+import AppLayout from '@/components/AppLayout.vue'
+import { getPracticeModes, getPracticeProgress, abandonPractice } from '@/api/learn'
 
 export default {
+  components: { AppLayout },
   data() {
     return {
-      subjects: [],
-      currentSubject: null,
-      modes: []
+      subjectId: null,
+      subjectName: '',
+      modes: [],
+      progressMap: {},
+      loading: true
     }
   },
   computed: {
-    endlessModes() {
-      return this.modes.filter(m => m.type === 'ENDLESS')
+    title() {
+      return this.subjectName ? `${this.subjectName} · 练习` : '专项练习'
     },
-    timedModes() {
-      return this.modes.filter(m => m.type === 'TIMED')
+    subjectInfo() {
+      // 从 modes 里反推学科信息（兜底）
+      return { name: this.subjectName, icon: '📚' }
+    },
+    totalQuestions() {
+      if (!this.modes.length) return 0
+      return Math.max(...this.modes.map(m => m.questionCount || 0))
     }
   },
-  onLoad() {
-    this.loadSubjects()
-    this.loadModes()
+  onLoad(options) {
+    this.subjectId = options.subjectId
+    this.subjectName = decodeURIComponent(options.subjectName || '')
+  },
+  onShow() {
+    // 从答题页返回时刷新进度（断点续做状态可能变化）
+    this.loadData()
   },
   methods: {
-    goBack() {
-      uni.navigateBack()
+    progressPercent(modeId) {
+      const p = this.progressMap[modeId]
+      if (!p || !p.hasSession || !p.total) return 0
+      return Math.round(p.answered / p.total * 100)
     },
-    async loadSubjects() {
+    async loadData() {
+      this.loading = true
       try {
-        const userStore = useUserStore()
-        const res = await getSubjects(userStore.userInfo?.gradeLevelId)
-        if (res && Array.isArray(res)) {
-          this.subjects = res
-        }
+        const modes = await getPracticeModes(this.subjectId)
+        this.modes = Array.isArray(modes) ? modes : []
+        // 并行拉取每个模式的进度
+        const results = await Promise.allSettled(
+          this.modes.map(m => getPracticeProgress(m.id))
+        )
+        const map = {}
+        results.forEach((r, i) => {
+          if (r.status === 'fulfilled' && r.value && r.value.hasSession) {
+            map[this.modes[i].id] = r.value
+          }
+        })
+        this.progressMap = map
       } catch (e) {
-        console.error('Failed to load subjects', e)
-      }
-    },
-    async loadModes() {
-      try {
-        const res = await getPracticeModes(this.currentSubject)
-        if (res && Array.isArray(res)) {
-          this.modes = res
-        }
-      } catch (e) {
-        console.error('Failed to load modes', e)
+        console.error('加载练习模式失败', e)
         uni.showToast({ title: '加载失败', icon: 'none' })
+      } finally {
+        this.loading = false
       }
     },
-    switchSubject(id) {
-      this.currentSubject = id
-      this.loadModes()
-    },
-    start(item) {
+    startMode(mode) {
       uni.navigateTo({
-        url: `/pages/learn/practice/quiz?modeId=${item.id}&type=${item.type}&timeLimit=${item.timeLimitSeconds || 0}`
+        url: `/pages/learn/quiz?practiceModeId=${mode.id}&modeType=${mode.type}&timeLimit=${mode.timeLimitSeconds || 0}`
       })
+    },
+    continueMode(mode) {
+      const p = this.progressMap[mode.id]
+      if (!p || !p.hasSession) {
+        this.startMode(mode)
+        return
+      }
+      uni.navigateTo({
+        url: `/pages/learn/quiz?practiceModeId=${mode.id}&sessionId=${p.sessionId}&modeType=${mode.type}&timeLimit=${mode.timeLimitSeconds || 0}`
+      })
+    },
+    async restartMode(mode) {
+      const p = this.progressMap[mode.id]
+      if (!p || !p.hasSession) {
+        this.startMode(mode)
+        return
+      }
+      const confirmed = await new Promise(resolve => {
+        uni.showModal({
+          title: '重新开始',
+          content: '当前进度将被清空，确定重新开始吗？',
+          success: r => resolve(r.confirm)
+        })
+      })
+      if (!confirmed) return
+      try {
+        await abandonPractice(p.sessionId)
+        // 清除本地进度后直接新建会话
+        const newMap = { ...this.progressMap }
+        delete newMap[mode.id]
+        this.progressMap = newMap
+        this.startMode(mode)
+      } catch (e) {
+        uni.showToast({ title: '操作失败', icon: 'none' })
+      }
     }
   }
 }
@@ -116,162 +169,153 @@ export default {
 @import '@/styles/variables.scss';
 
 .practice-page {
-  height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #F5F7FA;
+  gap: 16px;
 }
 
-.header {
-  padding: 32rpx;
-  background: #FFF;
+.hero {
   display: flex;
   align-items: center;
-  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.02);
-  z-index: 10;
+  gap: 16px;
+  padding: 20px;
 }
 
-.back-btn {
-  font-size: 32rpx;
-  color: #666;
-  font-weight: bold;
-  margin-right: 32rpx;
-}
-
-.title {
-  font-size: 36rpx;
-  font-weight: bold;
-}
-
-.subject-tabs {
-  white-space: nowrap;
-  padding: 24rpx 32rpx;
-  background: #FFF;
-}
-
-.tab {
-  display: inline-block;
-  padding: 12rpx 32rpx;
-  background: #F0F2F5;
-  border-radius: 32rpx;
-  font-size: 28rpx;
-  color: #666;
-  margin-right: 16rpx;
-
-  &.active {
-    background: #E8F0FE;
-    color: $primary;
-    font-weight: bold;
-  }
-}
-
-.content-scroll {
-  flex: 1;
-  padding: 32rpx;
-  box-sizing: border-box;
-}
-
-.section {
-  margin-bottom: 40rpx;
-}
-
-.section-title {
-  font-size: 32rpx;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 24rpx;
-}
-
-.grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24rpx;
-}
-
-.card {
-  width: calc(33.33% - 16rpx);
-  background: #FFF;
-  border-radius: 24rpx;
-  padding: 32rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0,0,0,0.04);
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  box-sizing: border-box;
-
-  &.challenge {
-    border: 2rpx solid #FFF3E0;
-    background: #FFFAF5;
-  }
-}
-
-.card-icon {
-  font-size: 64rpx;
-  margin-bottom: 16rpx;
-  background: #F5F9FF;
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 24rpx;
+.hero-icon {
+  font-size: 40px;
+  width: 64px;
+  height: 64px;
+  background: #EEF3FF;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.challenge .card-icon {
-  background: #FFF3E0;
-}
-
-.card-info {
+.hero-info {
   flex: 1;
 }
 
-.card-name {
-  font-size: 32rpx;
+.hero-name {
+  font-size: 20px;
   font-weight: bold;
-  color: #333;
+  color: $text;
   display: block;
-  margin-bottom: 8rpx;
 }
 
-.card-desc {
-  font-size: 24rpx;
-  color: #999;
+.hero-desc {
+  font-size: 13px;
+  color: $text-secondary;
   display: block;
-  margin-bottom: 24rpx;
+  margin-top: 4px;
+}
+
+.mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mode-card {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mode-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.mode-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  flex-shrink: 0;
+  background: #EEF3FF;
+
+  &.icon-SEQUENTIAL { background: #E8F4FF; }
+  &.icon-RANDOM { background: #FFF3E6; }
+  &.icon-MOCK_EXAM { background: #F3E8FF; }
+}
+
+.mode-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mode-name {
+  font-size: 17px;
+  font-weight: bold;
+  color: $text;
+  display: block;
+}
+
+.mode-desc {
+  font-size: 13px;
+  color: $text-secondary;
+  display: block;
+  margin-top: 4px;
   line-height: 1.4;
-  height: 68rpx;
+}
+
+.mode-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stat-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-tag {
+  font-size: 12px;
+  color: $primary;
+  background: rgba(255, 122, 89, 0.1);
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-weight: bold;
+}
+
+.progress-bar {
+  height: 6px;
+  background: #F0F2F5;
+  border-radius: 100px;
   overflow: hidden;
 }
 
-.btn {
-  background: $primary;
-  color: #FFF;
-  text-align: center;
-  padding: 16rpx 0;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  font-weight: bold;
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, $primary, #FF9A7B);
+  border-radius: 100px;
+  transition: width 0.3s;
 }
 
-.challenge-btn {
-  background: $warning;
+.mode-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
 }
 
-.tag {
-  position: absolute;
-  top: 16rpx;
-  right: 16rpx;
-  background: #FFE8E8;
-  color: #E74C3C;
-  font-size: 20rpx;
-  padding: 4rpx 12rpx;
-  border-radius: 8rpx;
-  font-weight: bold;
+.restart-btn {
+  font-size: 13px;
+  color: $text-secondary;
+  padding: 6px 16px;
+  text-decoration: underline;
 }
 
 .empty-state {
   text-align: center;
-  color: #999;
-  padding: 100rpx 0;
+  padding: 60px 0;
 }
 </style>
