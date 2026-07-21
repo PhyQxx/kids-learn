@@ -2,6 +2,8 @@ package com.kidslearn.api.dto.user;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class UserVO {
     private Long userId;
@@ -16,4 +18,6 @@ public class UserVO {
     private String gradeLevelName;
     private String phone;
     private Integer onboardingStep;
+    /** 后台管理权限码列表（仅管理员有值） */
+    private List<String> permissions;
 }

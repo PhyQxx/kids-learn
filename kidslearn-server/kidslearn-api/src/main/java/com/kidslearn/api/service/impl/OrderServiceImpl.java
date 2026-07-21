@@ -7,6 +7,7 @@ import com.kidslearn.api.service.OrderService;
 import com.kidslearn.api.service.SubscriptionService;
 import com.kidslearn.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
@@ -53,6 +55,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public Map<String, Object> handlePaymentCallback(String orderNo, Integer payStatus) {
+        // 幂等性检查：使用订单号+状态作为唯一键，防止重复处理
         Order order = orderMapper.selectOne(
             new LambdaQueryWrapper<Order>().eq(Order::getOrderNo, orderNo).last("LIMIT 1")
         );
@@ -60,10 +63,18 @@ public class OrderServiceImpl implements OrderService {
             throw new BusinessException("订单不存在");
         }
 
-        if (order.getPayStatus() != null && order.getPayStatus() == PAY_STATUS_PAID) {
-            Map<String, Object> result = toOrderMap(order);
-            result.put("subscription", subscriptionService.getCurrentSubscription(order.getUserId()));
-            return result;
+        // 幂等性检查：如果订单已处理（已支付或已退款），直接返回当前状态，不重复处理
+        if (order.getPayStatus() != null) {
+            if (order.getPayStatus() == PAY_STATUS_PAID) {
+                log.info("订单已支付，跳过重复回调: orderNo={}", orderNo);
+                Map<String, Object> result = toOrderMap(order);
+                result.put("subscription", subscriptionService.getCurrentSubscription(order.getUserId()));
+                return result;
+            }
+            if (order.getPayStatus() == PAY_STATUS_REFUNDED) {
+                log.info("订单已退款，跳过重复回调: orderNo={}", orderNo);
+                return toOrderMap(order);
+            }
         }
 
         if (payStatus == null || (payStatus != PAY_STATUS_PAID && payStatus != PAY_STATUS_REFUNDED)) {
@@ -72,14 +83,22 @@ public class OrderServiceImpl implements OrderService {
 
         if (payStatus == PAY_STATUS_REFUNDED) {
             order.setPayStatus(PAY_STATUS_REFUNDED);
+            order.setUpdateTime(LocalDateTime.now());
             orderMapper.updateById(order);
+            log.info("订单退款成功: orderNo={}", orderNo);
             return toOrderMap(order);
         }
 
+        // 支付成功：更新订单状态
         order.setPayStatus(PAY_STATUS_PAID);
         order.setPayTime(LocalDateTime.now());
-        orderMapper.updateById(order);
+        order.setUpdateTime(LocalDateTime.now());
+        int rows = orderMapper.updateById(order);
+        if (rows == 0) {
+            throw new BusinessException("订单状态更新失败，可能存在并发问题");
+        }
 
+        // 激活订阅（如果是订阅订单）
         Map<String, Object> result = toOrderMap(order);
         if (order.getProductType() != null && order.getProductType() == PRODUCT_TYPE_SUBSCRIPTION) {
             result.put("subscription", subscriptionService.activateSubscription(
@@ -87,6 +106,8 @@ public class OrderServiceImpl implements OrderService {
                 order.getProductId().intValue()
             ));
         }
+
+        log.info("订单支付处理成功: orderNo={}, userId={}", orderNo, order.getUserId());
         return result;
     }
 

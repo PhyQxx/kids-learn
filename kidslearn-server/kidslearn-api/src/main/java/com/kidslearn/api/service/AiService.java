@@ -17,6 +17,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
@@ -337,7 +338,77 @@ public class AiService {
         }
     }
 
-    private String chatCompletion(List<Map<String, String>> messages, int maxTokens, double temperature) throws Exception {
+    /**
+     * AI出题：根据学科和难度生成题目
+     */
+    public Map<String, Object> generateQuestion(String subject, String difficulty, String questionType) {
+        if (!isAvailable()) {
+            log.warn("AI service is not available for question generation");
+            return null;
+        }
+
+        String systemPrompt = "你是一位专业的儿童教育专家，擅长为3-12岁儿童出题。请严格按照JSON格式返回题目。";
+        String userPrompt = "请为%s学科生成一道%s难度的%s题目。要求：\n1. 题目内容适合儿童理解\n2. 选项清晰明确\n3. 包含解析\n\n请返回JSON格式：\n{\"questionContent\":\"题目内容\",\"options\":[{\"label\":\"A\",\"content\":\"选项内容\",\"isCorrect\":true/false}],\"analysis\":\"解析\",\"difficulty\":1-5}".formatted(subject, difficulty, questionType != null ? questionType : "选择题");
+
+        try {
+            String response = chatCompletion(List.of(
+                Map.of("role", "system", "content", systemPrompt),
+                Map.of("role", "user", "content", userPrompt)
+            ), 1000, 0.8);
+            if (response == null || response.isBlank()) {
+                return null;
+            }
+            return parseJsonResponse(response);
+        } catch (Exception e) {
+            log.error("AI question generation failed", e);
+            return null;
+        }
+    }
+
+    /**
+     * AI对话辅导：针对题目进行对话式辅导
+     */
+    public String tutorChat(String question, String userAnswer, String correctAnswer, String chatHistory) {
+        if (!isAvailable()) {
+            return "让我们再想想这道题吧！🤔";
+        }
+
+        String systemPrompt = "你是一位耐心的儿童辅导老师，正在帮助小朋友理解题目。请用简单易懂的语言解释，鼓励小朋友思考，不要直接给出答案。";
+
+        // 构建消息列表，包含历史对话
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", systemPrompt));
+
+        // 添加历史对话记录
+        if (chatHistory != null && !chatHistory.isBlank()) {
+            messages.add(Map.of("role", "assistant", "content", "之前的对话记录：" + chatHistory));
+        }
+
+        String userPrompt = "题目：%s\n小朋友的答案：%s\n正确答案：%s\n\n请引导小朋友理解为什么答案是这样的，用鼓励的语气。如果小朋友答对了，给予表扬；如果答错了，温和地指出并引导思考。".formatted(question, userAnswer, correctAnswer);
+        messages.add(Map.of("role", "user", "content", userPrompt));
+
+        try {
+            String response = chatCompletion(messages, 500, 0.7);
+            return response != null ? response.trim() : "继续加油哦！💪";
+        } catch (Exception e) {
+            log.error("AI tutor chat failed", e);
+            return "让我们再想想这道题吧！🤔";
+        }
+    }
+
+    private Map<String, Object> parseJsonResponse(String response) {
+        try {
+            // 清理markdown代码块标记
+            String json = response.replaceAll("```json\\s*", "").replaceAll("```\\s*$", "").trim();
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.readValue(json, Map.class);
+        } catch (Exception e) {
+            log.warn("Failed to parse AI response as JSON: {}", response);
+            return null;
+        }
+    }
+
+    public String chatCompletion(List<Map<String, String>> messages, int maxTokens, double temperature) throws Exception {
         String provider = getProvider();
         String apiKey = getConfig("ai." + provider + ".api_key");
         String baseUrl = getConfig("ai." + provider + ".base_url");

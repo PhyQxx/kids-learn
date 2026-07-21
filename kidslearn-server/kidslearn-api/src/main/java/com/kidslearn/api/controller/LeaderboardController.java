@@ -36,7 +36,23 @@ public class LeaderboardController {
             return R.ok(challengeService.getChallengeRanking(currentUserId));
         }
 
-        // Get top 50 users by exp
+        boolean isWeekly = "weekly".equals(type);
+        LocalDate weekStart = isWeekly ? LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1) : null;
+
+        // 批量查询本周所有用户的统计数据（避免N+1）
+        Map<Long, Integer> weeklyExpMap = new HashMap<>();
+        if (isWeekly) {
+            List<DailyStats> allWeekStats = dailyStatsMapper.selectList(
+                new LambdaQueryWrapper<DailyStats>()
+                    .ge(DailyStats::getStatDate, weekStart)
+            );
+            // 按userId分组求和
+            for (DailyStats ds : allWeekStats) {
+                weeklyExpMap.merge(ds.getUserId(), ds.getEarnedExp() != null ? ds.getEarnedExp() : 0, Integer::sum);
+            }
+        }
+
+        // Get top 50 users by total exp
         List<User> users = userMapper.selectList(
             new LambdaQueryWrapper<User>()
                 .eq(User::getStatus, 1)
@@ -53,19 +69,11 @@ public class LeaderboardController {
             map.put("nickname", u.getNickname());
             map.put("avatar", u.getAvatar());
 
-            if ("weekly".equals(type)) {
-                // Weekly score: sum of this week's earned exp
-                LocalDate weekStart = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
-                List<DailyStats> weekStats = dailyStatsMapper.selectList(
-                    new LambdaQueryWrapper<DailyStats>()
-                        .eq(DailyStats::getUserId, u.getId())
-                        .ge(DailyStats::getStatDate, weekStart)
-                );
-                int weeklyExp = weekStats.stream().mapToInt(DailyStats::getEarnedExp).sum();
-                map.put("score", weeklyExp);
-            } else {
-                map.put("score", u.getTotalExp() != null ? u.getTotalExp() : 0);
-            }
+            // 使用预查询的Map获取分数，避免N+1查询
+            int score = isWeekly
+                ? weeklyExpMap.getOrDefault(u.getId(), 0)
+                : (u.getTotalExp() != null ? u.getTotalExp() : 0);
+            map.put("score", score);
 
             if (u.getId().equals(currentUserId)) {
                 containsMe = true;
@@ -91,31 +99,26 @@ public class LeaderboardController {
                 myMap.put("nickname", me.getNickname());
                 myMap.put("avatar", me.getAvatar());
                 myMap.put("isMe", true);
-                
-                int myScore = 0;
-                long myRank = 0;
-                
-                if ("weekly".equals(type)) {
-                    LocalDate weekStart = LocalDate.now().minusDays(LocalDate.now().getDayOfWeek().getValue() - 1);
-                    List<DailyStats> weekStats = dailyStatsMapper.selectList(
-                        new LambdaQueryWrapper<DailyStats>()
-                            .eq(DailyStats::getUserId, me.getId())
-                            .ge(DailyStats::getStatDate, weekStart)
-                    );
-                    myScore = weekStats.stream().mapToInt(DailyStats::getEarnedExp).sum();
-                    
-                    // Note: Calculating exact weekly rank outside top 50 is complex in memory.
-                    // For now, we estimate it. Real implementation would use a better SQL query.
-                    myRank = 50 + 1; // Simplified default
+
+                int myScore = isWeekly
+                    ? weeklyExpMap.getOrDefault(me.getId(), 0)
+                    : (me.getTotalExp() != null ? me.getTotalExp() : 0);
+
+                long myRank;
+                if (isWeekly) {
+                    // 计算周排名：统计分数高于我的用户数+1
+                    long higherCount = weeklyExpMap.values().stream()
+                        .filter(s -> s > myScore)
+                        .count();
+                    myRank = higherCount + 1;
                 } else {
-                    myScore = me.getTotalExp() != null ? me.getTotalExp() : 0;
                     myRank = userMapper.selectCount(
                         new LambdaQueryWrapper<User>()
                             .gt(User::getTotalExp, myScore)
                             .eq(User::getStatus, 1)
                     ) + 1;
                 }
-                
+
                 myMap.put("score", myScore);
                 myMap.put("rank", myRank);
                 result.add(myMap);

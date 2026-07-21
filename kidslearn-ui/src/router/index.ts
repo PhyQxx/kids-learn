@@ -74,6 +74,24 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '称号管理' },
       },
       {
+        path: 'ranking',
+        name: 'Ranking',
+        component: () => import('@/views/ranking/index.vue'),
+        meta: { title: '排行榜管理' },
+      },
+      {
+        path: 'order',
+        name: 'Order',
+        component: () => import('@/views/order/index.vue'),
+        meta: { title: '订单管理' },
+      },
+      {
+        path: 'challenge',
+        name: 'Challenge',
+        component: () => import('@/views/challenge/index.vue'),
+        meta: { title: '挑战赛管理' },
+      },
+      {
         path: 'system/user',
         name: 'SystemUser',
         component: () => import('@/views/system/user.vue'),
@@ -123,6 +141,18 @@ const routes: RouteRecordRaw[] = [
       },
     ],
   },
+  {
+    path: '/403',
+    name: 'Forbidden',
+    component: () => import('@/views/error/403.vue'),
+    meta: { title: '权限不足' },
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('@/views/error/404.vue'),
+    meta: { title: '页面不存在' },
+  },
 ]
 
 const router = createRouter({
@@ -130,13 +160,76 @@ const router = createRouter({
   routes,
 })
 
+// 路由与权限的映射关系
+const ROUTE_PERMISSIONS: Record<string, string> = {
+  '/dashboard': 'admin:dashboard:read',
+  '/question-bank': 'admin:question:read',
+  '/content': 'admin:subject:read',
+  '/content/audit': 'admin:content:read',
+  '/pet/list': 'admin:pet:read',
+  '/pet/item': 'admin:pet-item:read',
+  '/pet/decoration': 'admin:decoration:read',
+  '/achievement/list': 'admin:achievement:read',
+  '/achievement/sticker': 'admin:sticker:read',
+  '/achievement/title': 'admin:title:read',
+  '/ranking': 'admin:dashboard:read',
+  '/order': 'admin:order:read',
+  '/challenge': 'admin:challenge:read',
+  '/system/user': 'admin:user:read',
+  '/system/role': 'admin:role:read',
+  '/system/config': 'admin:config:read',
+  '/system/ai': 'admin:config:read',
+  '/system/feedback-audio': 'admin:config:read',
+  '/system/log': 'admin:log:read',
+  '/system/dict': 'admin:dict:read',
+  '/system/version': 'admin:version:read',
+}
+
 router.beforeEach((to, _from, next) => {
   const token = localStorage.getItem('admin_token')
+
+  // 未登录跳转登录页
   if (to.path !== '/login' && !token) {
     next('/login')
-  } else {
-    next()
+    return
   }
+
+  // 已登录访问登录页跳转首页
+  if (to.path === '/login' && token) {
+    next('/dashboard')
+    return
+  }
+
+  // 权限检查（动态导入避免循环依赖）
+  const requiredPermission = ROUTE_PERMISSIONS[to.path]
+  if (requiredPermission && token) {
+    import('@/stores/user').then(async ({ useUserStore }) => {
+      const userStore = useUserStore()
+
+      // 如果userInfo未加载，尝试加载
+      if (!userStore.userInfo) {
+        try {
+          const { default: request } = await import('@/utils/request')
+          const res: any = await request.get('/user/info')
+          if (res?.code === 200 && res.data) {
+            userStore.setUserInfo(res.data)
+          }
+        } catch {
+          // 加载失败，放行（避免阻塞用户）
+        }
+      }
+
+      // 检查权限
+      if (userStore.userInfo && !userStore.hasPermission(requiredPermission)) {
+        next('/403')
+        return
+      }
+      next()
+    })
+    return
+  }
+
+  next()
 })
 
 export default router

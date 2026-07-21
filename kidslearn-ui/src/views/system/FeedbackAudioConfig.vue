@@ -208,7 +208,7 @@ async function aiGenerate(type: 'correct' | 'wrong') {
       // 自动试听
       setTimeout(() => previewAudio(fileName), 300)
     } else {
-      ElMessage.error(res.message || 'AI 生成失败')
+      ElMessage.error(res.msg || 'AI 生成失败')
     }
   } catch (e: any) {
     ElMessage.error(e.message || 'AI 生成失败')
@@ -223,14 +223,15 @@ async function handleSave() {
     const data = {
       baseUrl: form.baseUrl.trim(),
       correctList: correctItems.value.map(s => s.trim()).filter(Boolean).join(','),
-      wrongList: wrongItems.value.map(s => s.trim()).filter(Boolean).join(',')
+      wrongList: wrongItems.value.map(s => s.trim()).filter(Boolean).join(','),
+      aiMaxTokens: 800
     }
     const res = await saveFeedbackAudioConfig(data)
     if (res.code === 200) {
       ElMessage.success('保存成功')
       fetchData()
     } else {
-      ElMessage.error(res.message || '保存失败')
+      ElMessage.error(res.msg || '保存失败')
     }
   } finally {
     saving.value = false

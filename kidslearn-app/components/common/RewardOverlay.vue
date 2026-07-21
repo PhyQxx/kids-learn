@@ -1,19 +1,9 @@
 <template>
   <transition name="reward-fade">
     <view v-if="visible" class="reward-overlay" @tap="closeReward">
-      <!-- Confetti particles -->
-      <view
-        v-for="particle in particles"
-        :key="particle.id"
-        class="confetti"
-        :style="particle.style"
-      >
-        <text class="confetti-emoji">{{ particle.emoji }}</text>
-      </view>
-
       <!-- Reward icon fly-in -->
       <view class="reward-item" :class="[rewardType, { 'animate-reward-pop': visible }]">
-        <text class="reward-emoji">{{ icon }}</text>
+        <image class="reward-art" src="/static/redesign/achievement-cabinet.png" mode="aspectFill" />
       </view>
 
       <!-- Score increment -->
@@ -69,7 +59,7 @@ const particles = ref([])
 
 // Generate confetti particles
 function generateParticles() {
-  const emojis = ['⭐', '🌟', '✨', '💫', '🎊', '🎉', '🏅', '🔔', '💎']
+  const emojis = ['奖励']
   const newParticles = []
 
   for (let i = 0; i < props.confettiCount; i++) {
@@ -166,6 +156,8 @@ function closeReward() {
   font-size: 80px;
   filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.3));
 }
+
+.reward-art { width: 180px; height: 180px; border-radius: 28px; box-shadow: 0 18px 44px rgba(24,33,47,.28); }
 
 /* Score fly */
 .score-fly {

@@ -1,22 +1,18 @@
 <template>
   <view class="register-page">
-    <view class="bg-decor">
-      <view class="decor-circle c1"></view>
-      <view class="decor-circle c2"></view>
-      <view class="decor-circle c3"></view>
-    </view>
-
     <view class="register-card">
       <!-- 左侧品牌 -->
       <view class="brand-side">
-        <text class="brand-emoji">🌍</text>
+        <image class="register-world-art" src="/static/redesign/nav-islands.png" mode="aspectFill" />
+        <view class="brand-content">
         <text class="text-xl text-bold text-white">趣学星球</text>
         <text class="text-sm text-white" style="opacity: 0.8;">加入我们，开启学习之旅</text>
         <view class="features">
-          <text class="text-sm text-white" style="opacity: 0.7;">📚 丰富课程</text>
-          <text class="text-sm text-white" style="opacity: 0.7;">🎮 趣味学习</text>
-          <text class="text-sm text-white" style="opacity: 0.7;">🐱 宠物陪伴</text>
-          <text class="text-sm text-white" style="opacity: 0.7;">🏆 排行竞技</text>
+          <text class="text-sm text-white" style="opacity: 0.8;">丰富课程</text>
+          <text class="text-sm text-white" style="opacity: 0.8;">趣味练习</text>
+          <text class="text-sm text-white" style="opacity: 0.8;">伙伴陪伴</text>
+          <text class="text-sm text-white" style="opacity: 0.8;">成长荣誉</text>
+        </view>
         </view>
       </view>
 
@@ -89,7 +85,7 @@
 
 <script setup>
 import { ref, onBeforeUnmount } from 'vue'
-import { register as registerApi } from '@/api/auth'
+import { register as registerApi, sendVerifyCode } from '@/api/auth'
 import { useUserStore } from '@/store/user'
 import { useRealtimeStore } from '@/store/realtime'
 import { showLoading, hideLoading } from '@/utils/loading'
@@ -124,22 +120,34 @@ function onGradeChange(e) {
   selectedGradeLabel.value = gradeOptions[idx].label
 }
 
-function sendCode() {
+async function sendCode() {
   if (codeSent.value) return
   if (!phone.value) {
     errorMsg.value = '请输入手机号'
     return
   }
-  codeSent.value = true
-  smsTimer = setInterval(() => {
-    countdown.value--
-    if (countdown.value <= 0) {
-      clearInterval(smsTimer)
-      smsTimer = null
-      codeSent.value = false
-      countdown.value = 60
-    }
-  }, 1000)
+  // 校验手机号格式
+  if (!/^1[3-9]\d{9}$/.test(phone.value)) {
+    errorMsg.value = '手机号格式不正确'
+    return
+  }
+
+  try {
+    await sendVerifyCode(phone.value)
+    uni.showToast({ title: '验证码已发送', icon: 'success' })
+    codeSent.value = true
+    smsTimer = setInterval(() => {
+      countdown.value--
+      if (countdown.value <= 0) {
+        clearInterval(smsTimer)
+        smsTimer = null
+        codeSent.value = false
+        countdown.value = 60
+      }
+    }, 1000)
+  } catch (e) {
+    uni.showToast({ title: e.message || '发送失败', icon: 'none' })
+  }
 }
 
 async function doRegister() {
@@ -159,7 +167,7 @@ async function doRegister() {
       gradeLevel: selectedGrade.value
     }, { 
       showLoading: '星球注册中...', 
-      loadingMascot: '🚀' 
+      loadingMascot: ''
     })
     
     const userStore = useUserStore()
@@ -216,6 +224,8 @@ function goLogin() {
 }
 
 .brand-side {
+  position: relative;
+  overflow: hidden;
   width: 360px;
   background: linear-gradient(135deg, $primary, $primary-light);
   padding: 48px 36px;
@@ -224,8 +234,13 @@ function goLogin() {
   gap: 12px;
 }
 
+.brand-side::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(24,33,47,.08), rgba(24,33,47,.78)); }
+.register-world-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.brand-content { position: relative; z-index: 2; margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+
 .brand-emoji { font-size: 56px; }
-.features { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+.features { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.features text { min-height: 34px; padding: 0 10px; border-radius: 11px; background: rgba(255,255,255,.15); display: flex; align-items: center; }
 
 .form-side {
   flex: 1;

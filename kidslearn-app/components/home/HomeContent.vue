@@ -1,163 +1,113 @@
 <template>
   <view class="home-content">
-    <!-- Loading -->
-    <FunLoadingState v-if="loading" title="正在准备星球任务" mascot="🚀" />
+    <FunLoadingState v-if="loading" title="正在准备星球任务" mascot="" />
 
     <template v-else>
-      <!-- 任务横幅 -->
-      <view class="task-banner" @tap="$emit('go-learn')">
-        <view class="banner-info">
-          <text class="banner-emoji animate-float">🚀</text>
-          <view class="banner-text">
-            <text class="banner-kicker">今日小目标</text>
-            <text class="banner-title">先完成 {{ Math.max(totalTasks - completedTasks, 0) }} 个学习任务</text>
-            <text class="banner-desc">已完成 {{ completedTasks }}/{{ totalTasks }} 个，点这里继续闯关</text>
+      <view class="mission-grid">
+        <view class="mission-panel" @tap="$emit('go-learn')">
+          <image class="mission-art" src="/static/redesign/mission-island.png" mode="aspectFill" />
+          <view class="mission-copy">
+            <text class="mission-eyebrow">今日小目标</text>
+            <text class="mission-progress-copy">已完成 <text class="mission-progress-number">{{ completedTasks }}/{{ totalTasks }}</text> 个</text>
+          </view>
+          <view class="mission-action">
+            <text>继续学习</text>
+          </view>
+          <view class="mission-steps" aria-label="今日任务进度">
+            <view
+              v-for="step in Math.max(totalTasks, 5)"
+              :key="step"
+              class="mission-step"
+              :class="{ completed: step <= completedTasks, current: step === completedTasks + 1 }"
+            />
           </view>
         </view>
-        <view class="banner-progress">
-          <tn-line-progress :percent="taskProgress" active-color="#FFE66D" inactive-color="rgba(255,255,255,0.3)" :height="12" :show-percent="false" />
-        </view>
-      </view>
 
-      <!-- 签到入口 -->
-      <view class="checkin-banner card card-hover" @tap="openCheckin">
-        <view class="checkin-icon-wrap">
-          <text class="checkin-emoji">📅</text>
-        </view>
-        <view class="checkin-info">
-          <text class="text-md text-bold" style="color: #2C3E50;">每日签到</text>
-          <text class="text-xs text-light">{{ checkinStreak > 0 ? `已连续签到 ${checkinStreak} 天` : '点击签到领奖励' }}</text>
-        </view>
-        <view class="checkin-action-btn" :class="{ 'done': checkinDone }">
-          <text class="text-sm text-bold" :style="{ color: checkinDone ? '#2ECC71' : '#FFF' }">{{ checkinDone ? '已签到' : '去签到' }}</text>
-        </view>
-      </view>
-
-      <!-- 排名横幅 -->
-      <view class="rank-banner card card-hover" @tap="goRanking">
-        <view class="rank-info">
-          <text class="rank-emoji">🏆</text>
-          <view class="rank-text">
-            <text class="rank-title">本周排行</text>
-            <text class="rank-desc">{{ myRankText }}</text>
-          </view>
-        </view>
-        <view class="rank-action">
-          <text>查看</text>
-        </view>
-      </view>
-
-      <!-- 学科网格 (专项练习) -->
-      <view class="section-title-row">
-        <view class="section-title-copy">
-          <text class="text-lg text-bold">📚 今日练习</text>
-          <text class="section-hint">选择学科进行无尽刷题</text>
-        </view>
-        <text class="text-primary text-sm section-link" @tap="$emit('go-learn')">全部模式</text>
-      </view>
-      <view class="subject-grid stagger-list">
-        <view
-          v-for="subject in subjects"
-          :key="subject.id"
-          class="subject-card card card-hover"
-          :class="{ locked: subject.locked }"
-          :style="{ background: subject.locked ? '#F5F5F5' : subject.bg }"
-          @tap="!subject.locked && $emit('go-subject', subject)"
-        >
-          <view class="subject-icon-wrap" style="background: rgba(255,255,255,0.6);">
-            <text class="subject-emoji">{{ subject.icon }}</text>
-          </view>
-          <text class="subject-name" :style="{ color: subject.color }">{{ subject.name }}</text>
-          <view class="subject-practice-tag" :style="{ color: subject.color, background: 'rgba(255,255,255,0.8)' }">
-            <text class="text-xs">去练习 →</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 薄弱点推荐 -->
-      <view v-if="weakPoints.length > 0" class="section-title-row">
-        <view class="section-title-copy">
-          <text class="text-lg text-bold">🎯 薄弱点突击</text>
-          <text class="section-hint">AI 针对错题为你推荐</text>
-        </view>
-        <text class="text-primary text-sm section-link" @tap="goWrongTopics">错题本</text>
-      </view>
-      <view v-if="weakPoints.length > 0" class="weak-grid stagger-list">
-        <view
-          v-for="wp in weakPoints"
-          :key="wp.subjectId"
-          class="weak-card card card-hover"
-          @tap="goAdaptivePractice(wp)"
-        >
-          <view class="weak-header">
-            <view class="weak-icon-wrap">
-              <text class="weak-icon">{{ wp.subjectIcon }}</text>
-            </view>
-            <view class="weak-info">
-              <text class="text-md text-bold" style="color: #2C3E50;">{{ wp.subjectName }}</text>
-              <view class="weak-stats">
-                <text class="weak-stat-tag">错题 {{ wp.wrongCount }} 道</text>
-                <text class="weak-stat-tag" style="background: #E8F8F0; color: #2ECC71;">正确率 {{ wp.accuracy }}%</text>
-              </view>
+        <view class="daily-stack">
+          <view class="daily-panel checkin-panel" @tap="openCheckin">
+            <image class="daily-art" src="/static/redesign/checkin-island.png" mode="aspectFill" />
+            <view class="daily-copy">
+              <text class="daily-title">每日签到</text>
+              <text class="daily-value">{{ checkinDone ? '今天已完成' : `连续 ${checkinStreak || 0} 天` }}</text>
             </view>
           </view>
-          <view class="weak-action-btn">
-            <text class="text-white text-sm text-bold">立即突击</text>
+          <view class="daily-panel rank-panel" @tap="goRanking">
+            <image class="daily-art" src="/static/redesign/rank-island.png" mode="aspectFill" />
+            <view class="daily-copy">
+              <text class="daily-title">本周排行</text>
+              <text class="daily-value rank-value">{{ myRank ? `第 ${myRank} 名` : '等待上榜' }}</text>
+            </view>
           </view>
         </view>
       </view>
 
-      <!-- 快捷入口 -->
-      <view class="section-title-row" style="margin-top: 8px;">
-        <view class="section-title-copy">
-          <text class="text-lg text-bold">⭐ 快捷探索</text>
+      <view class="section-heading">
+        <view>
+          <text class="section-title">今日练习</text>
+          <text class="section-subtitle">选择学科进行专项练习</text>
         </view>
+        <view class="section-action" @tap="$emit('go-learn')"><text>查看全部模式</text></view>
       </view>
-      <view class="quick-grid">
-        <view class="quick-card card card-hover pet-quick" @tap="goPet">
-          <view class="quick-pet-info">
-            <text class="pet-emoji animate-bounce">{{ petStore.currentImageUrl }}</text>
-            <view class="pet-text-area">
-              <text class="pet-name text-bold">{{ petStore.name }}</text>
-              <text class="pet-status-text text-xs text-light">{{ petStore.moodText }} · Lv.{{ petStore.level }}</text>
-            </view>
+
+      <view class="subject-stage">
+        <image class="subject-art" src="/static/redesign/subject-dioramas.png" mode="aspectFill" />
+        <view class="subject-hit-grid">
+          <view
+            v-for="subject in subjects.slice(0, 6)"
+            :key="subject.id"
+            class="subject-hit"
+            :class="{ locked: subject.locked }"
+            @tap="!subject.locked && $emit('go-subject', subject)"
+          >
+            <view v-if="subject.locked" class="subject-status"><text>会员解锁</text></view>
+            <text class="subject-label">{{ subject.name }}</text>
           </view>
-          <view class="quick-arrow">→</view>
-        </view>
-        <view class="quick-card card card-hover achievement-quick" @tap="goAchievement">
-          <view class="quick-ach-info">
-            <text class="ach-emoji animate-pulse">🏅</text>
-            <view class="ach-text-area">
-              <text class="text-white text-md text-bold">成就中心</text>
-              <text class="text-white text-xs" style="opacity: 0.8;">已解锁 {{ achievementCount }} 个</text>
-            </view>
-          </view>
-          <view class="quick-arrow" style="color: rgba(255,255,255,0.5);">→</view>
         </view>
       </view>
 
-      <!-- 排行速览 -->
-      <view class="ranking-quick card">
-        <view class="ranking-header">
-          <text class="text-md text-bold" style="color: #2C3E50;">🏆 排行榜风云</text>
-          <text class="text-primary text-sm" @tap="goRanking" style="cursor: pointer;">查看更多</text>
-        </view>
-        <view class="ranking-list">
-          <view v-for="(r, i) in topRankers" :key="r.id || i" class="ranking-item">
-            <view class="rank-medal-wrap">
-              <text class="rank-medal">{{ ['🥇','🥈','🥉'][i] }}</text>
-            </view>
-            <text class="rank-name text-sm text-bold">{{ r.name }}</text>
-            <text class="rank-score text-xs text-primary">{{ r.score }} 分</text>
+      <view class="explore-grid">
+        <view class="explore-card weak-explore" @tap="weakPoints[0] ? goAdaptivePractice(weakPoints[0]) : goWrongTopics()">
+          <image class="explore-art" src="/static/redesign/weakpoint-console.png" mode="aspectFill" />
+          <view class="explore-copy">
+            <text class="explore-title">薄弱点突击</text>
+            <text class="explore-name">{{ weakPoints[0]?.subjectName || '分数比较' }}</text>
+            <text class="explore-detail">错题 {{ weakPoints[0]?.wrongCount || 6 }} 道 · 正确率 {{ weakPoints[0]?.accuracy || 58 }}%</text>
+            <view class="explore-action purple"><text>立即突击</text></view>
           </view>
-          <view v-if="topRankers.length === 0" class="ranking-empty">
-            <text class="text-xs text-light">暂无排行数据，快去闯关上榜吧！</text>
+        </view>
+
+        <view class="explore-card pet-explore" @tap="goPet">
+          <image class="explore-art" src="/static/redesign/pet-habitat.png" mode="aspectFill" />
+          <view class="explore-copy">
+            <text class="explore-title teal-title">{{ petStore.name || '小芽兽' }}</text>
+            <text class="explore-detail">{{ petStore.moodText || '心情很好' }} · Lv.{{ petStore.level }}</text>
+            <view class="explore-action teal"><text>进入小窝</text></view>
+          </view>
+        </view>
+
+        <view class="explore-card achievement-explore" @tap="goAchievement">
+          <image class="explore-art" src="/static/redesign/achievement-cabinet.png" mode="aspectFill" />
+          <view class="explore-copy">
+            <text class="explore-title">已解锁 <text class="achievement-number">{{ achievementCount }}</text> 个</text>
+            <text class="explore-detail">成就收藏</text>
+            <view class="explore-action gold"><text>查看成就</text></view>
+          </view>
+        </view>
+
+        <view class="explore-card ranking-explore" @tap="goRanking">
+          <image class="explore-art" src="/static/redesign/ranking-podium.png" mode="aspectFill" />
+          <view class="explore-copy ranking-copy">
+            <text class="explore-title blue-title">排行榜风云</text>
+            <view class="mini-ranking">
+              <text v-for="(r, i) in topRankers.slice(0, 3)" :key="r.id || i" class="mini-ranker">{{ i + 1 }} {{ r.name }}</text>
+              <text v-if="topRankers.length === 0" class="mini-ranker">完成练习后查看排名</text>
+            </view>
+            <view class="explore-action blue"><text>查看排行</text></view>
           </view>
         </view>
       </view>
     </template>
 
-    <!-- 签到弹窗 -->
     <CheckinPopup v-if="showCheckin" :auto-close-if-done="checkinAutoOpen" @close="onCheckinClose" />
   </view>
 </template>
@@ -625,5 +575,480 @@ function goAdaptivePractice(wp) {
   .subject-grid { grid-template-columns: repeat(2, 1fr); }
   .subject-card { min-height: 140px; }
   .weak-card { flex-wrap: wrap; gap: 12px; }
+}
+
+/* 2026 Planet Control Deck redesign */
+.home-content {
+  gap: 14px;
+  color: #18212F;
+}
+
+.mission-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(236px, 1fr);
+  gap: 12px;
+  min-height: 232px;
+}
+
+.mission-panel,
+.daily-panel,
+.subject-stage,
+.explore-card {
+  position: relative;
+  overflow: hidden;
+  background: #FFFFFF;
+  border: 1px solid rgba(63, 111, 229, 0.10);
+  box-shadow: 0 10px 30px rgba(69, 91, 124, 0.09);
+}
+
+.mission-panel {
+  min-height: 232px;
+  border-radius: 26px;
+  cursor: pointer;
+}
+
+.mission-panel:active,
+.daily-panel:active,
+.subject-hit:active,
+.explore-card:active {
+  transform: scale(0.985);
+}
+
+.mission-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mission-copy {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 2;
+}
+
+.mission-eyebrow {
+  font-size: 25px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.mission-progress-copy {
+  font-size: 14px;
+  font-weight: 650;
+  color: #5D6A7A;
+}
+
+.mission-progress-number {
+  color: #FF6B4A;
+  font-size: 19px;
+  font-weight: 850;
+}
+
+.mission-action {
+  position: absolute;
+  left: 24px;
+  bottom: 44px;
+  z-index: 2;
+  min-width: 210px;
+  min-height: 54px;
+  padding: 0 28px;
+  border-radius: 18px;
+  background: #FF6B4A;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 850;
+  box-shadow: 0 12px 24px rgba(255, 107, 74, 0.28);
+}
+
+.mission-steps {
+  position: absolute;
+  left: 40px;
+  right: 40px;
+  bottom: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 2;
+}
+
+.mission-steps::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 3px;
+}
+
+.mission-step {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 3px solid rgba(93, 106, 122, 0.24);
+  z-index: 1;
+}
+
+.mission-step.completed {
+  background: #FF6B4A;
+  border-color: #FFFFFF;
+}
+
+.mission-step.current {
+  width: 22px;
+  height: 22px;
+  background: #FFFFFF;
+  border-color: #FF6B4A;
+}
+
+.daily-stack {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 12px;
+}
+
+.daily-panel {
+  min-height: 110px;
+  border-radius: 22px;
+  cursor: pointer;
+}
+
+.daily-art {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 62%;
+  height: 100%;
+}
+
+.daily-copy {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.daily-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #18212F;
+}
+
+.daily-value {
+  font-size: 15px;
+  font-weight: 750;
+  color: #168F85;
+}
+
+.rank-value { color: #3F6FE5; }
+
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.section-heading > view:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.section-title {
+  font-size: 21px;
+  line-height: 1.2;
+  font-weight: 850;
+}
+
+.section-subtitle {
+  font-size: 12px;
+  color: #7A8797;
+}
+
+.section-action {
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 15px;
+  background: #EEF3FF;
+  color: #3F6FE5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.subject-stage {
+  min-height: 150px;
+  border-radius: 24px;
+}
+
+.subject-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.subject-hit-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.subject-hit {
+  position: relative;
+  min-height: 150px;
+  cursor: pointer;
+}
+
+.subject-hit.locked::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(246, 248, 252, 0.54);
+}
+
+.subject-label {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 8px;
+  min-height: 36px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #18212F;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow: 0 5px 12px rgba(69, 91, 124, 0.10);
+  z-index: 2;
+}
+
+.subject-status {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  padding: 5px 10px;
+  border-radius: 12px;
+  background: #18212F;
+  color: #FFFFFF;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.explore-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.explore-card {
+  min-height: 178px;
+  border-radius: 22px;
+  cursor: pointer;
+}
+
+.explore-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.explore-copy {
+  position: absolute;
+  inset: 14px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.explore-title {
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: 850;
+  color: #5F3BB8;
+}
+
+.explore-title,
+.explore-name,
+.explore-detail,
+.mini-ranking {
+  max-width: 92%;
+  padding: 2px 5px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.84);
+  box-sizing: border-box;
+}
+
+.teal-title { color: #168F85; }
+.blue-title { color: #245CCB; }
+
+.explore-name {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.explore-detail {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #5D6A7A;
+}
+
+.achievement-number {
+  color: #E59A12;
+  font-size: 22px;
+}
+
+.explore-action {
+  margin-top: auto;
+  width: 100%;
+  min-height: 42px;
+  border-radius: 14px;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 8px 16px rgba(69, 91, 124, 0.16);
+}
+
+.explore-action.purple { background: #7754D8; }
+.explore-action.teal { background: #22AFA2; }
+.explore-action.gold { background: #F0AE2B; }
+.explore-action.blue { background: #3F7CE5; }
+
+.ranking-copy { right: 10px; }
+
+.mini-ranking {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 3px;
+}
+
+.mini-ranker {
+  font-size: 10px;
+  line-height: 1.25;
+  color: #5D6A7A;
+}
+
+@include respond-md-lg {
+  .mission-grid { grid-template-columns: minmax(0, 1.7fr) minmax(210px, 1fr); }
+  .mission-action { min-width: 172px; }
+  .explore-card { min-height: 184px; }
+  .explore-copy { inset: 12px; }
+}
+
+/* iPad Pro / 大屏横板：内容随可用高度生长，避免固定卡片堆在顶部。 */
+@media (min-width: 1200px) and (min-height: 900px) {
+  .home-content {
+    display: grid;
+    grid-template-rows:
+      minmax(250px, 1.18fr)
+      auto
+      minmax(180px, 0.82fr)
+      minmax(210px, 1fr);
+    gap: 16px;
+    height: calc(100vh - 110px);
+    min-height: 0;
+  }
+
+  .mission-grid,
+  .mission-panel,
+  .daily-panel,
+  .subject-stage,
+  .subject-hit,
+  .explore-card {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .mission-grid {
+    grid-template-columns: minmax(0, 2.05fr) minmax(300px, 1fr);
+    gap: 16px;
+  }
+
+  .daily-stack {
+    gap: 16px;
+  }
+
+  .mission-copy {
+    top: 28px;
+    left: 30px;
+  }
+
+  .mission-eyebrow { font-size: 28px; }
+  .mission-action {
+    left: 30px;
+    bottom: 54px;
+    min-width: 220px;
+    min-height: 58px;
+  }
+
+  .daily-copy {
+    left: 22px;
+    top: 22px;
+  }
+
+  .section-title { font-size: 23px; }
+  .section-subtitle { font-size: 13px; }
+
+  .subject-label {
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .explore-grid { gap: 16px; }
+  .explore-copy { inset: 16px; }
+  .explore-title { font-size: 18px; }
+  .explore-name { font-size: 14px; }
+  .explore-detail { font-size: 12px; }
+  .explore-action {
+    min-height: 48px;
+    font-size: 14px;
+  }
+}
+
+@include respond-md {
+  .mission-grid { grid-template-columns: 1fr; }
+  .daily-stack { grid-template-columns: 1fr 1fr; grid-template-rows: none; }
+  .subject-stage { overflow-x: auto; }
+  .subject-art, .subject-hit-grid { min-width: 760px; }
+  .explore-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@include respond-sm {
+  .mission-panel { min-height: 230px; }
+  .daily-stack { grid-template-columns: 1fr; }
+  .section-heading { align-items: center; }
+  .section-subtitle { display: none; }
+  .explore-grid { grid-template-columns: 1fr; }
 }
 </style>

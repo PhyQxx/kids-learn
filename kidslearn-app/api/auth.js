@@ -6,6 +6,9 @@ export const login = (data) => post('/auth/login', data)
 // 注册
 export const register = (data) => post('/auth/register', data)
 
+// 发送验证码
+export const sendVerifyCode = (phone) => post('/auth/send-code', { phone })
+
 // 刷新Token
 export const refreshToken = (refreshToken) => post('/auth/refresh-token', { refreshToken })
 

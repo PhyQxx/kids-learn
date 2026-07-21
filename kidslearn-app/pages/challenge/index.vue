@@ -86,7 +86,7 @@
             <text class="text-xs" :class="h.win ? 'text-success' : 'text-error'">
               {{ h.rankDelta > 0 ? '+' : '' }}{{ h.rankDelta }} 分
             </text>
-            <text v-if="h.rewardGold > 0" class="text-xs text-primary">+{{ h.rewardGold }} 🪙</text>
+            <text v-if="h.rewardGold > 0" class="text-xs text-primary">金币 +{{ h.rewardGold }}</text>
           </view>
         </view>
         <view v-if="history.length === 0" class="history-empty">
@@ -115,12 +115,12 @@
           <view class="vs-container">
             <view class="vs-clash">
               <view class="vs-avatar left animate-slide-in-left">
-                <text class="avatar-emoji">👦</text>
+                <text class="avatar-emoji">{{ userStore.userInfo?.nickname?.slice(0, 1) || '我' }}</text>
                 <text class="avatar-name">{{ userStore.userInfo?.nickname || '我' }}</text>
               </view>
               <view class="vs-text animate-pop-in">VS</view>
               <view class="vs-avatar right animate-slide-in-right">
-                <text class="avatar-emoji">{{ matchedOpponent?.opponent?.avatar || '🦁' }}</text>
+                <text class="avatar-emoji">{{ matchedOpponent?.opponent?.nickname?.slice(0, 1) || '对' }}</text>
                 <text class="avatar-name">{{ matchedOpponent?.opponent?.nickname || '神秘对手' }}</text>
               </view>
             </view>
@@ -241,11 +241,7 @@ function cancelMatch() {
 }
 
 function getTierIcon(tierName) {
-  const map = { '青铜': '🥉', '白银': '🥈', '黄金': '🥇', '铂金': '💎', '钻石': '💠', '星耀': '🌟', '王者': '👑' }
-  for (let key in map) {
-    if (tierName.includes(key)) return map[key]
-  }
-  return '🏅'
+  return tierName?.slice(0, 1) || '段'
 }
 
 onMounted(() => {

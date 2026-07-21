@@ -3,25 +3,25 @@
     <view class="quiz-container" :class="{ 'has-bottom-nav': isPractice && screen === 'quiz' }">
       <!-- 开始屏 -->
       <view v-if="screen === 'start'" class="screen start-screen">
-        <text class="start-emoji animate-pulse">{{ levelEmoji }}</text>
+        <image class="start-world-art" src="/static/redesign/mission-island.png" mode="aspectFill" />
         <text class="start-title text-title text-bold">{{ levelName }}</text>
         <text class="start-subtitle text-light">准备好了吗？</text>
         <text v-if="!totalQuestions" class="start-tip">题目正在准备中，请稍等一下</text>
         <view class="info-row">
           <view class="info-item card">
-            <text class="info-emoji">📝</text>
+            <text class="info-kind">题量</text>
             <text class="info-text text-sm">{{ totalQuestions }} 题</text>
           </view>
           <view class="info-item card" v-if="!isPractice">
-            <text class="info-emoji">⭐</text>
+            <text class="info-kind">目标</text>
             <text class="info-text text-sm">目标 3 星</text>
           </view>
           <view class="info-item card" v-if="timeLimit > 0">
-            <text class="info-emoji">⏱️</text>
+            <text class="info-kind">限时</text>
             <text class="info-text text-sm">{{ timeLimit }} 秒</text>
           </view>
           <view class="info-item card" v-else-if="isPractice">
-            <text class="info-emoji">🔄</text>
+            <text class="info-kind">模式</text>
             <text class="info-text text-sm">无尽模式</text>
           </view>
         </view>
@@ -33,13 +33,13 @@
         <!-- 顶部栏 -->
         <view class="quiz-topbar">
           <view class="close-btn" @tap="exitQuiz">
-            <text>✕</text>
+            <text>退出</text>
           </view>
           <view class="quiz-progress">
             <tn-line-progress :percent="(currentIndex + 1) / totalQuestions * 100" active-color="#4A90D9" :height="10" :show-percent="false" />
           </view>
           <view class="hint-btn" :class="{ used: hintUsed }" @tap="useHint">
-            <text>{{ hintUsed ? '🐾 已用' : '🐾 提示' }}</text>
+            <text>{{ hintUsed ? '提示已用' : '查看提示' }}</text>
           </view>
           <view class="timer" :class="{ warning: timeLimit > 0 && countdown <= 10 }">
             <text v-if="timeLimit > 0">{{ countdown }}s</text>
@@ -50,7 +50,7 @@
         <!-- 题目区域 -->
         <view class="question-area">
           <view class="question-speech" :class="{ speaking: isSpeaking }" @tap="questionToSpeech()">
-            <text class="question-emoji">{{ currentQuestion.emoji }}</text>
+            <text class="question-audio-label">听题</text>
             <view v-if="isSpeaking" class="sound-wave">
               <view class="sound-bar" v-for="i in 4" :key="i"></view>
             </view>
@@ -116,11 +116,11 @@
           <!-- 练习模式：解析卡片 -->
           <view v-if="isPractice && showAnalysis" class="analysis-card" :class="userAnswers[currentIndex]?.isCorrect ? 'analysis-correct' : 'analysis-wrong'">
             <view class="analysis-header">
-              <text class="analysis-icon">{{ userAnswers[currentIndex]?.isCorrect ? '✅' : '❌' }}</text>
+              <text class="analysis-icon">{{ userAnswers[currentIndex]?.isCorrect ? '正确' : '复盘' }}</text>
               <text class="analysis-title text-bold">{{ userAnswers[currentIndex]?.isCorrect ? '回答正确！' : '回答错误' }}</text>
             </view>
             <view v-if="currentAnalysisText" class="analysis-body">
-              <text class="analysis-label">📝 解析</text>
+              <text class="analysis-label">题目解析</text>
               <text class="analysis-text">{{ currentAnalysisText }}</text>
             </view>
           </view>
@@ -144,28 +144,11 @@
 
       <!-- 结果屏 -->
       <view v-if="screen === 'result'" class="screen result-screen">
-        <!-- 3星宝箱动画 -->
-        <view v-if="showTreasureChest" class="treasure-chest animate-chest-open">
-          <text class="chest-emoji">🎁</text>
-          <view class="chest-coins" v-if="showRewardAnimation">
-            <text
-              v-for="p in coinParticles"
-              :key="'chest-' + p.id"
-              class="chest-coin animate-coin-scatter"
-              :style="p.style"
-            >🪙</text>
-          </view>
-        </view>
-        <text v-else class="result-emoji animate-pop-in">{{ resultEmoji }}</text>
+        <image class="result-world-art" src="/static/redesign/achievement-cabinet.png" mode="aspectFill" />
 
         <!-- 星级 (闯关时显示) -->
         <view class="result-stars" v-if="!isPractice">
-          <text
-            v-for="s in 3"
-            :key="s"
-            class="result-star"
-            :class="{ filled: s <= earnedStars, animate: s <= earnedStars }"
-          >⭐</text>
+          <text class="result-rating">{{ earnedStars }}/3 星评价</text>
         </view>
 
         <text class="result-title text-title text-bold">{{ resultTitle }}</text>
@@ -174,19 +157,19 @@
         <!-- 奖励卡片 -->
         <view class="reward-row" :class="{ 'animate-slide-up': showRewardAnimation }">
           <view class="reward-card card">
-            <text class="reward-emoji">🪙</text>
+            <text class="reward-kind">金币</text>
             <AnimatedNumber v-if="showRewardAnimation" :value="rewards.gold" :duration="800" prefix="+" class="reward-value text-md text-bold" />
             <text v-else class="reward-value text-md text-bold">+{{ rewards.gold }}</text>
             <text class="reward-label text-xs text-light">金币</text>
           </view>
           <view class="reward-card card">
-            <text class="reward-emoji">⚡</text>
+            <text class="reward-kind">经验</text>
             <AnimatedNumber v-if="showRewardAnimation" :value="rewards.exp" :duration="800" prefix="+" class="reward-value text-md text-bold" />
             <text v-else class="reward-value text-md text-bold">+{{ rewards.exp }}</text>
             <text class="reward-label text-xs text-light">经验</text>
           </view>
           <view class="reward-card card" v-if="!isPractice">
-            <text class="reward-emoji">🎨</text>
+            <text class="reward-kind">贴纸</text>
             <AnimatedNumber v-if="showRewardAnimation" :value="rewards.stickers" :duration="600" prefix="x" class="reward-value text-md text-bold" />
             <text v-else class="reward-value text-md text-bold">x{{ rewards.stickers }}</text>
             <text class="reward-label text-xs text-light">贴纸</text>
@@ -211,7 +194,7 @@
 
         <view v-if="challengeResult" class="challenge-result card">
           <view class="challenge-result-main">
-            <text class="challenge-result-icon">{{ challengeResult.isWin ? '🏆' : '🛡️' }}</text>
+            <text class="challenge-result-icon">PK</text>
             <view>
               <text class="text-md text-bold">{{ challengeResult.isWin ? 'PK 获胜' : 'PK 已完成' }}</text>
               <text class="text-xs text-light">对手得分 {{ challengeResult.opponentScore }} · 段位积分 {{ challengeResult.rankDelta >= 0 ? '+' : '' }}{{ challengeResult.rankDelta }}</text>
@@ -229,8 +212,8 @@
       <!-- 答对反馈 -->
       <view v-if="showCorrect" class="feedback-overlay correct-overlay">
         <view class="feedback-content animate-pop-in">
-          <text class="feedback-text text-title text-bold text-white">✅ 正确！</text>
-          <text v-if="petExpGained" class="pet-exp-badge animate-pop-in">🐾 +{{ petExpGained }}</text>
+          <text class="feedback-text text-title text-bold text-white">回答正确</text>
+          <text v-if="petExpGained" class="pet-exp-badge animate-pop-in">伙伴经验 +{{ petExpGained }}</text>
         </view>
         <!-- 金币/星星飞入粒子 -->
         <view class="coin-particles" v-if="coinParticles.length">
@@ -250,7 +233,7 @@
       <!-- 答错反馈 -->
       <view v-if="showWrong" class="feedback-overlay wrong-overlay">
         <view class="wrong-feedback-card animate-shake">
-          <text class="feedback-text text-title text-bold text-white">❌ 再想想</text>
+          <text class="feedback-text text-title text-bold text-white">再想一想</text>
           <text v-if="wrongAiLoading" class="wrong-ai-text">AI老师正在讲一讲...</text>
           <text v-else-if="wrongAiExplanation" class="wrong-ai-text">{{ wrongAiExplanation }}</text>
         </view>
@@ -673,7 +656,7 @@ function generateCoinParticles(count = 8, isStar = true) {
     const ty = Math.sin(angle * Math.PI / 180) * (60 + Math.random() * 40) - 20
     particles.push({
       id: i,
-      emoji: isStar ? '⭐' : '🪙',
+      emoji: isStar ? '星' : '币',
       style: {
         '--coin-tx': `${tx}px`,
         '--coin-ty': `${ty}px`,
@@ -842,6 +825,8 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
           try { playFeedbackAudio('correct') } catch (_) {}
           generateCoinParticles(8)
           if (res?.petExp) showPetExpGain(res.petExp)
+          // 答对反馈短暂展示后自动关闭（解析卡片保留供查看）
+          setTimeout(() => { showCorrect.value = false }, 1500)
         } else {
           showWrong.value = true
           wrongAiExplanation.value = ''
@@ -854,6 +839,8 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
             const cOpt = q.options.find(o => (o.answerValue || o.label) === correctAnswer)
             if (cOpt) cOpt.correct = true
           }
+          // 答错反馈展示一段时间后自动关闭（解析卡片保留供查看）
+          setTimeout(() => { showWrong.value = false }, 2500)
         }
         // 显示解析
         currentAnalysisText.value = analysis
@@ -896,6 +883,7 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
         currentAnalysisText.value = ''
         showAnalysis.value = true
         try { playFeedbackAudio('wrong') } catch (_) {}
+        setTimeout(() => { showWrong.value = false }, 2500)
       } else {
         showWrong.value = true
         try { playFeedbackAudio('wrong') } catch (_) {}

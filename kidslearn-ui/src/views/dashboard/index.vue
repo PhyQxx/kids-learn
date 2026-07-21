@@ -182,7 +182,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { getDashboardStats } from '@/api/request'
 
@@ -322,6 +322,9 @@ async function fetchStats() {
     loading.value = false
   }
 }
+
+// 监听时间范围变化
+watch(timeRange, () => fetchStats())
 
 onMounted(() => fetchStats())
 </script>

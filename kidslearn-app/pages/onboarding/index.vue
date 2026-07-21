@@ -7,13 +7,13 @@
 
     <!-- Step 1: 选择宠物 -->
     <view v-if="step === 1" class="step-content animate-fade-in">
-      <text class="step-title animate-bounce-in">选择你的学习伙伴 🌟</text>
+      <text class="step-title animate-bounce-in">选择你的学习伙伴</text>
       <text class="step-desc">选一个喜欢的宠物，它会陪你一起学习！</text>
       <scroll-view scroll-y class="pet-grid">
         <view class="pet-row">
           <view v-for="pet in pets" :key="pet.id" class="pet-card" :class="{ selected: selectedPetId === pet.id }"
             @tap="selectedPetId = pet.id">
-            <text class="pet-emoji">{{ pet.imageUrl }}</text>
+            <image class="pet-preview-image" :src="isImageSrc(pet.imageUrl) ? pet.imageUrl : '/static/redesign/pet-habitat.png'" mode="aspectFill" />
             <text class="pet-name">{{ pet.petName }}</text>
           </view>
         </view>
@@ -25,7 +25,7 @@
 
     <!-- Step 2: 测评答题 -->
     <view v-if="step === 2" class="step-content animate-fade-in">
-      <text class="step-title">快速小测试 📝</text>
+      <text class="step-title">快速小测试</text>
       <text class="step-desc">回答 {{ assessmentTotal }} 道题，帮你找到合适的学习起点</text>
 
       <view v-if="!quizStarted" class="quiz-intro">
@@ -62,20 +62,20 @@
 
     <!-- Step 3: 功能导览 -->
     <view v-if="step === 3" class="step-content animate-fade-in">
-      <text class="step-title animate-bounce-in">准备就绪！🎉</text>
+      <text class="step-title animate-bounce-in">准备就绪</text>
       <view class="tour-cards">
         <view class="tour-card animate-slide-left">
-          <text class="tour-icon">📚</text>
+          <image class="tour-art" src="/static/redesign/subject-dioramas.png" mode="aspectFill" />
           <text class="tour-title">学习中心</text>
           <text class="tour-desc">选择学科和课程，开始答题闯关</text>
         </view>
         <view class="tour-card animate-slide-left" style="animation-delay:0.1s">
-          <text class="tour-icon">🐱</text>
+          <image class="tour-art" src="/static/redesign/pet-habitat.png" mode="aspectFill" />
           <text class="tour-title">我的宠物</text>
           <text class="tour-desc">喂食、玩耍、换装，宠物陪你成长</text>
         </view>
         <view class="tour-card animate-slide-left" style="animation-delay:0.2s">
-          <text class="tour-icon">🏆</text>
+          <image class="tour-art" src="/static/redesign/ranking-podium.png" mode="aspectFill" />
           <text class="tour-title">成就排行</text>
           <text class="tour-desc">完成挑战，赢取金币和徽章</text>
         </view>
@@ -122,6 +122,7 @@ const assessmentTotal = ref(10)
 const currentQuestion = computed(() => questions.value[currentIndex.value] || null)
 const isLastQuestion = computed(() => currentIndex.value >= questions.value.length - 1)
 const quizProgress = computed(() => questions.value.length ? ((currentIndex.value + 1) / questions.value.length) * 100 : 0)
+const isImageSrc = value => typeof value === 'string' && /^(https?:|data:|\/static\/)/.test(value)
 
 onMounted(async () => {
   const res = await getAvailablePets()
@@ -282,7 +283,7 @@ async function finishOnboarding() {
     transform: scale(1.05);
   }
 }
-.pet-emoji { font-size: 40px; }
+.pet-preview-image { width: 76px; height: 70px; border-radius: 16px; }
 .pet-name { font-size: 12px; color: $text-secondary; }
 
 .btn-next {
@@ -404,7 +405,7 @@ async function finishOnboarding() {
   gap: 8px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.06);
 }
-.tour-icon { font-size: 36px; }
+.tour-art { width: 100%; height: 92px; border-radius: 16px; }
 .tour-title { font-size: 16px; font-weight: 700; color: $text; }
 .tour-desc { font-size: 12px; color: $text-secondary; text-align: center; line-height: 1.5; }
 </style>

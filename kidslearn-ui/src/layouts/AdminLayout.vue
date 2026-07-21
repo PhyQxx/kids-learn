@@ -12,53 +12,69 @@
         router
         class="side-menu"
       >
-        <el-menu-item index="/dashboard">
+        <el-menu-item v-if="hasAnyPerm(['admin:dashboard:read', 'admin:*'])" index="/dashboard">
           <el-icon><Odometer /></el-icon>
           <template #title>首页概览</template>
         </el-menu-item>
 
-        <el-sub-menu index="learning">
+        <el-sub-menu v-if="hasAnyPerm(['admin:question:read', 'admin:subject:read', 'admin:content:read'])" index="learning">
           <template #title>
             <el-icon><Reading /></el-icon>
             <span>学习管理</span>
           </template>
-          <el-menu-item index="/question-bank">题库管理</el-menu-item>
-          <el-menu-item index="/content">闯关管理</el-menu-item>
-          <el-menu-item index="/content/audit">内容审核</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:question:read')" index="/question-bank">题库管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:subject:read')" index="/content">闯关管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:content:read')" index="/content/audit">内容审核</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="pet">
+        <el-sub-menu v-if="hasAnyPerm(['admin:pet:read', 'admin:pet-item:read', 'admin:decoration:read'])" index="pet">
           <template #title>
             <el-icon><Pointer /></el-icon>
             <span>宠物管理</span>
           </template>
-          <el-menu-item index="/pet/list">宠物种类</el-menu-item>
-          <el-menu-item index="/pet/item">道具管理</el-menu-item>
-          <el-menu-item index="/pet/decoration">装饰管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:pet:read')" index="/pet/list">宠物种类</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:pet-item:read')" index="/pet/item">道具管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:decoration:read')" index="/pet/decoration">装饰管理</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="achievement">
+        <el-sub-menu v-if="hasAnyPerm(['admin:achievement:read', 'admin:sticker:read', 'admin:title:read'])" index="achievement">
           <template #title>
             <el-icon><Trophy /></el-icon>
             <span>成就管理</span>
           </template>
-          <el-menu-item index="/achievement/list">成就定义</el-menu-item>
-          <el-menu-item index="/achievement/sticker">贴纸管理</el-menu-item>
-          <el-menu-item index="/achievement/title">称号管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:achievement:read')" index="/achievement/list">成就定义</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:sticker:read')" index="/achievement/sticker">贴纸管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:title:read')" index="/achievement/title">称号管理</el-menu-item>
         </el-sub-menu>
 
-        <el-sub-menu index="system">
+        <el-menu-item v-if="hasAnyPerm(['admin:dashboard:read', 'admin:*'])" index="/ranking">
+          <el-icon><Trophy /></el-icon>
+          <template #title>排行榜</template>
+        </el-menu-item>
+
+        <el-menu-item v-if="hasAnyPerm(['admin:order:read', 'admin:*'])" index="/order">
+          <el-icon><Document /></el-icon>
+          <template #title>订单管理</template>
+        </el-menu-item>
+
+        <el-menu-item v-if="hasAnyPerm(['admin:challenge:read', 'admin:*'])" index="/challenge">
+          <el-icon><VideoPlay /></el-icon>
+          <template #title>挑战赛管理</template>
+        </el-menu-item>
+
+        <el-sub-menu v-if="hasAnyPerm(['admin:user:read', 'admin:role:read', 'admin:config:read', 'admin:log:read'])" index="system">
           <template #title>
             <el-icon><Setting /></el-icon>
             <span>系统管理</span>
           </template>
-          <el-menu-item index="/system/user">用户管理</el-menu-item>
-          <el-menu-item index="/system/config">系统配置</el-menu-item>
-          <el-menu-item index="/system/ai">AI配置</el-menu-item>
-          <el-menu-item index="/system/feedback-audio">反馈语音配置</el-menu-item>
-          <el-menu-item index="/system/log">操作日志</el-menu-item>
-          <el-menu-item index="/system/dict">字典管理</el-menu-item>
-          <el-menu-item index="/system/version">版本管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:user:read')" index="/system/user">用户管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:role:read')" index="/system/role">角色管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:config:read')" index="/system/config">系统配置</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:config:read')" index="/system/ai">AI配置</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:config:read')" index="/system/feedback-audio">反馈语音配置</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:log:read')" index="/system/log">操作日志</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:dict:read')" index="/system/dict">字典管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:version:read')" index="/system/version">版本管理</el-menu-item>
         </el-sub-menu>
       </el-menu>
     </el-aside>
@@ -111,6 +127,18 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const isCollapse = ref(false)
+
+// 权限检查函数
+function hasPerm(permission: string): boolean {
+  // 如果没有userInfo（还没加载完），暂时显示所有菜单
+  if (!userStore.userInfo) return true
+  return userStore.hasPermission(permission)
+}
+
+function hasAnyPerm(perms: string[]): boolean {
+  if (!userStore.userInfo) return true
+  return userStore.hasAnyPermission(perms)
+}
 
 function handleCommand(command: string) {
   if (command === 'logout') {

@@ -43,4 +43,75 @@ export default {
 <style lang="scss">
 @import '@/styles/tokens.scss';
 @import '@/styles/common.scss';
+@import '@/styles/planet-pages.scss';
+
+/* 页面切换动画 */
+uni-page-head {
+  display: none !important;
+}
+
+/* 页面进入动画 */
+@keyframes pageSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* 页面退出动画 */
+@keyframes pageSlideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-30%);
+    opacity: 0.6;
+  }
+}
+
+/* 应用页面动画 */
+.page-enter-active {
+  animation: pageSlideIn 0.3s ease-out;
+}
+
+.page-leave-active {
+  animation: pageSlideOut 0.3s ease-in;
+}
+
+/* 淡入淡出动画 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 弹出动画 */
+@keyframes popIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pop-enter-active {
+  animation: popIn 0.2s ease-out;
+}
 </style>

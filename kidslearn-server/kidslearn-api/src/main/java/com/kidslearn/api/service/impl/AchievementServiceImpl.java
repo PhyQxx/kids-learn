@@ -553,7 +553,7 @@ public class AchievementServiceImpl implements AchievementService {
         log.setQuantity(quantity);
         log.setSourceType("ACHIEVEMENT");
         log.setSourceId(achievementId);
-        log.setDescription("鎴愬氨濂栧姳");
+        log.setDescription("成就奖励");
         rewardLogMapper.insert(log);
     }
 

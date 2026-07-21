@@ -50,7 +50,7 @@
         >
           <image v-if="video.coverUrl" class="playlist-cover" :src="video.coverUrl" mode="aspectFill" />
           <view v-else class="playlist-cover empty-cover">
-            <text>▶</text>
+            <text>课程</text>
           </view>
           <view class="playlist-info">
             <text class="playlist-title text-sm text-bold">{{ video.title }}</text>
@@ -64,7 +64,6 @@
     </view>
 
     <view v-else class="empty-state">
-      <text class="empty-icon">▶</text>
       <text class="text-md text-bold">暂无视频课程</text>
       <text class="text-sm text-light">可以先从关卡练习开始</text>
       <tn-button type="primary" shape="round" @click="goLevels">去练习</tn-button>

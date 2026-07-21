@@ -3,7 +3,7 @@
     <view class="shop-content">
       <!-- 金币余额 -->
       <view class="balance-bar">
-        <text class="balance-icon">🪙</text>
+        <text class="balance-label">账户余额</text>
         <text class="text-lg text-bold">{{ userStore.gold || 0 }} 金币</text>
         <text class="text-sm text-light">钻石 {{ userStore.userInfo?.diamond || 0 }}</text>
       </view>
@@ -23,7 +23,7 @@
           <text v-if="item.effectDesc" class="text-xs text-light">{{ item.effectDesc }}</text>
           <view class="shop-meta">
             <view class="price-tag">
-              <text class="text-xs text-bold text-primary">{{ item.priceType === 'diamond' ? '💎' : '🪙' }} {{ item.price }}</text>
+              <text class="text-xs text-bold text-primary">{{ item.priceType === 'diamond' ? '晶石' : '金币' }} {{ item.price }}</text>
             </view>
           </view>
           <tn-button

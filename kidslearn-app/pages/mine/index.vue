@@ -1,4 +1,5 @@
 <template>
+  <AppLayout theme="kids" title="个人中心" :show-back="true" active-nav="home">
   <view class="mine-page">
     <view class="user-card">
       <image class="user-avatar" :src="summary.avatar" mode="aspectFill" />
@@ -16,22 +17,23 @@
     </view>
     <view class="summary-card">
       <view class="summary-item">
-        <text class="summary-icon">🏅</text>
+        <text class="summary-kind">成就</text>
         <text class="summary-text">{{ summary.achievementText }}</text>
       </view>
       <view class="summary-item">
-        <text class="summary-icon">🐾</text>
+        <text class="summary-kind">伙伴</text>
         <text class="summary-text">{{ summary.petText }}</text>
       </view>
     </view>
     <view class="menu-list">
       <view class="menu-item" v-for="item in menus" :key="item.label" @tap="handleMenu(item)">
-        <text class="menu-icon">{{ item.icon }}</text>
+        <view class="menu-route-mark"><text>{{ item.label.slice(0, 1) }}</text></view>
         <text class="menu-label">{{ item.label }}</text>
-        <text class="menu-arrow">›</text>
+        <text class="menu-action">进入</text>
       </view>
     </view>
   </view>
+  </AppLayout>
 </template>
 
 <script setup>
@@ -43,6 +45,7 @@ import { getMyProgress } from '@/api/achievement'
 import { useUserStore } from '@/store/user'
 import { usePetStore } from '@/store/pet'
 import { buildMineProfileSummary } from '@/utils/mineProfile.mjs'
+import AppLayout from '@/components/AppLayout.vue'
 
 const userStore = useUserStore()
 const petStore = usePetStore()
@@ -50,12 +53,10 @@ const loading = ref(true)
 const achievementProgress = ref(null)
 
 const menus = [
-  { icon: '📋', label: '学习记录', url: '/pages/mine/records' },
-  { icon: '📖', label: '错题本', url: '/pages/mine/wrong' },
-  { icon: '🛡️', label: '家长中心', url: '/pages/parent/index' },
-  { icon: '👥', label: '好友列表', url: '' },
-  { icon: '👑', label: 'VIP会员', url: '/pages/mine/vip' },
-  { icon: '⚙️', label: '设置', url: '/pages/mine/settings' },
+  { label: '闯关记录', url: '/pages/mine/records' },
+  { label: '错题本', url: '/pages/mine/wrong' },
+  { label: 'VIP会员', url: '/pages/mine/vip' },
+  { label: '设置', url: '/pages/mine/settings' },
 ]
 
 const summary = computed(() => buildMineProfileSummary({
@@ -98,16 +99,19 @@ onShow(loadMineData)
 
 <style lang="scss" scoped>
 .mine-page {
-  min-height: 100vh;
-  padding: 32rpx;
-  padding-bottom: 180rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .user-card {
   display: flex;
   align-items: center;
   gap: 24rpx;
-  background: linear-gradient(135deg, #FF6B6B, #FF8E8E);
+  min-height: 220px;
+  background-image: linear-gradient(90deg, rgba(24,33,47,.88), rgba(24,33,47,.18)), url('/static/redesign/pet-habitat.png');
+  background-size: cover;
+  background-position: center;
   padding: 40rpx 32rpx;
   border-radius: 24rpx;
 }
@@ -147,7 +151,9 @@ onShow(loadMineData)
   background: #fff;
   border-radius: 24rpx;
   padding: 32rpx;
-  margin: 24rpx 0 16rpx;
+  margin: 0;
+  border: 1px solid rgba(63,111,229,.09);
+  box-shadow: 0 9px 24px rgba(69,91,124,.07);
 }
 
 .stat-item {
@@ -171,7 +177,8 @@ onShow(loadMineData)
   background: #fff;
   border-radius: 24rpx;
   padding: 24rpx 32rpx;
-  margin-bottom: 24rpx;
+  margin-bottom: 0;
+  border: 1px solid rgba(63,111,229,.09);
 }
 
 .summary-item {
@@ -183,6 +190,21 @@ onShow(loadMineData)
 
 .summary-icon {
   font-size: 32rpx;
+}
+
+.summary-kind,
+.menu-route-mark {
+  min-width: 58rpx;
+  height: 58rpx;
+  margin-right: 18rpx;
+  border-radius: 18rpx;
+  background: #EAF1FF;
+  color: #315EBA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20rpx;
+  font-weight: 850;
 }
 
 .summary-text {
@@ -213,8 +235,14 @@ onShow(loadMineData)
   font-size: 28rpx;
 }
 
-.menu-arrow {
-  color: #ccc;
-  font-size: 32rpx;
+.menu-action {
+  min-width: 72rpx;
+  padding: 8rpx 16rpx;
+  border-radius: 999px;
+  background: #EEF3FF;
+  color: #315EBA;
+  font-size: 20rpx;
+  font-weight: 800;
+  text-align: center;
 }
 </style>

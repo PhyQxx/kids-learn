@@ -1,14 +1,14 @@
 <template>
   <view class="practice-quiz-page">
     <view class="quiz-topbar">
-      <view class="close-btn" @click="exitQuiz">✕</view>
+      <view class="close-btn" @click="exitQuiz">退出</view>
       <view class="mode-info">
         <text class="mode-name">{{ modeName }}</text>
         <text v-if="isTimed" class="timer" :class="{ warning: countdown <= 10 }">{{ countdown }}s</text>
       </view>
       <view class="stats">
-        <text>✅ {{ correctCount }}</text>
-        <text>❌ {{ wrongCount }}</text>
+        <text>正确 {{ correctCount }}</text>
+        <text>错误 {{ wrongCount }}</text>
       </view>
     </view>
 

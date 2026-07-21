@@ -3,15 +3,16 @@
     <template #header>
       <div style="display:flex;align-items:center;gap:12px">
         <el-breadcrumb separator="/">
-          <el-breadcrumb-item @click="goToLevel('subject')" style="cursor:pointer">
+          <el-breadcrumb-item @click="goTo('subject')" style="cursor:pointer">
             <span :style="{ color: state.level === 'subject' ? '#FF6B6B' : '', fontWeight: state.level === 'subject' ? '600' : '' }">闯关管理</span>
           </el-breadcrumb-item>
-          <el-breadcrumb-item v-if="state.level === 'level'" @click="goToLevel('level')" style="cursor:pointer">
+          <el-breadcrumb-item v-if="state.level === 'level'" @click="goTo('level')" style="cursor:pointer">
             <span :style="{ color: state.level === 'level' ? '#FF6B6B' : '', fontWeight: state.level === 'level' ? '600' : '' }">{{ state.subject?.subjectName }}</span>
           </el-breadcrumb-item>
         </el-breadcrumb>
-        <el-button v-if="state.level === 'subject'" link type="primary" @click="goToLevel('grade')" style="margin-left:auto">年级管理</el-button>
-        <el-button v-if="state.level === 'grade'" link type="primary" @click="goToLevel('subject')" style="margin-left:auto">返回闯关管理</el-button>
+        <el-button v-if="state.level === 'subject'" link type="primary" @click="goTo('grade')" style="margin-left:auto">年级管理</el-button>
+        <el-button v-if="state.level === 'grade'" link type="primary" @click="goTo('subject')" style="margin-left:auto">返回闯关管理</el-button>
+        <el-button v-if="state.level === 'level'" link type="primary" @click="goTo('subject')" style="margin-left:auto">返回学科列表</el-button>
       </div>
     </template>
 
@@ -49,7 +50,7 @@ function onSubjectSelect(row: any) {
   state.level = 'level'
 }
 
-function goToLevel(target: DrillLevel) {
+function goTo(target: DrillLevel) {
   if (target === 'subject') {
     state.subject = null
   } else if (target === 'grade') {

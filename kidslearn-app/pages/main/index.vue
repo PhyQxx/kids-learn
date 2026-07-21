@@ -7,16 +7,29 @@
   >
     <!-- 顶部栏左侧 -->
     <template #topbar-left>
-      <view class="topbar-left-custom">
-        <text class="topbar-title">{{ currentTitle }}</text>
-        <text class="topbar-subtitle">选一个喜欢的任务开始吧</text>
+      <view
+        class="topbar-left-custom"
+        role="button"
+        aria-label="进入个人中心"
+        hover-class="topbar-left-custom--pressed"
+        :hover-stay-time="80"
+        @tap="goMine"
+      >
+        <view class="profile-orbit"><text>{{ userStore.nickname?.slice(0, 1) || '小' }}</text></view>
+        <view class="profile-copy">
+          <text class="topbar-title">你好，{{ userStore.nickname }}</text>
+          <text class="topbar-subtitle">{{ currentTitle }} · Lv.{{ userStore.level }}</text>
+        </view>
+        <text class="profile-entry-label">个人中心</text>
       </view>
     </template>
 
     <!-- 顶部栏右侧 -->
     <template #topbar-right>
-      <text class="greeting-text">你好，{{ userStore.nickname }} 👋</text>
-      <view class="action-btn" @tap="goNotifications"><text>🔔</text></view>
+      <view class="notification-entry" @tap="goNotifications">
+        <view class="notification-signal"></view>
+        <text>通知</text>
+      </view>
     </template>
 
     <!-- 主内容 -->
@@ -113,7 +126,11 @@ const currentTitle = computed(() => {
 })
 
 function goNotifications() {
-  uni.showToast({ title: '暂无新消息', icon: 'none' })
+  uni.navigateTo({ url: '/pages/notification/index' })
+}
+
+function goMine() {
+  uni.navigateTo({ url: '/pages/mine/index' })
 }
 
 function showLearningBlocked(message) {
@@ -189,20 +206,95 @@ onLoad((query) => {
 
 .topbar-left-custom {
   display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 4px 10px 4px 4px;
+  margin-left: -4px;
+  border-radius: 18px;
+  cursor: pointer;
+  transition: background-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+.topbar-left-custom:hover {
+  background: rgba(238, 243, 255, .74);
+  box-shadow: inset 0 0 0 1px rgba(63, 111, 229, .08);
+}
+
+.topbar-left-custom--pressed {
+  background: #E8F0FF;
+  transform: scale(.98);
+}
+
+.profile-orbit {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #DFF5F1;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 5px 14px rgba(35, 118, 138, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #168F85;
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.profile-copy {
+  display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
 }
 
 .topbar-title {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 800;
   color: $text;
 }
 
 .topbar-subtitle {
-  font-size: 12px;
+  font-size: 11px;
   color: $text-light;
+}
+
+.profile-entry-label {
+  margin-left: 4px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #E9F7F4;
+  color: #168F85;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.notification-entry {
+  position: relative;
+  min-width: 70px;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 15px;
+  background: #EEF3FF;
+  color: #315EBA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  box-sizing: border-box;
+}
+
+.notification-signal {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #FF6B4A;
+  border: 2px solid #EEF3FF;
 }
 
 .greeting-text {
@@ -237,6 +329,7 @@ onLoad((query) => {
 
 @include respond-sm {
   .topbar-subtitle { display: none; }
+  .profile-entry-label { display: none; }
   .greeting-text { display: none; }
 }
 </style>

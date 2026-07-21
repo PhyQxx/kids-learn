@@ -15,8 +15,8 @@
           :class="{ done: d.done, today: d.isToday, current: d.day === nextRewardDay && !checkedIn }"
         >
           <text class="day-label">Day{{ d.day }}</text>
-          <text class="day-emoji">{{ d.done ? '✅' : d.day === 7 ? '🎁' : '💰' }}</text>
-          <text class="day-reward">+{{ d.gold }}🪙</text>
+          <text class="day-emoji">{{ d.done ? '完成' : d.day === 7 ? '加倍' : '待签' }}</text>
+          <text class="day-reward">金币 +{{ d.gold }}</text>
         </view>
       </view>
 
@@ -30,15 +30,15 @@
         @click="doCheckin"
         style="background: linear-gradient(135deg, #FFD700, #FFA500);"
       >
-        签到领取 +{{ nextGold }}🪙 +{{ nextExp }}⚡
+        签到领取 · 金币 {{ nextGold }} · 经验 {{ nextExp }}
       </tn-button>
       <view v-else class="checked-tip">
-        <text class="text-md text-bold">今日已签到 ✅</text>
+        <text class="text-md text-bold">今日已签到</text>
         <text class="text-sm text-light">明天记得继续哦！</text>
       </view>
 
       <view class="checkin-close" @tap="close">
-        <text>✕</text>
+        <text>关闭</text>
       </view>
     </view>
   </view>
@@ -96,7 +96,7 @@ async function doCheckin() {
       weekDays.value = weekDays.value.map(d =>
         d.isToday ? { ...d, done: true } : d
       )
-      uni.showToast({ title: `+${res.goldReward}🪙 +${res.expReward}⚡`, icon: 'none' })
+      uni.showToast({ title: `金币 +${res.goldReward} · 经验 +${res.expReward}`, icon: 'none' })
     }
   } catch (e) {
     uni.showToast({ title: e.message || '签到失败', icon: 'none' })

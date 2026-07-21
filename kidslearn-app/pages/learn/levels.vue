@@ -21,11 +21,9 @@
             :class="level.status"
             @tap="level.status !== 'locked' && startQuiz(level)"
           >
-            <text v-if="unit.isBoss" class="boss-icon">{{ level.status === 'locked' ? '🔒' : '👑' }}</text>
+            <text v-if="unit.isBoss" class="boss-icon">BOSS</text>
             <text class="level-num" :class="level.status">{{ level.num }}</text>
-            <view class="level-stars">
-              <text v-for="s in 3" :key="s" class="level-star" :class="{ filled: s <= level.stars }">⭐</text>
-            </view>
+            <view class="level-stars"><text>{{ level.stars }}/3 星</text></view>
             <text class="level-status-text text-xs">{{ statusText(level) }}</text>
           </view>
         </view>

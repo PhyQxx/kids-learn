@@ -61,7 +61,7 @@
         <el-table-column label="操作" width="120">
           <template #default="{ row }">
             <el-button link type="primary" @click="openEvoDialog(row)">编辑</el-button>
-            <el-button link type="danger">删除</el-button>
+            <el-button link type="danger" @click="handleDeleteEvo(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -84,7 +84,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getPetList, savePet, deletePet, getPetEvolutions, savePetEvolution } from '@/api/request'
+import { getPetList, savePet, deletePet, getPetEvolutions, savePetEvolution, deletePetEvolution } from '@/api/request'
 import { useTableHeight } from '@/composables/useTableHeight'
 
 const { tableBox, tableMaxHeight } = useTableHeight()
@@ -154,6 +154,15 @@ function openEvoDialog(row?: any) {
 async function saveEvolution() {
   const res = await savePetEvolution({ ...evoForm, id: evoEditingId.value, petId: currentPetId.value })
   if (res.code === 200) { ElMessage.success('保存成功'); evoFormVisible.value = false; openEvolution({ id: currentPetId.value }) }
+}
+
+async function handleDeleteEvo(id: number) {
+  await ElMessageBox.confirm('确认删除此进化阶段？', '提示', { type: 'warning' })
+  const res = await deletePetEvolution(id)
+  if (res.code === 200) {
+    ElMessage.success('删除成功')
+    openEvolution({ id: currentPetId.value })
+  }
 }
 
 onMounted(() => fetchData())

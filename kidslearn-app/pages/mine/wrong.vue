@@ -8,16 +8,16 @@
 
       <!-- 错题统计 & 智能复习 -->
       <view class="wrong-stats">
-        <text class="text-sm text-light">共 {{ wrongList.length }} 道错题待掌握</text>
+        <text class="text-sm text-light">共 {{ filteredWrongList.length }} 道错题待掌握</text>
         <view class="action-btns">
-          <tn-button type="warning" size="sm" shape="round" @click="startSmartReview" style="background: linear-gradient(135deg, #F39C12, #F1C40F); color: #FFF; margin-right: 8px;">✨ 智能复习</tn-button>
+          <tn-button type="warning" size="sm" shape="round" @click="startSmartReview" style="background: #F0AE2B; color: #FFF; margin-right: 8px;">智能复习</tn-button>
           <tn-button type="primary" size="sm" shape="round" @click="retryAll">全部重做</tn-button>
         </view>
       </view>
 
       <!-- 错题列表 -->
       <view class="wrong-list">
-        <view v-for="item in wrongList" :key="item.id" class="wrong-card card">
+        <view v-for="item in filteredWrongList" :key="item.id" class="wrong-card card">
           <view class="wrong-header">
             <view style="display: flex; gap: 8px; align-items: center;">
               <view class="subject-tag" :style="{ background: item.bg, color: item.color }">
@@ -33,16 +33,16 @@
           <rich-text class="wrong-question text-sm" :nodes="item.questionNodes" />
 
           <view class="answer-row wrong-answer">
-            <text class="text-xs">❌ 你的答案：{{ item.yourAnswer }}</text>
+            <text class="text-xs">你的答案：{{ item.yourAnswer }}</text>
           </view>
           <view class="answer-row correct-answer">
-            <text class="text-xs">✅ 正确答案：{{ item.correctAnswer }}</text>
+            <text class="text-xs">正确答案：{{ item.correctAnswer }}</text>
           </view>
 
           <view class="card-actions">
             <tn-button type="primary" size="sm" shape="round" @click="retryOne(item)">重做消灭错题</tn-button>
             <tn-button size="sm" shape="round" @click="loadExplanation(item)" style="background: #F0F7FF; color: #4A90D9; border: 1px solid #D0E3F7; margin-left: 8px;">
-              {{ item.explanationLoading ? '思考中...' : (item.aiExplanation ? '收起讲解' : '🤖 AI讲解') }}
+              {{ item.explanationLoading ? '思考中...' : (item.aiExplanation ? '收起讲解' : 'AI讲解') }}
             </tn-button>
           </view>
 
@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { getWrongTopics, getExplainWrong, getSmartReviewQuiz } from '@/api/learn'
 import { richContentToNodes, richContentToText } from '@/utils/richContent.mjs'
@@ -78,6 +78,15 @@ const tabItems = ref([
 ])
 
 const wrongList = ref([])
+
+// 根据Tab过滤错题列表
+const filteredWrongList = computed(() => {
+  const tabLabel = tabItems.value[activeTab.value]?.label
+  if (!tabLabel || tabLabel === '全部') {
+    return wrongList.value
+  }
+  return wrongList.value.filter(item => item.subject === tabLabel)
+})
 
 onMounted(async () => {
   loadWrongTopics()

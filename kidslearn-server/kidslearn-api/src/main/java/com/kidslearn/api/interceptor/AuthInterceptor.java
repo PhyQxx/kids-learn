@@ -46,16 +46,12 @@ public class AuthInterceptor implements HandlerInterceptor {
             }
             Long userId = JwtUtil.getUserId(token);
             String userType = JwtUtil.getUserType(token);
-            
-            // 校验Redis中的Token
-            String cachedToken = redisTemplate.opsForValue().get(RedisConstants.USER_TOKEN + userId);
-            if (cachedToken == null) {
-                log.warn("认证失败: Redis中Token不存在, userId: {}", userId);
-                sendError(response, R.unauthorized(), HttpServletResponse.SC_UNAUTHORIZED);
-                return false;
-            }
-            if (!token.equals(cachedToken)) {
-                log.warn("认证失败: Token不匹配, 可能在其他地方登录, userId: {}", userId);
+
+            // 校验Redis中的Token（支持多设备同时登录）
+            // 登录时把 token 加入 Set，只要 token 在 Set 中就有效
+            Boolean isMember = redisTemplate.opsForSet().isMember(RedisConstants.USER_TOKEN + userId, token);
+            if (Boolean.FALSE.equals(isMember)) {
+                log.warn("认证失败: Token无效或已登出, userId: {}", userId);
                 sendError(response, R.unauthorized(), HttpServletResponse.SC_UNAUTHORIZED);
                 return false;
             }

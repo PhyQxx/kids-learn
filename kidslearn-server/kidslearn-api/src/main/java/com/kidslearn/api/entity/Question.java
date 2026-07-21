@@ -15,4 +15,5 @@ public class Question extends BaseEntity {
     private Integer timeLimit;
     private String analysis;
     private Integer sortOrder;
+    private Integer difficulty; // 难度1-5
 }

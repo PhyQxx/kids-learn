@@ -56,6 +56,10 @@ async function handleLogin() {
     if (res.code === 200) {
       userStore.setToken(res.data.accessToken)
       userStore.setUserInfo(res.data.userInfo)
+      // 保存refreshToken用于token续期
+      if (res.data.refreshToken) {
+        localStorage.setItem('admin_refresh_token', res.data.refreshToken)
+      }
       ElMessage.success('登录成功')
       router.push('/dashboard')
     } else {

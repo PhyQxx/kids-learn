@@ -1,20 +1,21 @@
 ﻿<template>
   <view class="achievement-content">
-    <FunLoadingState v-if="loading" title="正在开启宝箱" mascot="🏅" />
+    <FunLoadingState v-if="loading" title="正在开启宝箱" mascot="" />
 
     <template v-else>
       <view class="summary-card">
+        <image class="achievement-hero-art" src="/static/redesign/achievement-cabinet.png" mode="aspectFill" />
         <view class="summary-info">
-          <text class="summary-emoji">🏅</text>
           <view>
-            <text class="text-lg text-bold text-white">成就中心</text>
-            <text class="text-sm text-white" style="opacity: 0.8;">已解锁 {{ completedCount }}/{{ totalCount }} 个成就</text>
+            <text class="achievement-kicker">成长收藏馆</text>
+            <text class="achievement-hero-title">成就中心</text>
+            <text class="achievement-hero-desc">已解锁 {{ completedCount }}/{{ totalCount }} 个成就</text>
           </view>
         </view>
         <view class="summary-right">
-          <text class="text-sm text-white" style="opacity: 0.8;">当前称号</text>
+          <text class="current-title-label">当前称号</text>
           <view class="title-badge">
-            <text class="text-sm text-bold text-white">{{ currentTitle }}</text>
+            <text>{{ currentTitle }}</text>
           </view>
         </view>
       </view>
@@ -42,7 +43,7 @@
           :class="ach.status"
         >
           <view class="achieve-icon-wrap" :class="ach.rarity">
-            <text class="achieve-emoji">{{ ach.icon }}</text>
+            <text class="achieve-index">{{ String(achievements.indexOf(ach) + 1).padStart(2, '0') }}</text>
           </view>
           <view class="achieve-info">
             <text class="text-sm text-bold">{{ ach.name }}</text>
@@ -52,10 +53,10 @@
               <text class="text-xs text-light">{{ ach.current }}/{{ ach.target }}</text>
             </view>
             <view v-if="ach.status === 'done'" class="done-badge">
-              <text class="text-xs text-success">✓ 已达成</text>
+              <text class="text-xs text-success">已达成</text>
             </view>
             <view v-if="ach.status === 'locked'" class="locked-badge">
-              <text class="text-xs text-light">🔒 未解锁</text>
+              <text class="text-xs text-light">尚未解锁</text>
             </view>
           </view>
           <tn-button
@@ -316,5 +317,61 @@ async function claimAllRewards() {
 
 .done-badge, .locked-badge {
   margin-top: 2px;
+}
+
+/* Planet achievement gallery */
+.summary-card {
+  position: relative;
+  min-height: 224px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 28px;
+  background: #FFF7EA;
+  border: 1px solid rgba(229,154,18,.14);
+  box-shadow: 0 12px 32px rgba(69,91,124,.10);
+}
+.achievement-hero-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.summary-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.80) 36%, rgba(255,255,255,.04) 72%);
+}
+.summary-info {
+  position: absolute;
+  z-index: 2;
+  left: 28px;
+  top: 28px;
+}
+.achievement-kicker { display: block; color: #E59A12; font-size: 13px; font-weight: 850; }
+.achievement-hero-title { display: block; margin-top: 6px; color: #18212F; font-size: 28px; font-weight: 850; }
+.achievement-hero-desc { display: block; margin-top: 7px; color: #5D6A7A; font-size: 14px; }
+.summary-right {
+  position: absolute;
+  z-index: 2;
+  left: 28px;
+  bottom: 22px;
+  align-items: flex-start;
+}
+.current-title-label { color: #7A8797; font-size: 11px; font-weight: 750; }
+.title-badge { min-height: 34px; padding: 0 14px; background: #FFF1CE; color: #9A6507; display: flex; align-items: center; font-size: 13px; font-weight: 850; }
+.action-row { margin-top: -60px; margin-right: 20px; z-index: 3; min-height: 44px; align-items: center; }
+.achieve-grid { gap: 14px; }
+.achieve-card {
+  min-height: 96px;
+  padding: 16px 18px;
+  border: 1px solid rgba(63,111,229,.10);
+  border-left-width: 4px;
+  border-radius: 20px;
+  background: #FFFFFF;
+  box-shadow: 0 8px 22px rgba(69,91,124,.07);
+}
+.achieve-icon-wrap { width: 48px; height: 48px; border-radius: 16px; box-shadow: inset 0 0 0 3px rgba(255,255,255,.46); }
+.achieve-index { color: #FFFFFF; font-size: 13px; font-weight: 900; letter-spacing: .5px; }
+
+@media (min-width: 1200px) and (min-height: 900px) {
+  .summary-card { min-height: 270px; }
+  .achieve-grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .achieve-card { min-height: 108px; }
 }
 </style>

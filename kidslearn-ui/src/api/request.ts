@@ -223,6 +223,7 @@ export function savePet(data: AdminRecord) { return post<void>('/admin/pet/save'
 export function deletePet(id: number) { return del(`/admin/pet/${id}`) }
 export function getPetEvolutions(petId: number) { return get<AdminRecord[]>(`/admin/pet/${petId}/evolutions`) }
 export function savePetEvolution(data: AdminRecord) { return post<void>('/admin/pet/evolution/save', data) }
+export function deletePetEvolution(id: number) { return del(`/admin/pet/evolution/${id}`) }
 
 // ==================== 道具管理 ====================
 export function getPetItemList(params: PageQuery) { return get<PageResult<AdminRecord>>('/admin/pet-item/list', params) }
@@ -294,3 +295,19 @@ export function deleteDictData(id: number) { return del(`/admin/dict/data/${id}`
 export function getVersionList(params: PageQuery) { return get<PageResult<AdminRecord>>('/admin/version/list', params) }
 export function saveVersion(data: AdminRecord) { return post<void>('/admin/version/save', data) }
 export function deleteVersion(id: number) { return del(`/admin/version/${id}`) }
+
+// ==================== 排行榜管理 ====================
+export function getRankingList(type: string) { return get<AdminRecord[]>(`/leaderboard/${type}`) }
+
+// ==================== 订单管理 ====================
+export function getOrderList(params: PageQuery & { status?: number; keyword?: string }) { return get<PageResult<AdminRecord>>('/admin/order/list', params) }
+
+// ==================== 挑战赛管理 ====================
+export function getChallengeList(params: PageQuery & { type?: string }) { return get<PageResult<AdminRecord>>('/admin/challenge/list', params) }
+export function saveChallenge(data: AdminRecord) { return post<void>('/admin/challenge/save', data) }
+export function deleteChallenge(id: number) { return del(`/admin/challenge/${id}`) }
+
+// ==================== AI 难度评分 ====================
+export function aiRateDifficulty(batchSize?: number) {
+  return post<{ rated: number; total: number; remaining: number }>('/admin/question/ai-rate-difficulty', null, { params: { batchSize: batchSize || 50 } })
+}

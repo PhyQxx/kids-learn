@@ -2,17 +2,20 @@
   <view class="login-container">
     <view class="login-box">
       <view class="logo-area">
-        <text class="logo-emoji">🚀</text>
-        <text class="logo-text">KidsLearn</text>
+        <image class="login-world-art" src="/static/redesign/mission-island.png" mode="aspectFill" />
+        <view class="login-brand-copy">
+          <text class="logo-text">趣学星球</text>
+          <text class="logo-subtitle">开启今天的学习航线</text>
+        </view>
       </view>
 
       <view class="form-area">
         <view class="input-group">
-          <text class="input-icon">👤</text>
+          <text class="input-label">账号</text>
           <input class="input-field" v-model="loginForm.username" placeholder="请输入账号" placeholder-class="ph-color" />
         </view>
         <view class="input-group">
-          <text class="input-icon">🔒</text>
+          <text class="input-label">密码</text>
           <input class="input-field" v-model="loginForm.password" type="password" placeholder="请输入密码" placeholder-class="ph-color" />
         </view>
         <view v-if="loginError" class="error-msg">{{ loginError }}</view>
@@ -29,50 +32,43 @@
   </view>
 </template>
 
-<script>
+<script setup>
+import { reactive, ref } from 'vue'
 import { login } from '@/api/auth'
 import { useUserStore } from '@/store/user'
 import { useRealtimeStore } from '@/store/realtime'
 import { getPostAuthRedirectUrl } from '@/utils/onboardingFlow.mjs'
-import { showLoading, hideLoading } from '@/utils/loading'
 import GlobalLoadingOverlay from '@/components/common/GlobalLoadingOverlay.vue'
 
-export default {
-  data() {
-    return {
-      loginForm: { username: '', password: '' },
-      loginError: '',
+const loginForm = reactive({ username: '', password: '' })
+const loginError = ref('')
+
+async function handleLogin() {
+  const { username, password } = loginForm
+  if (!username) { loginError.value = '请输入账号'; return }
+  if (!password) { loginError.value = '请输入密码'; return }
+  loginError.value = ''
+
+  try {
+    const res = await login({ username, password }, {
+      showLoading: '正在进入星球...',
+      loadingMascot: ''
+    })
+
+    const userStore = useUserStore()
+    userStore.setToken(res.accessToken, res.refreshToken)
+    if (res.userInfo) {
+      userStore.setUserInfo(res.userInfo)
     }
-  },
-  methods: {
-    async handleLogin() {
-      const { username, password } = this.loginForm
-      if (!username) { this.loginError = '请输入账号'; return }
-      if (!password) { this.loginError = '请输入密码'; return }
-      this.loginError = ''
-      
-      try {
-        // 使用拦截器自动处理加载状态
-        const res = await login({ username, password }, {
-          showLoading: '正在进入星球...', 
-          loadingMascot: '🚀' 
-        })
-        
-        const userStore = useUserStore()
-        userStore.setToken(res.accessToken, res.refreshToken)
-        if (res.userInfo) {
-          userStore.setUserInfo(res.userInfo)
-        }
-        useRealtimeStore().connect()
-        uni.reLaunch({ url: getPostAuthRedirectUrl(res.userInfo) })
-      } catch (e) {
-        this.loginError = e.msg || '登录失败，请检查账号密码'
-      }
-    },
-    goRegister() {
-      uni.navigateTo({ url: '/pages/login/register' })
-    }
+    useRealtimeStore().connect()
+    uni.reLaunch({ url: getPostAuthRedirectUrl(res.userInfo) })
+  } catch (e) {
+    loginError.value = e.msg || '登录失败，请检查账号密码'
   }
+}
+
+function goRegister() {
+  uni.navigateTo({ url: '/pages/login/register' })
 }
 </script>
 
@@ -99,11 +95,21 @@ export default {
 }
 
 .logo-area {
+  position: relative;
+  min-height: 178px;
+  overflow: hidden;
+  border-radius: 22px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 40px;
+  justify-content: flex-end;
+  margin-bottom: 28px;
 }
+
+.login-world-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.logo-area::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.94)); }
+.login-brand-copy { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 3px; margin-bottom: 16px; }
+.logo-subtitle { color: #5D6A7A; font-size: 12px; }
 
 .logo-emoji {
   font-size: 64px;
@@ -131,6 +137,8 @@ export default {
   border-radius: 16px;
   padding: 12px 20px;
 }
+
+.input-label { width: 40px; margin-right: 10px; color: #315EBA; font-size: 12px; font-weight: 850; }
 
 .input-icon {
   font-size: 20px;

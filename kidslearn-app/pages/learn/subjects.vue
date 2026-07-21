@@ -1,29 +1,38 @@
 <template>
-  <view class="subjects-page">
-    <view class="header">
-      <view class="back-btn" @click="goBack">⬅️ 返回</view>
-      <text class="title">选择学科</text>
-    </view>
-    <view class="subject-grid">
-      <view class="subject-card" v-for="item in subjects" :key="item.code"
-        :style="{ background: item.bgColor }" @click="goNext(item)">
-        <text class="subject-icon">{{ item.icon }}</text>
-        <text class="subject-name">{{ item.name }}</text>
-        <text v-if="!isPractice" class="subject-count">{{ item.levelCount }}个关卡</text>
-        <view class="progress-bar" v-if="!isPractice && item.progress > 0">
-          <view class="progress-fill" :style="{ width: item.progress + '%' }"></view>
+  <AppLayout theme="learn" :title="isPractice ? '选择练习学科' : '选择闯关学科'" :show-back="true" active-nav="learn">
+    <view class="subjects-page">
+      <view class="subject-hero">
+        <image class="subject-hero-art" src="/static/redesign/subject-dioramas.png" mode="aspectFill" />
+        <view class="subject-hero-copy">
+          <text class="subject-kicker">学科星域</text>
+          <text class="subject-hero-title">{{ isPractice ? '选择今天要巩固的学科' : '选择一条闯关航线' }}</text>
+          <text class="subject-hero-desc">内容会根据当前年级自动匹配</text>
+        </view>
+      </view>
+
+      <view class="subject-grid">
+        <view class="subject-card" v-for="(item, index) in subjects" :key="item.code" @click="goNext(item)">
+          <view class="subject-number"><text>{{ String(index + 1).padStart(2, '0') }}</text></view>
+          <text class="subject-name">{{ item.name }}</text>
+          <text class="subject-count">{{ isPractice ? '专项练习' : `${item.levelCount} 个关卡` }}</text>
+          <view class="progress-bar" v-if="!isPractice">
+            <view class="progress-fill" :style="{ width: item.progress + '%' }"></view>
+          </view>
+          <view class="subject-action"><text>{{ isPractice ? '开始训练' : '查看关卡' }}</text></view>
         </view>
       </view>
     </view>
-  </view>
+  </AppLayout>
 </template>
 
 <script>
 import { getSubjects } from '@/api/learn'
 import { useUserStore } from '@/store/user'
 import { useLearnStore } from '@/store/learn'
+import AppLayout from '@/components/AppLayout.vue'
 
 export default {
+  components: { AppLayout },
   data() {
     return {
       isPractice: false,
@@ -78,66 +87,49 @@ export default {
 <style lang="scss" scoped>
 @import '@/styles/variables.scss';
 
-.subjects-page {
-  min-height: 100vh;
-  padding: 32rpx;
-  background: #F7F7F7;
+.subjects-page { display: flex; flex-direction: column; gap: 16px; }
+.subject-hero {
+  position: relative;
+  min-height: 230px;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(63,111,229,.10);
+  background: #EEF5FF;
+  box-shadow: 0 12px 32px rgba(69,91,124,.10);
 }
-
-.header {
-  margin-bottom: 32rpx;
-  display: flex;
-  align-items: center;
-}
-
-.back-btn {
-  font-size: 32rpx;
-  color: #666;
-  font-weight: bold;
-  margin-right: 32rpx;
-}
-
-.title {
-  font-size: 40rpx;
-  font-weight: 800;
-}
+.subject-hero-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.subject-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(255,255,255,.98), rgba(255,255,255,.78) 38%, rgba(255,255,255,.04) 72%); }
+.subject-hero-copy { position: absolute; z-index: 2; left: 28px; top: 28px; display: flex; flex-direction: column; gap: 7px; }
+.subject-kicker { color: #3F6FE5; font-size: 13px; font-weight: 850; }
+.subject-hero-title { color: #18212F; font-size: 28px; font-weight: 850; }
+.subject-hero-desc { color: #5D6A7A; font-size: 14px; }
 
 .subject-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 24rpx;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .subject-card {
-  width: calc(50% - 12rpx);
-  padding: 40rpx 32rpx;
-  border-radius: 24rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.05);
+  position: relative;
+  min-height: 164px;
+  padding: 18px;
+  border-radius: 22px;
+  background: #FFFFFF;
+  border: 1px solid rgba(63,111,229,.10);
+  box-shadow: 0 9px 24px rgba(69,91,124,.08);
+  cursor: pointer;
 }
-
-.subject-icon {
-  font-size: 64rpx;
-  display: block;
-}
-
-.subject-name {
-  font-size: 32rpx;
-  font-weight: 700;
-  margin-top: 16rpx;
-  display: block;
-}
-
-.subject-count {
-  font-size: 24rpx;
-  color: #999;
-  margin-top: 4rpx;
-}
+.subject-card:active { transform: scale(.985); }
+.subject-number { width: 42px; height: 42px; border-radius: 14px; background: #EAF1FF; color: #315EBA; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; }
+.subject-name { display: block; margin-top: 12px; color: #18212F; font-size: 20px; font-weight: 850; }
+.subject-count { display: block; margin-top: 4px; color: #7A8797; font-size: 12px; }
 
 .progress-bar {
-  height: 6px;
-  background: rgba(0,0,0,0.1);
+  height: 5px;
+  background: #E8EEF7;
   border-radius: 3px;
-  margin-top: 12rpx;
+  margin-top: 12px;
   overflow: hidden;
 }
 
@@ -146,5 +138,15 @@ export default {
   background: $primary;
   border-radius: 3px;
   transition: width 0.3s;
+}
+.subject-action { position: absolute; right: 14px; bottom: 14px; min-height: 36px; padding: 0 14px; border-radius: 12px; background: #3F7CE5; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 850; }
+
+@media (min-width: 1200px) and (min-height: 900px) {
+  .subject-hero { min-height: 280px; }
+  .subject-card { min-height: 190px; }
+}
+
+@include respond-md {
+  .subject-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

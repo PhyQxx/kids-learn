@@ -34,6 +34,21 @@ public class AuthController {
         return R.ok(authService.register(dto));
     }
 
+    @Operation(summary = "发送验证码")
+    @PostMapping("/send-code")
+    public R<Void> sendVerifyCode(@RequestBody Map<String, String> body) {
+        String phone = body.get("phone");
+        if (phone == null || phone.isBlank()) {
+            return R.fail("手机号不能为空");
+        }
+        // 简单校验手机号格式
+        if (!phone.matches("^1[3-9]\\d{9}$")) {
+            return R.fail("手机号格式不正确");
+        }
+        authService.sendVerifyCode(phone);
+        return R.ok();
+    }
+
     @Operation(summary = "刷新Token")
     @PostMapping("/refresh-token")
     public R<TokenVO> refreshToken(@RequestBody Map<String, String> body) {
@@ -48,7 +63,8 @@ public class AuthController {
     @PostMapping("/logout")
     public R<Void> logout(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
-        authService.logout(userId);
+        String token = (String) request.getAttribute("token");
+        authService.logout(userId, token);
         return R.ok();
     }
 }

@@ -1,0 +1,170 @@
+/* Shared Planet Control Deck language for secondary screens. */
+
+.levels-content,
+.videos-shell,
+.sticker-content,
+.challenge-content,
+.wrong-content,
+.records-content,
+.settings-content,
+.notification-content,
+.parent-page,
+.shop-content,
+.dress-content,
+.vip-content {
+  color: #18212F;
+}
+
+.content-wrapper .card,
+.content-wrapper .panel,
+.content-wrapper .settings-group,
+.content-wrapper .notification-item,
+.content-wrapper .wrong-card,
+.content-wrapper .record-card,
+.content-wrapper .shop-card,
+.content-wrapper .item-card,
+.content-wrapper .level-card,
+.content-wrapper .playlist-item {
+  border: 1px solid rgba(63, 111, 229, .10);
+  border-radius: 20px;
+  background-color: #FFFFFF;
+  box-shadow: 0 9px 24px rgba(69, 91, 124, .08);
+}
+
+.content-wrapper .tn-tabs,
+.content-wrapper .action-bar,
+.content-wrapper .wrong-stats,
+.content-wrapper .balance-bar {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .88);
+  border: 1px solid rgba(63, 111, 229, .08);
+}
+
+.content-wrapper button,
+.content-wrapper .tn-button,
+.content-wrapper [class*="-btn"] {
+  min-height: 44px;
+}
+
+/* Functional hero surfaces reuse the established illustrated world. */
+.season-banner,
+.vip-content .hero-banner,
+.sticker-content .summary-card {
+  position: relative;
+  min-height: 210px;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(63, 111, 229, .10);
+  box-shadow: 0 12px 32px rgba(69, 91, 124, .10);
+  background-color: #EAF3FF;
+  background-image: linear-gradient(90deg, rgba(24,33,47,.90), rgba(24,33,47,.28)), url('/static/redesign/ranking-podium.png');
+  background-size: cover;
+  background-position: center;
+}
+
+.vip-content .hero-banner {
+  background-image: linear-gradient(90deg, rgba(24,33,47,.92), rgba(24,33,47,.28)), url('/static/redesign/achievement-cabinet.png');
+}
+
+.sticker-content .summary-card {
+  background-image: linear-gradient(90deg, rgba(95,59,184,.90), rgba(95,59,184,.20)), url('/static/redesign/achievement-cabinet.png');
+}
+
+.levels-content { display: flex; flex-direction: column; gap: 16px; }
+.unit-section {
+  padding: 18px;
+  border-radius: 24px;
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(63,111,229,.09);
+  box-shadow: 0 9px 26px rgba(69,91,124,.07);
+}
+.unit-header { margin-bottom: 14px; }
+.level-grid { gap: 12px; }
+.level-card { min-height: 116px; border-left: 0 !important; }
+.level-card.current { box-shadow: 0 10px 24px rgba(63,124,229,.18); border-color: rgba(63,124,229,.34); }
+.level-card.locked { opacity: .58; filter: grayscale(.2); }
+.level-num { color: #315EBA; font-size: 22px; }
+
+.videos-shell { gap: 16px; }
+.player-panel,
+.playlist {
+  border-radius: 24px;
+  border: 1px solid rgba(63,111,229,.09);
+  background: #FFFFFF;
+  box-shadow: 0 10px 28px rgba(69,91,124,.08);
+}
+.video-player { border-radius: 22px; background: #18212F; }
+.playlist-item.active { border-color: rgba(63,124,229,.44); background: #F1F5FF; }
+
+.wrong-content,
+.records-content,
+.settings-content,
+.notification-content,
+.shop-content,
+.dress-content,
+.parent-page,
+.vip-content,
+.challenge-content,
+.sticker-content { display: flex; flex-direction: column; gap: 16px; }
+
+.wrong-card,
+.record-card,
+.notification-item,
+.settings-group,
+.shop-card { padding: 18px 20px; }
+.answer-row { border-radius: 13px; }
+.wrong-answer { background: #FFF1F0; color: #B84438; }
+.correct-answer { background: #EAF8F3; color: #168F85; }
+.notification-item.unread { background: #F2F6FF; border-color: rgba(63,124,229,.26); }
+.unread-dot { background: #FF6B4A; }
+.settings-group { overflow: hidden; }
+.setting-item { min-height: 58px; border-bottom-color: #EDF1F7; }
+
+.summary-row,
+.summary-grid { gap: 14px; }
+.summary-row .summary-item,
+.summary-grid .summary-card { min-height: 100px; border-radius: 20px; background: #FFFFFF; }
+.summary-value,
+.summary-row .text-primary { color: #3F6FE5 !important; }
+
+.shop-grid,
+.sticker-grid { gap: 14px; }
+.shop-card,
+.sticker-slot { min-height: 170px; border-radius: 20px; }
+.dress-layout { gap: 16px; }
+.preview-panel,
+.items-panel { border-radius: 24px; border: 1px solid rgba(63,111,229,.09); box-shadow: 0 10px 28px rgba(69,91,124,.08); }
+
+.result-container,
+.start-screen {
+  border-radius: 28px;
+  background-color: #F4F8FF;
+  background-image: linear-gradient(180deg, rgba(255,255,255,.30), rgba(255,255,255,.92)), url('/static/redesign/mission-island.png');
+  background-size: cover;
+  background-position: center;
+}
+
+.quiz-container,
+.adaptive-container,
+.practice-quiz-page {
+  color: #18212F;
+  background: #F6F8FC;
+}
+.quiz-topbar,
+.question-area,
+.analysis-panel,
+.summary-overlay .summary-card {
+  border: 1px solid rgba(63,111,229,.09);
+  box-shadow: 0 9px 26px rgba(69,91,124,.08);
+}
+.option-btn { border-radius: 20px !important; }
+.option-btn.selected { border-color: #3F7CE5 !important; background: #EEF3FF !important; }
+
+@media (min-width: 1200px) and (min-height: 900px) {
+  .season-banner,
+  .vip-content .hero-banner,
+  .sticker-content .summary-card { min-height: 250px; }
+  .level-card { min-height: 132px; }
+  .shop-card,
+  .sticker-slot { min-height: 190px; }
+}

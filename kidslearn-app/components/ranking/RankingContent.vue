@@ -1,16 +1,22 @@
 <template>
   <view class="ranking-content">
     <!-- Loading -->
-    <FunLoadingState v-if="loading" title="正在核对排行榜" mascot="🏆" />
+    <FunLoadingState v-if="loading" title="正在核对排行榜" mascot="" />
 
     <template v-else>
     <!-- 领奖台 -->
     <view class="podium-section">
+      <image class="podium-world-art" src="/static/redesign/ranking-podium.png" mode="aspectFill" />
+      <view class="podium-heading">
+        <text class="podium-kicker">本周学习风云</text>
+        <text class="podium-title">星际排行榜</text>
+        <text class="podium-subtitle">坚持完成练习，登上荣誉舞台</text>
+      </view>
       <view class="podium-row">
         <!-- 第2名 -->
         <view class="podium-item">
           <view class="podium-avatar silver-bg">
-            <text class="podium-emoji">{{ podiumData[1]?.avatar || '🐰' }}</text>
+            <text class="podium-initial">{{ podiumData[1]?.name?.slice(0, 1) || '二' }}</text>
           </view>
           <text class="text-sm text-bold">{{ podiumData[1]?.name || '-' }}</text>
           <text class="text-xs text-light">{{ podiumData[1]?.score || 0 }} 分</text>
@@ -20,9 +26,8 @@
         </view>
         <!-- 第1名 -->
         <view class="podium-item first">
-          <text class="crown">👑</text>
           <view class="podium-avatar gold-bg">
-            <text class="podium-emoji">{{ podiumData[0]?.avatar || '🦁' }}</text>
+            <text class="podium-initial">{{ podiumData[0]?.name?.slice(0, 1) || '一' }}</text>
           </view>
           <text class="text-sm text-bold">{{ podiumData[0]?.name || '-' }}</text>
           <text class="text-xs text-light">{{ podiumData[0]?.score || 0 }} 分</text>
@@ -33,7 +38,7 @@
         <!-- 第3名 -->
         <view class="podium-item">
           <view class="podium-avatar bronze-bg">
-            <text class="podium-emoji">{{ podiumData[2]?.avatar || '🦊' }}</text>
+            <text class="podium-initial">{{ podiumData[2]?.name?.slice(0, 1) || '三' }}</text>
           </view>
           <text class="text-sm text-bold">{{ podiumData[2]?.name || '-' }}</text>
           <text class="text-xs text-light">{{ podiumData[2]?.score || 0 }} 分</text>
@@ -51,13 +56,13 @@
 
     <view class="challenge-entry card" @tap="goChallenge">
       <view class="challenge-entry-copy">
-        <text class="challenge-entry-icon">⚔️</text>
+        <view class="challenge-route-mark"><text>PK</text></view>
         <view>
           <text class="text-md text-bold">好友PK与段位赛</text>
           <text class="text-xs text-light">完成挑战赢金币，提升段位积分</text>
         </view>
       </view>
-      <text class="text-primary text-sm">去挑战 →</text>
+      <view class="challenge-entry-action"><text>进入挑战</text></view>
     </view>
 
     <!-- 我的排名 -->
@@ -65,7 +70,7 @@
       <view class="my-rank-left">
         <text class="rank-num">#{{ myRankData.rank }}</text>
         <view class="my-avatar-sm">
-          <text>{{ myRankData.avatar }}</text>
+          <text>{{ myRankData.name?.slice(0, 1) || '我' }}</text>
         </view>
         <view>
           <text class="text-md text-bold">我</text>
@@ -75,7 +80,7 @@
       <view class="my-rank-right">
         <text class="text-md text-bold text-primary">{{ myRankData.score }} 分</text>
         <view class="star-row">
-          <text v-for="s in myRankData.stars" :key="s">⭐</text>
+          <text>{{ myRankData.stars || 0 }} 连胜</text>
         </view>
       </view>
     </view>
@@ -85,7 +90,7 @@
       <view v-for="(r, i) in rankList" :key="r.id || i" class="rank-item" :class="{ me: r.isMe }">
         <text class="rank-pos" :class="{ 'top-three': r.rank <= 3 }">{{ r.rank }}</text>
         <view class="rank-avatar-sm">
-          <text>{{ r.avatar }}</text>
+          <text>{{ r.name?.slice(0, 1) || '学' }}</text>
         </view>
         <view class="rank-user-info">
           <text class="text-sm text-bold">{{ r.name }}</text>
@@ -93,7 +98,7 @@
         </view>
         <text class="rank-score text-sm text-bold">{{ r.score }} 分</text>
         <view class="star-row">
-          <text v-for="s in r.stars" :key="s">⭐</text>
+          <text>{{ r.stars || 0 }} 连胜</text>
         </view>
       </view>
       <view v-if="podiumData.length === 0 && rankList.length === 0" class="rank-empty">
@@ -349,5 +354,97 @@ watch(activeTab, () => {
 .rank-empty {
   padding: 18px 0;
   text-align: center;
+}
+
+/* Planet ranking deck */
+.ranking-content { gap: 14px; }
+.podium-section {
+  position: relative;
+  min-height: 286px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 28px;
+  background: #EAF3FF;
+  border: 1px solid rgba(63,111,229,.10);
+  box-shadow: 0 12px 32px rgba(69,91,124,.10);
+}
+.podium-world-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+.podium-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255,255,255,.96) 0%, rgba(255,255,255,.70) 38%, rgba(255,255,255,.08) 72%);
+}
+.podium-heading {
+  position: absolute;
+  z-index: 2;
+  left: 28px;
+  top: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.podium-kicker { color: #3F6FE5; font-size: 13px; font-weight: 850; }
+.podium-title { color: #18212F; font-size: 28px; font-weight: 850; }
+.podium-subtitle { color: #5D6A7A; font-size: 13px; }
+.podium-row {
+  position: absolute;
+  z-index: 3;
+  left: 24px;
+  bottom: 20px;
+  gap: 10px;
+}
+.podium-item,
+.podium-item.first { margin-bottom: 0; }
+.podium-avatar { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,.9); }
+.podium-initial { color: #FFFFFF; font-size: 15px; font-weight: 850; }
+.pedestal { width: 58px; border-radius: 12px 12px 5px 5px; }
+.pedestal.gold-ped { height: 32px; }
+.pedestal.silver-ped { height: 26px; }
+.pedestal.bronze-ped { height: 22px; }
+.ped-rank { font-size: 16px; }
+
+.challenge-entry,
+.my-rank-card,
+.rank-list {
+  border: 1px solid rgba(63,111,229,.10);
+  border-radius: 22px;
+  box-shadow: 0 9px 24px rgba(69,91,124,.08);
+}
+.challenge-entry { min-height: 76px; background: #F1F5FF; }
+.challenge-route-mark {
+  width: 46px;
+  height: 46px;
+  border-radius: 15px;
+  background: #DCE8FF;
+  color: #315EBA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+}
+.challenge-entry-action {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 13px;
+  background: #3F7CE5;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 850;
+}
+.my-rank-card { border-color: rgba(255,107,74,.28); background: #FFF9F5; }
+.my-avatar-sm,
+.rank-avatar-sm { background: #EAF1FF; color: #315EBA; font-weight: 850; }
+.star-row { color: #7A8797; font-weight: 750; }
+.rank-item { min-height: 50px; border-bottom-color: #EDF1F7; }
+
+@media (min-width: 1200px) and (min-height: 900px) {
+  .podium-section { min-height: 330px; }
+  .rank-list { padding: 16px 20px; }
+  .rank-item { min-height: 56px; }
 }
 </style>

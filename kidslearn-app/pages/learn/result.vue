@@ -1,26 +1,25 @@
 <template>
   <AppLayout theme="kids" title="答题结果" :show-back="true">
     <view class="result-container">
-      <text class="result-emoji animate-pop-in">🎉</text>
       <view class="result-stars">
-        <text v-for="s in 3" :key="s" class="result-star" :class="{ filled: s <= 3 }">⭐</text>
+        <text class="result-rating">满星评价</text>
       </view>
       <text class="result-title text-title text-bold">太棒了！</text>
       <text class="result-subtitle text-light">你获得了满星评价！</text>
 
       <view class="reward-row">
         <view class="reward-card card">
-          <text class="reward-icon">🪙</text>
+          <text class="reward-kind">金币</text>
           <text class="text-md text-bold">+30</text>
           <text class="text-xs text-light">金币</text>
         </view>
         <view class="reward-card card">
-          <text class="reward-icon">⚡</text>
+          <text class="reward-kind">经验</text>
           <text class="text-md text-bold">+25</text>
           <text class="text-xs text-light">经验</text>
         </view>
         <view class="reward-card card">
-          <text class="reward-icon">🎨</text>
+          <text class="reward-kind">贴纸</text>
           <text class="text-md text-bold">x1</text>
           <text class="text-xs text-light">贴纸</text>
         </view>

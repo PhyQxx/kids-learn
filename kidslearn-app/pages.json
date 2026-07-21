@@ -26,10 +26,11 @@
         { "path": "pages/challenge/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "挑战赛" } },
         { "path": "pages/parent/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "家长中心" } },
         { "path": "pages/mine/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "个人中心" } },
-        { "path": "pages/mine/records", "style": { "navigationStyle": "custom", "navigationBarTitleText": "学习记录" } },
+        { "path": "pages/mine/records", "style": { "navigationStyle": "custom", "navigationBarTitleText": "闯关记录" } },
         { "path": "pages/mine/wrong", "style": { "navigationStyle": "custom", "navigationBarTitleText": "错题本" } },
         { "path": "pages/mine/vip", "style": { "navigationStyle": "custom", "navigationBarTitleText": "VIP" } },
-        { "path": "pages/mine/settings", "style": { "navigationStyle": "custom", "navigationBarTitleText": "设置" } }
+        { "path": "pages/mine/settings", "style": { "navigationStyle": "custom", "navigationBarTitleText": "设置" } },
+        { "path": "pages/notification/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "消息通知" } }
     ],
     "globalStyle": {
         "navigationBarTextStyle": "black",

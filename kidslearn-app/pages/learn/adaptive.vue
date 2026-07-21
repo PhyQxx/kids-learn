@@ -14,7 +14,7 @@
       <!-- 答题屏 -->
       <view v-if="screen === 'quiz'" class="screen quiz-screen">
         <view class="quiz-topbar">
-          <view class="close-btn" @tap="exitQuiz"><text>✕</text></view>
+          <view class="close-btn" @tap="exitQuiz"><text>退出</text></view>
           <view class="quiz-progress">
             <tn-line-progress :percent="(currentIndex + 1) / totalQuestions * 100" active-color="#FF6B6B" :height="10" :show-percent="false" />
           </view>
@@ -73,7 +73,7 @@
       <!-- 答对反馈 -->
       <view v-if="showCorrect" class="feedback-overlay correct-overlay">
         <view class="feedback-content animate-pop-in">
-          <text class="feedback-text text-title text-bold text-white">✅ 正确！</text>
+          <text class="feedback-text text-title text-bold text-white">回答正确</text>
           <text v-if="masteredThis" class="mastered-badge animate-pop-in">🎯 已掌握</text>
         </view>
       </view>
@@ -81,7 +81,7 @@
       <!-- 答错反馈 -->
       <view v-if="showWrong" class="feedback-overlay wrong-overlay">
         <view class="feedback-content animate-pop-in">
-          <text class="feedback-text text-title text-bold text-white animate-shake">❌ 再想想</text>
+          <text class="feedback-text text-title text-bold text-white animate-shake">再想一想</text>
         </view>
       </view>
     </view>

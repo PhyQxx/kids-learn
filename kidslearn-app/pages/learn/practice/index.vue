@@ -1,7 +1,7 @@
 <template>
   <view class="practice-page">
     <view class="header">
-      <view class="back-btn" @click="goBack">⬅️ 返回</view>
+      <view class="back-btn" @click="goBack">返回</view>
       <text class="title">专项练习</text>
     </view>
 

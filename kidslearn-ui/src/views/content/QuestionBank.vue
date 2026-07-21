@@ -36,6 +36,9 @@
             <el-text size="small" type="warning">{{ batchAnalysisStatus }}</el-text>
             <el-button type="danger" size="small" @click="batchAnalysisCancelled = true">停止</el-button>
           </div>
+          <el-button type="info" @click="handleAiRateDifficulty" :loading="ratingDifficulty">
+            🎯 AI评分难度
+          </el-button>
           <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增题目</el-button>
         </div>
       </div>
@@ -87,6 +90,12 @@
         </template>
       </el-table-column>
       <el-table-column prop="score" label="分值" width="80" />
+      <el-table-column prop="difficulty" label="难度" width="100">
+        <template #default="{ row }">
+          <el-rate v-if="row.difficulty" :model-value="row.difficulty" disabled size="small" />
+          <el-tag v-else type="info" size="small">未评</el-tag>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="180">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDialog(row)">编辑</el-button>
@@ -283,6 +292,7 @@ import {
   saveQuestion,
   getSubjectList,
   getGradeLevelList,
+  aiRateDifficulty,
 } from '@/api/request'
 import {
   richContentSpeech,
@@ -302,6 +312,7 @@ const loading = ref(false)
 const saving = ref(false)
 const generatingAudio = ref(false)
 const batchGenerating = ref(false)
+const ratingDifficulty = ref(false)
 const batchProgress = ref(0)
 const batchDone = ref(0)
 const batchTotal = ref(0)
@@ -910,6 +921,46 @@ function collectCorrectAnswer() {
 
 function questionTypeLabel(type: number) {
   return ['', '选择题', '判断题', '填空题', '排序题', '连线题'][type] || '未知'
+}
+
+// AI 批量评分难度（循环调用直到全部完成）
+async function handleAiRateDifficulty() {
+  await ElMessageBox.confirm(
+    'AI 将对所有未评分的题目逐批评估难度（1-5星），每批50题。\n这个过程可能需要几分钟，确定开始？',
+    'AI 难度评分',
+    { type: 'info', confirmButtonText: '开始评分', cancelButtonText: '取消' }
+  )
+
+  ratingDifficulty.value = true
+  let totalRated = 0
+  try {
+    while (true) {
+      const res = await aiRateDifficulty(50)
+      if (res.code !== 200) {
+        ElMessage.error(res.msg || '评分失败')
+        break
+      }
+      const { rated, remaining } = res.data
+      totalRated += rated
+      ElMessage.success(`已评分 ${rated} 题，剩余 ${remaining} 题`)
+
+      if (remaining === 0 || rated === 0) {
+        break
+      }
+      // 短暂延迟，避免请求过快
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+    if (totalRated > 0) {
+      ElMessage.success(`难度评分完成！共评分 ${totalRated} 题`)
+      fetchData()
+    }
+  } catch (e: any) {
+    if (e?.message !== 'cancel') {
+      ElMessage.error(e?.message || '评分过程出错')
+    }
+  } finally {
+    ratingDifficulty.value = false
+  }
 }
 
 onMounted(() => {

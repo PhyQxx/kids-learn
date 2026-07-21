@@ -1,23 +1,8 @@
 <template>
   <view class="app-layout" :class="themeClass">
-    <!-- 侧边栏 -->
-    <view class="sidebar" :class="{ collapsed: collapsed }">
-      <!-- Logo区域 -->
-      <view class="sidebar-header">
-        <view class="hamburger" @tap="toggleSidebar">
-          <text class="hamburger-icon">{{ collapsed ? '☰' : '✕' }}</text>
-        </view>
-        <view v-show="!collapsed" class="brand">
-          <text class="brand-emoji">🌍</text>
-          <view class="brand-text">
-            <text class="brand-name">趣学星球</text>
-            <text class="brand-sub">{{ isParentMode ? 'Parent' : 'KidsLearn' }}</text>
-          </view>
-        </view>
-      </view>
-
-      <!-- 导航菜单 -->
-      <view class="sidebar-nav">
+    <view class="sidebar" :class="{ collapsed: collapsed, 'parent-sidebar': isParentMode }">
+      <image v-if="!isParentMode" class="nav-world-art" src="/static/redesign/nav-islands.png" mode="aspectFill" />
+      <view class="sidebar-nav" :class="{ 'student-world-nav': !isParentMode }">
         <view
           v-for="item in navItems"
           :key="item.key"
@@ -25,22 +10,7 @@
           :class="{ active: currentNavKey === item.key }"
           @tap="navigateTo(item)"
         >
-          <text class="nav-icon">{{ item.icon }}</text>
-          <text v-show="!collapsed" class="nav-label">{{ item.label }}</text>
-        </view>
-      </view>
-
-      <!-- 用户区域 -->
-      <view class="sidebar-footer">
-        <view class="sidebar-divider"></view>
-        <view class="user-area" @tap="navigateTo({ path: '/pages/mine/index' })">
-          <view class="user-avatar">
-            <text class="avatar-emoji">👦</text>
-          </view>
-          <view v-show="!collapsed" class="user-info">
-            <text class="user-name">{{ userStore.nickname }}</text>
-            <text class="user-level">Lv.{{ userStore.level }}</text>
-          </view>
+          <text class="nav-label">{{ item.label }}</text>
         </view>
       </view>
     </view>
@@ -51,7 +21,7 @@
       <view class="topbar" v-if="showTopbar">
         <view class="topbar-left">
           <view v-if="showBack" class="back-btn" @tap="goBack">
-            <text>←</text>
+            <text>返回</text>
           </view>
           <text v-if="title" class="topbar-title">{{ title }}</text>
           <slot name="topbar-left"></slot>
@@ -62,11 +32,9 @@
         </view>
         <view class="topbar-right">
           <view v-if="isParentMode" class="mode-switch-btn student-mode-btn" @tap="goStudentMode">
-            <text class="mode-switch-icon">🏠</text>
             <text class="mode-switch-text">学生模式</text>
           </view>
           <view v-else class="mode-switch-btn parent-mode-btn" @tap="goParentMode">
-            <text class="parent-mode-icon">🛡️</text>
             <text class="mode-switch-text">家长模式</text>
           </view>
           <slot name="topbar-right"></slot>
@@ -133,17 +101,17 @@ const currentNavKey = computed(() => {
 const isParentMode = computed(() => ['parent', 'vip'].includes(currentNavKey.value))
 
 const studentNavItems = [
-  { key: 'home', icon: '🏠', label: '首页', tab: 'home' },
-  { key: 'learn', icon: '📚', label: '学习中心', tab: 'learn' },
-  { key: 'pet', icon: '🐱', label: '我的宠物', tab: 'pet' },
-  { key: 'challenge', icon: '⚔️', label: 'PK挑战', path: '/pages/challenge/index' },
-  { key: 'ranking', icon: '🏆', label: '排行榜', tab: 'ranking' },
-  { key: 'achievement', icon: '🏅', label: '成就', tab: 'achievement' }
+  { key: 'home', label: '首页', tab: 'home' },
+  { key: 'learn', label: '学习中心', tab: 'learn' },
+  { key: 'pet', label: '我的宠物', tab: 'pet' },
+  { key: 'challenge', label: 'PK挑战', path: '/pages/challenge/index' },
+  { key: 'ranking', label: '排行榜', tab: 'ranking' },
+  { key: 'achievement', label: '成就', tab: 'achievement' }
 ]
 
 const parentNavItems = [
-  { key: 'parent', icon: '🛡️', label: '家长中心', path: '/pages/parent/index' },
-  { key: 'vip', icon: '👑', label: '会员中心', path: '/pages/mine/vip' }
+  { key: 'parent', label: '家长中心', path: '/pages/parent/index' },
+  { key: 'vip', label: '会员中心', path: '/pages/mine/vip' }
 ]
 
 // 导航项
@@ -500,14 +468,17 @@ function goStudentMode() {
 }
 
 .back-btn {
-  width: 48px;
+  min-width: 58px;
   height: 48px;
+  padding: 0 12px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: $radius;
   background: #F1F6FC;
-  font-size: 18px;
+  font-size: 13px;
+  font-weight: 800;
   cursor: pointer;
 
   &:active { transform: scale(0.9); }
@@ -622,5 +593,135 @@ function goStudentMode() {
   .mode-switch-btn { min-width: 44px; width: 44px; padding: 0; }
   .mode-switch-text { display: none; }
   .content-wrapper { padding: 14px 14px 18px; }
+}
+
+/* Planet Control Deck shell */
+@media (min-width: 641px) {
+  .app-layout {
+    background: #F6F8FC;
+  }
+
+  .sidebar,
+  .sidebar.collapsed {
+    position: relative;
+    width: 148px;
+    min-width: 148px;
+    background: #6FC9F4;
+    border-right: 1px solid rgba(63, 111, 229, 0.16);
+    box-shadow: 8px 0 28px rgba(41, 81, 140, 0.12);
+  }
+
+  .nav-world-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .sidebar-nav.student-world-nav {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    gap: 0;
+    padding: 6px 8px;
+    height: 100%;
+    box-sizing: border-box;
+  }
+
+  .student-world-nav .nav-item {
+    width: 100%;
+    min-height: 0;
+    padding: 0;
+    align-items: flex-end;
+    justify-content: center;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .student-world-nav .nav-item:hover,
+  .student-world-nav .nav-item:not(.active):hover {
+    background: transparent;
+  }
+
+  .theme-learn .student-world-nav .nav-item.active,
+  .theme-kids .student-world-nav .nav-item.active {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .student-world-nav .nav-label {
+    min-width: 86px;
+    min-height: 30px;
+    margin-bottom: 6px;
+    padding: 0 10px;
+    border-radius: 12px;
+    background: rgba(23, 67, 124, 0.88);
+    color: #FFFFFF;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    font-size: 12px;
+    font-weight: 800;
+    box-shadow: 0 7px 14px rgba(21, 65, 124, 0.22);
+  }
+
+  .student-world-nav .nav-item.active .nav-label {
+    background: #FF6B4A;
+    color: #FFFFFF;
+    box-shadow: 0 8px 18px rgba(255, 107, 74, 0.36);
+  }
+
+  .parent-sidebar .sidebar-nav {
+    padding-top: 22px;
+  }
+
+  .topbar {
+    height: 68px;
+    min-height: 68px;
+    padding: 0 20px;
+    background: rgba(255, 255, 255, 0.94);
+  }
+
+  .content-wrapper {
+    padding: 16px 18px 22px;
+    box-sizing: border-box;
+  }
+}
+
+/* iPad Pro / 大屏横板：给六座导航岛屿留出上下安全区。 */
+@media (min-width: 1200px) and (min-height: 900px) {
+  .sidebar,
+  .sidebar.collapsed {
+    width: 154px;
+    min-width: 154px;
+  }
+
+  .nav-world-art {
+    top: 14px;
+    bottom: 14px;
+    height: auto;
+  }
+
+  .sidebar-nav.student-world-nav {
+    padding: 18px 8px 20px;
+  }
+
+  .student-world-nav .nav-label {
+    min-height: 32px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+
+  .content-wrapper {
+    height: 100%;
+    padding: 18px 20px 24px;
+  }
+}
+
+@include respond-sm {
+  .nav-world-art { display: none; }
+  .student-world-nav .nav-item.active { background: #FFF0E8; }
 }
 </style>

@@ -10,6 +10,12 @@ import './styles/index.css'
 
 const app = createApp(App)
 
+// 全局错误处理
+app.config.errorHandler = (err, instance, info) => {
+  console.error('全局错误:', err, info)
+  // 可以在这里上报错误到监控系统
+}
+
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })

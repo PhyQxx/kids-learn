@@ -1,7 +1,7 @@
 <template>
   <view v-if="visible" class="gate-mask" @tap.stop>
     <view class="gate-dialog" @tap.stop>
-      <view class="gate-icon">🛡️</view>
+      <image class="gate-art" src="/static/redesign/rank-island.png" mode="aspectFill" />
       <text class="gate-title">验证家长密码</text>
       <text class="gate-desc">进入家长模式前需要确认当前账号密码</text>
       <input
@@ -118,6 +118,8 @@ defineExpose({ open })
   font-size: 26px;
   align-self: center;
 }
+
+.gate-art { width: 86px; height: 86px; align-self: center; border-radius: 22px; }
 
 .gate-title {
   color: $text;

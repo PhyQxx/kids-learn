@@ -4,14 +4,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kidslearn.api.dto.learn.*;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
+import com.kidslearn.api.entity.TimeControl;
 import com.kidslearn.api.realtime.RealtimeEventPublisher;
 import com.kidslearn.api.service.AchievementService;
 import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.LearnService;
 import com.kidslearn.api.service.PetService;
+import com.kidslearn.api.service.SubscriptionService;
 import com.kidslearn.common.exception.BusinessException;
 import com.kidslearn.common.util.RichContentUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LearnServiceImpl implements LearnService {
@@ -47,6 +51,8 @@ public class LearnServiceImpl implements LearnService {
     private final PetService petService;
     private final AiService aiService;
     private final PracticeModeMapper practiceModeMapper;
+    private final SubscriptionService subscriptionService;
+    private final TimeControlMapper timeControlMapper;
 
     @Override
     public DailyTaskVO getDailyTasks(Long userId) {
@@ -151,6 +157,18 @@ public class LearnServiceImpl implements LearnService {
             return List.of();
         }
 
+        // VIP权限控制：非VIP用户只能看免费视频
+        Map<String, Object> subscription = subscriptionService.getCurrentSubscription(userId);
+        boolean isVip = Boolean.TRUE.equals(subscription.get("active"));
+        if (!isVip) {
+            videos = videos.stream()
+                .filter(v -> v.getIsFree() != null && v.getIsFree() == 1)
+                .collect(Collectors.toList());
+            if (videos.isEmpty()) {
+                return List.of();
+            }
+        }
+
         List<Long> videoIds = videos.stream().map(CourseVideo::getId).collect(Collectors.toList());
         Map<Long, UserVideoProgress> progressByVideoId = userVideoProgressMapper.selectList(
             new LambdaQueryWrapper<UserVideoProgress>()
@@ -159,7 +177,14 @@ public class LearnServiceImpl implements LearnService {
         ).stream().collect(Collectors.toMap(UserVideoProgress::getVideoId, p -> p, (left, right) -> left));
 
         return videos.stream()
-            .map(video -> toVideoMap(video, progressByVideoId.get(video.getId())))
+            .map(video -> {
+                Map<String, Object> map = toVideoMap(video, progressByVideoId.get(video.getId()));
+                // 非VIP用户标记付费视频为锁定状态
+                if (!isVip && (video.getIsFree() == null || video.getIsFree() != 1)) {
+                    map.put("locked", true);
+                }
+                return map;
+            })
             .collect(Collectors.toList());
     }
 
@@ -335,14 +360,19 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public List<Map<String, Object>> getQuestions(Long userId, Long levelId) {
+        // 时间控制检查
+        checkTimeControl(userId);
+
         CourseLevel level = courseLevelMapper.selectById(levelId);
         if (level == null || level.getSubjectId() == null) {
             return List.of();
         }
 
         Long subjectId = level.getSubjectId();
-        int baseCount = level.getBaseQuestionCount() != null ? level.getBaseQuestionCount() : 8;
-        int advancedCount = level.getAdvancedQuestionCount() != null ? level.getAdvancedQuestionCount() : 2;
+        int levelNum = level.getLevelNum() != null ? level.getLevelNum() : 1;
+        int baseCount = level.getBaseQuestionCount() != null ? level.getBaseQuestionCount() : 12;
+        int advancedCount = level.getAdvancedQuestionCount() != null ? level.getAdvancedQuestionCount() : 3;
+        int totalCount = baseCount + advancedCount;
 
         Long userGradeLevelId = null;
         try {
@@ -358,40 +388,45 @@ public class LearnServiceImpl implements LearnService {
             // ignore
         }
 
+        // 查询用户最近答过的题目ID，避免短期内重复出题
+        Set<Long> recentQuestionIds = getRecentAnsweredQuestionIds(userId, subjectId, totalCount);
+
         Random random = new Random();
         List<Question> selectedQuestions = new ArrayList<>();
 
         if (userGradeLevelId != null) {
-            LambdaQueryWrapper<Question> baseWrapper = new LambdaQueryWrapper<Question>()
-                .eq(Question::getSubjectId, subjectId)
-                .eq(Question::getGradeLevelId, userGradeLevelId);
-            List<Question> baseQuestions = questionMapper.selectList(baseWrapper);
-            Collections.shuffle(baseQuestions, random);
-            int limit = Math.min(baseCount, baseQuestions.size());
-            for (int i = 0; i < limit; i++) {
-                selectedQuestions.add(baseQuestions.get(i));
-            }
+            // 基础题：从当前年级抽取，按关卡号哈希分桶保证不同关卡题目不重叠
+            List<Question> baseQuestions = questionMapper.selectList(
+                new LambdaQueryWrapper<Question>()
+                    .eq(Question::getSubjectId, subjectId)
+                    .eq(Question::getGradeLevelId, userGradeLevelId)
+            );
+            List<Question> basePool = pickByLevelSlot(baseQuestions, levelNum, baseCount, recentQuestionIds, random);
+            selectedQuestions.addAll(basePool);
 
+            // 高阶题：从下一年级抽取（同关卡分桶逻辑，但桶号偏移避免与基础题完全重合）
             Long nextGradeLevelId = userGradeLevelId + 1;
-            LambdaQueryWrapper<Question> advancedWrapper = new LambdaQueryWrapper<Question>()
-                .eq(Question::getSubjectId, subjectId)
-                .eq(Question::getGradeLevelId, nextGradeLevelId);
-            List<Question> advancedQuestions = questionMapper.selectList(advancedWrapper);
-            Collections.shuffle(advancedQuestions, random);
-            int advLimit = Math.min(advancedCount, advancedQuestions.size());
-            for (int i = 0; i < advLimit; i++) {
-                selectedQuestions.add(advancedQuestions.get(i));
-            }
+            List<Question> advancedQuestions = questionMapper.selectList(
+                new LambdaQueryWrapper<Question>()
+                    .eq(Question::getSubjectId, subjectId)
+                    .eq(Question::getGradeLevelId, nextGradeLevelId)
+            );
+            List<Question> advPool = pickByLevelSlot(advancedQuestions, levelNum, advancedCount, recentQuestionIds, random);
+            selectedQuestions.addAll(advPool);
         }
 
-        if (selectedQuestions.isEmpty()) {
-            LambdaQueryWrapper<Question> fallbackWrapper = new LambdaQueryWrapper<Question>()
-                .eq(Question::getSubjectId, subjectId)
-                .last("LIMIT 20");
-            List<Question> fallback = questionMapper.selectList(fallbackWrapper);
+        // 兜底：题库不足时从同学科任意年级补齐
+        if (selectedQuestions.size() < totalCount) {
+            int need = totalCount - selectedQuestions.size();
+            Set<Long> alreadyIds = selectedQuestions.stream().map(Question::getId).collect(Collectors.toSet());
+            List<Question> fallback = questionMapper.selectList(
+                new LambdaQueryWrapper<Question>()
+                    .eq(Question::getSubjectId, subjectId)
+                    .notIn(!alreadyIds.isEmpty(), Question::getId, alreadyIds)
+                    .last("LIMIT " + (need * 3))
+            );
             Collections.shuffle(fallback, random);
-            int fallbackLimit = Math.min(baseCount + advancedCount, fallback.size());
-            for (int i = 0; i < fallbackLimit; i++) {
+            for (int i = 0; i < Math.min(need, fallback.size()); i++) {
                 selectedQuestions.add(fallback.get(i));
             }
         }
@@ -1335,7 +1370,16 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public Map<String, Object> submitPracticeAnswer(Long userId, Long practiceSessionId, SubmitAnswerDTO dto) {
-        return submitAnswer(userId, dto);
+        // 专项练习答题，复用submitAnswer的核心逻辑
+        log.info("专项练习答题 - userId: {}, practiceSessionId: {}, questionId: {}", userId, practiceSessionId, dto.getQuestionId());
+        Map<String, Object> result = submitAnswer(userId, dto);
+
+        // 记录专项练习来源，便于后续统计分析
+        if (result.containsKey("correct") && !Boolean.TRUE.equals(result.get("correct"))) {
+            log.info("专项练习答错 - userId: {}, practiceSessionId: {}, questionId: {}", userId, practiceSessionId, dto.getQuestionId());
+        }
+
+        return result;
     }
 
     @Override
@@ -1386,5 +1430,182 @@ public class LearnServiceImpl implements LearnService {
         res.put("continuousCorrectCount", wt.getContinuousCorrectCount());
         res.put("masteryLevel", wt.getMasteryLevel());
         return res;
+    }
+
+    /**
+     * 按关卡号从题库中抽题，保证难度递进、题型均匀、题目不重复。
+     *
+     * 策略：
+     * 1. 关卡号映射到目标难度（第一关=难度1，第二关=难度2...，超过5循环）
+     * 2. 优先取目标难度的题目；不足时取相邻难度补齐
+     * 3. 各题型均匀分配
+     *
+     * @param allQuestions 该年级段的全部题目
+     * @param levelNum     关卡号（1=第一关）
+     * @param needCount    本关需要的题目数
+     * @param recentIds    最近答过的题目ID（优先排除）
+     * @param random       随机源
+     */
+    private List<Question> pickByLevelSlot(List<Question> allQuestions, int levelNum, int needCount,
+                                           Set<Long> recentIds, Random random) {
+        if (allQuestions.isEmpty() || needCount <= 0) {
+            return new ArrayList<>();
+        }
+
+        // 关卡号映射到难度（1-5循环）
+        int targetDifficulty = ((levelNum - 1) % 5) + 1;
+
+        // 按难度分组
+        Map<Integer, List<Question>> byDifficulty = new HashMap<>();
+        for (Question q : allQuestions) {
+            int diff = q.getDifficulty() != null ? q.getDifficulty() : 3; // 未评分的默认中等
+            byDifficulty.computeIfAbsent(diff, k -> new ArrayList<>()).add(q);
+        }
+
+        // 优先取目标难度，不足时按距离取相邻难度
+        List<Integer> difficultyOrder = new ArrayList<>();
+        difficultyOrder.add(targetDifficulty);
+        for (int offset = 1; offset <= 4; offset++) {
+            if (targetDifficulty - offset >= 1) difficultyOrder.add(targetDifficulty - offset);
+            if (targetDifficulty + offset <= 5) difficultyOrder.add(targetDifficulty + offset);
+        }
+
+        List<Question> pool = new ArrayList<>();
+        for (int diff : difficultyOrder) {
+            List<Question> diffQuestions = byDifficulty.get(diff);
+            if (diffQuestions != null && !diffQuestions.isEmpty()) {
+                // 每种难度取一部分，保证题型均匀
+                Map<Integer, List<Question>> byType = diffQuestions.stream()
+                    .collect(Collectors.groupingBy(q -> q.getQuestionType() != null ? q.getQuestionType() : 1));
+
+                for (List<Question> typeQuestions : byType.values()) {
+                    List<Question> fresh = typeQuestions.stream()
+                        .filter(q -> !recentIds.contains(q.getId()))
+                        .collect(Collectors.toList());
+                    List<Question> used = typeQuestions.stream()
+                        .filter(q -> recentIds.contains(q.getId()))
+                        .collect(Collectors.toList());
+                    Collections.shuffle(fresh, random);
+                    Collections.shuffle(used, random);
+                    pool.addAll(fresh);
+                    pool.addAll(used);
+                }
+            }
+            // 够了就停
+            if (pool.size() >= needCount * 2) break;
+        }
+
+        // 去重（同一题可能在不同难度组出现）
+        Set<Long> seen = new HashSet<>();
+        pool = pool.stream()
+            .filter(q -> seen.add(q.getId()))
+            .collect(Collectors.toList());
+
+        // 题库不足时，从全部题目补齐
+        if (pool.size() < needCount) {
+            Set<Long> existIds = pool.stream().map(Question::getId).collect(Collectors.toSet());
+            List<Question> shuffled = new ArrayList<>(allQuestions);
+            Collections.shuffle(shuffled, random);
+            for (Question q : shuffled) {
+                if (pool.size() >= needCount) break;
+                if (!existIds.contains(q.getId())) {
+                    pool.add(q);
+                    existIds.add(q.getId());
+                }
+            }
+        }
+
+        List<Question> result = new ArrayList<>();
+        for (int i = 0; i < Math.min(needCount, pool.size()); i++) {
+            result.add(pool.get(i));
+        }
+        return result;
+    }
+
+    /**
+     * 获取用户最近答过的题目ID（用于避免短期内重复出题）
+     */
+    private Set<Long> getRecentAnsweredQuestionIds(Long userId, Long subjectId, int avoidCount) {
+        Set<Long> recentIds = new java.util.HashSet<>();
+        try {
+            // 从错题本获取用户最近接触的题目（按 lastWrongTime 倒序）
+            List<WrongTopic> recentWrong = wrongTopicMapper.selectList(
+                new LambdaQueryWrapper<WrongTopic>()
+                    .eq(WrongTopic::getUserId, userId)
+                    .orderByDesc(WrongTopic::getLastWrongTime)
+                    .last("LIMIT " + (avoidCount * 2))
+            );
+            for (WrongTopic wt : recentWrong) {
+                if (wt.getQuestionId() != null) {
+                    recentIds.add(wt.getQuestionId());
+                }
+            }
+        } catch (Exception e) {
+            log.warn("获取最近答题记录失败: {}", e.getMessage());
+        }
+        return recentIds;
+    }
+
+    /**
+     * 检查用户是否超过每日学习时间限制
+     * @throws BusinessException 如果超过限制
+     */
+    private void checkTimeControl(Long userId) {
+        TimeControl tc = timeControlMapper.selectOne(
+            new LambdaQueryWrapper<TimeControl>()
+                .eq(TimeControl::getChildUserId, userId)
+                .last("LIMIT 1")
+        );
+        if (tc == null || tc.getIsEnabled() == null || tc.getIsEnabled() != 1) {
+            return; // 未配置或未启用时间控制
+        }
+
+        // 检查禁止时段（forbiddenStart ~ forbiddenEnd 期间不允许学习）
+        if (tc.getForbiddenStart() != null && tc.getForbiddenEnd() != null) {
+            java.time.LocalTime now = java.time.LocalTime.now();
+            java.time.LocalTime start = tc.getForbiddenStart();
+            java.time.LocalTime end = tc.getForbiddenEnd();
+
+            boolean inForbiddenRange;
+            if (start.isBefore(end)) {
+                // 正常时段，如 22:00 - 23:00
+                inForbiddenRange = !now.isBefore(start) && !now.isAfter(end);
+            } else {
+                // 跨天时段，如 22:00 - 06:00
+                inForbiddenRange = !now.isBefore(start) || !now.isAfter(end);
+            }
+            if (inForbiddenRange) {
+                throw new BusinessException("当前为禁止学习时段（" + start + " - " + end + "），休息一下吧");
+            }
+        }
+
+        // 检查每日时长上限
+        if (tc.getDailyLimit() == null || tc.getDailyLimit() <= 0) {
+            return; // 未设置时长限制
+        }
+
+        // 统计今日已学习时长（秒），使用 answerTime 字段
+        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
+        List<LearningRecord> todayRecords = learningRecordMapper.selectList(
+            new LambdaQueryWrapper<LearningRecord>()
+                .eq(LearningRecord::getUserId, userId)
+                .ge(LearningRecord::getCreateTime, todayStart)
+                .select(LearningRecord::getAnswerTime)
+        );
+
+        long totalSeconds = todayRecords.stream()
+            .mapToLong(r -> r.getAnswerTime() != null ? r.getAnswerTime() : 0)
+            .sum();
+        int usedMinutes = (int) (totalSeconds / 60);
+
+        if (usedMinutes >= tc.getDailyLimit()) {
+            int remaining = 0;
+            throw new BusinessException("今日学习已达 " + usedMinutes + " 分钟，已超上限（" + tc.getDailyLimit() + " 分钟），明天再来吧");
+        }
+
+        // 距离上限不足5分钟时提醒（不拦截）
+        if (usedMinutes >= tc.getDailyLimit() - 5) {
+            log.info("用户{}今日学习已达{}分钟，距上限{}分钟不足5分钟", userId, usedMinutes, tc.getDailyLimit());
+        }
     }
 }

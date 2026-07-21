@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -65,6 +66,13 @@ public class AdminContentController {
     @Operation(summary = "删除学科")
     @DeleteMapping("/subject/{id}")
     public R<Void> subjectDelete(@PathVariable Long id) {
+        // 检查是否有关联的关卡
+        Long levelCount = courseLevelMapper.selectCount(
+            new LambdaQueryWrapper<CourseLevel>().eq(CourseLevel::getSubjectId, id)
+        );
+        if (levelCount > 0) {
+            return R.fail("该学科下还有 " + levelCount + " 个关卡，请先删除关卡");
+        }
         subjectMapper.deleteById(id);
         adminOperationLogService.write("content", "delete", "subject", id, "delete subject");
         return R.ok();
@@ -76,7 +84,7 @@ public class AdminContentController {
     @GetMapping("/level/list")
     public R<PageResult<CourseLevel>> levelList(
             @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "20") Integer pageSize,
+            @RequestParam(defaultValue = "50") Integer pageSize,
             @RequestParam(required = false) Long subjectId) {
         LambdaQueryWrapper<CourseLevel> wrapper = new LambdaQueryWrapper<CourseLevel>()
             .eq(subjectId != null, CourseLevel::getSubjectId, subjectId)
@@ -238,6 +246,87 @@ public class AdminContentController {
         String size = safe(body.get("size"));
         String imageUrl = aiService.generateImage(prompt, size.isBlank() ? null : size);
         return R.ok(Map.of("imageUrl", imageUrl));
+    }
+
+    @Operation(summary = "AI批量评分题目难度")
+    @PostMapping("/question/ai-rate-difficulty")
+    public R<Map<String, Object>> aiRateDifficulty(@RequestParam(defaultValue = "50") Integer batchSize) {
+        if (!aiService.isAvailable()) {
+            return R.fail("AI服务不可用，请先在AI配置中设置有效的API Key");
+        }
+
+        // 查询待评分题目（difficulty 为空或0）
+        List<Question> pending = questionMapper.selectList(
+            new LambdaQueryWrapper<Question>()
+                .and(w -> w.isNull(Question::getDifficulty).or().eq(Question::getDifficulty, 0))
+                .last("LIMIT " + batchSize)
+        );
+
+        if (pending.isEmpty()) {
+            return R.ok(Map.of("message", "没有待评分的题目", "rated", 0, "remaining", 0));
+        }
+
+        // 题型映射
+        Map<Integer, String> typeNames = Map.of(1, "选择题", 2, "判断题", 3, "填空题", 4, "排序题", 5, "连线题");
+
+        // 构建题目列表
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < pending.size(); i++) {
+            Question q = pending.get(i);
+            String text = com.kidslearn.common.util.RichContentUtil.toPlainText(q.getQuestionContent());
+            if (text.length() > 150) text = text.substring(0, 150);
+            String typeName = typeNames.getOrDefault(q.getQuestionType(), "未知");
+            sb.append(i + 1).append(". [").append(typeName).append("] ").append(text).append("\n");
+        }
+
+        String prompt = "你是一位资深的儿童教育专家，请为以下题目评估难度（1-5分）。\n\n" +
+            "难度标准（针对3-12岁儿童）：\n" +
+            "- 1分（很简单）：基础认知，如认字、数数、简单配对\n" +
+            "- 2分（简单）：直接记忆，如拼音、简单加减、词语搭配\n" +
+            "- 3分（中等）：需要理解，如阅读理解、应用题、逻辑推理入门\n" +
+            "- 4分（较难）：需要分析，如多步推理、综合应用、抽象概念\n" +
+            "- 5分（挑战）：需要创造，如开放性问题、复杂逻辑、跨知识点\n\n" +
+            "题目列表：\n" + sb + "\n" +
+            "请只返回JSON数组，格式为 [{\"index\":1,\"difficulty\":2}, ...]，index从1开始。不要其他文字。";
+
+        try {
+            String response = aiService.chatCompletion(List.of(
+                Map.of("role", "user", "content", prompt)
+            ), 2000, 0.3);
+
+            // 解析JSON
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            // 提取JSON数组
+            String json = response.replaceAll("(?s).*?(\\[.*\\]).*", "$1").trim();
+            List<Map<String, Object>> result = mapper.readValue(json,
+                mapper.getTypeFactory().constructCollectionType(List.class, Map.class));
+
+            int rated = 0;
+            for (Map<String, Object> item : result) {
+                int idx = ((Number) item.get("index")).intValue();
+                int difficulty = ((Number) item.get("difficulty")).intValue();
+                if (idx >= 1 && idx <= pending.size() && difficulty >= 1 && difficulty <= 5) {
+                    Question q = pending.get(idx - 1);
+                    q.setDifficulty(difficulty);
+                    questionMapper.updateById(q);
+                    rated++;
+                }
+            }
+
+            // 统计剩余
+            Long remaining = questionMapper.selectCount(
+                new LambdaQueryWrapper<Question>()
+                    .and(w -> w.isNull(Question::getDifficulty).or().eq(Question::getDifficulty, 0))
+            );
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("rated", rated);
+            data.put("total", pending.size());
+            data.put("remaining", remaining);
+            return R.ok(data);
+        } catch (Exception e) {
+            return R.fail("AI评分失败: " + e.getMessage());
+        }
     }
 
     private static String safe(Object value) {

@@ -14,5 +14,11 @@ public interface AuthService {
 
     void verifyPassword(Long userId, String password);
 
-    void logout(Long userId);
+    void logout(Long userId, String currentToken);
+
+    /**
+     * 发送手机验证码
+     * @param phone 手机号
+     */
+    void sendVerifyCode(String phone);
 }

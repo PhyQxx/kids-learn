@@ -4,7 +4,6 @@
       <!-- 概览 -->
       <view class="summary-card">
         <view class="summary-info">
-          <text class="summary-emoji">🎭</text>
           <view>
             <text class="text-lg text-bold text-white">贴纸册</text>
             <text class="text-sm text-white" style="opacity: 0.8;">已收集 {{ ownedCount }}/{{ totalCount }} 张</text>
@@ -31,8 +30,8 @@
           :class="{ owned: sticker.owned }"
           @tap="sticker.owned && previewSticker(sticker)"
         >
-          <text class="sticker-emoji">{{ sticker.owned ? sticker.icon : '❓' }}</text>
-          <text class="text-xs">{{ sticker.owned ? sticker.name : '???' }}</text>
+          <text class="sticker-index">{{ sticker.owned ? String(sticker.id).padStart(2, '0') : '--' }}</text>
+          <text class="text-xs">{{ sticker.owned ? sticker.name : '待收集' }}</text>
           <view v-if="sticker.owned && sticker.rarity === 'legendary'" class="legendary-glow"></view>
         </view>
       </view>
@@ -92,7 +91,7 @@ const currentStickers = computed(() => {
 })
 
 function previewSticker(sticker) {
-  uni.showToast({ title: `${sticker.icon} ${sticker.name}`, icon: 'none' })
+  uni.showToast({ title: sticker.name, icon: 'none' })
 }
 
 onMounted(async () => {
@@ -102,7 +101,7 @@ onMounted(async () => {
       allStickers.value = res.map(s => ({
         id: s.id,
         name: s.stickerName || s.name,
-        icon: s.iconUrl || s.icon || '🎭',
+        icon: s.iconUrl || s.icon || '',
         owned: s.owned || s.status === 'OWNED',
         category: s.seriesCode || s.category || 'animals',
         rarity: s.rarity || 'common'
@@ -168,6 +167,7 @@ onMounted(async () => {
 }
 
 .sticker-emoji { font-size: 36px; }
+.sticker-index { color: #5F3BB8; font-size: 22px; font-weight: 900; letter-spacing: 1px; }
 
 .legendary-glow {
   position: absolute;

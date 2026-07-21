@@ -7,7 +7,7 @@
     <view class="sticker-inner">
       <text class="sticker-emoji">{{ emoji }}</text>
       <view v-if="collected" class="collected-badge">
-        <text class="check-icon">✓</text>
+        <text class="check-icon">已收集</text>
       </view>
       <view v-if="!collected && locked" class="locked-overlay">
         <text class="lock-icon">🔒</text>

@@ -5,7 +5,7 @@
       <view class="popup-header">
         <text class="popup-title">选择年级</text>
         <view class="close-btn" @tap="onCloseTap">
-          <text>✕</text>
+          <text>关闭</text>
         </view>
       </view>
 
@@ -21,10 +21,10 @@
           :class="{ selected: selectedGrade === grade.value }"
           @tap="selectGrade(grade.value)"
         >
-          <text class="grade-emoji">{{ grade.icon }}</text>
+          <text class="grade-emoji">{{ grade.value }}</text>
           <text class="grade-label">{{ grade.label }}</text>
           <view v-if="selectedGrade === grade.value" class="check-badge">
-            <text>✓</text>
+            <text>已选</text>
           </view>
         </view>
       </view>
