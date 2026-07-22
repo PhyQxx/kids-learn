@@ -3,9 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   getOnboardingPayload,
-  normalizePetOptions,
-  normalizeQuestionOptions,
-  wasAnswerCorrect
+  normalizePetOptions
 } from '../utils/onboardingData.mjs'
 
 test('normalizes available pets when request layer already unwraps data', () => {
@@ -37,12 +35,5 @@ test('returns empty pet options for unexpected response shapes', () => {
 test('unwraps onboarding payloads from direct and enveloped responses', () => {
   assert.deepEqual(getOnboardingPayload({ id: 1, petName: '星小猫' }), { id: 1, petName: '星小猫' })
   assert.deepEqual(getOnboardingPayload({ code: 200, data: { id: 1, petName: '星小猫' } }), { id: 1, petName: '星小猫' })
-})
-
-test('normalizes assessment questions and answer correctness', () => {
-  assert.deepEqual(normalizeQuestionOptions({ code: 200, data: [{ id: 7 }] }), [{ id: 7 }])
-  assert.deepEqual(normalizeQuestionOptions([{ id: 8 }]), [{ id: 8 }])
-  assert.equal(wasAnswerCorrect({ correct: true }), true)
-  assert.equal(wasAnswerCorrect({ code: 200, data: { correct: true } }), true)
 })
 

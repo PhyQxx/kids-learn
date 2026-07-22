@@ -2,7 +2,7 @@
   <view class="onboarding-page">
     <!-- 步骤指示器 -->
     <view class="step-indicator">
-      <view v-for="s in 3" :key="s" class="step-dot" :class="{ active: step >= s, current: step === s }" />
+      <view v-for="s in 2" :key="s" class="step-dot" :class="{ active: step >= s, current: step === s }" />
     </view>
 
     <!-- Step 1: 选择宠物 -->
@@ -23,45 +23,8 @@
       </view>
     </view>
 
-    <!-- Step 2: 测评答题 -->
+    <!-- Step 2: 功能导览 -->
     <view v-if="step === 2" class="step-content animate-fade-in">
-      <text class="step-title">快速小测试</text>
-      <text class="step-desc">回答 {{ assessmentTotal }} 道题，帮你找到合适的学习起点</text>
-
-      <view v-if="!quizStarted" class="quiz-intro">
-        <text class="quiz-intro-text">测试约需 2 分钟，答错也没关系哦～</text>
-        <view class="btn-next" @tap="startQuiz">
-          <text class="text-white text-md">开始测试</text>
-        </view>
-      </view>
-
-      <view v-else class="quiz-area">
-        <view class="quiz-progress">
-          <view class="quiz-progress-bar">
-            <view class="quiz-progress-fill" :style="{ width: quizProgress + '%' }" />
-          </view>
-          <text class="text-sm text-light">{{ currentIndex + 1 }} / {{ assessmentTotal }}</text>
-        </view>
-
-        <view v-if="currentQuestion" class="question-card">
-          <text class="question-text">{{ currentQuestion.questionText }}</text>
-          <view class="option-list">
-            <view v-for="opt in currentQuestion.options" :key="opt.optionLabel"
-              class="option-item" :class="{ chosen: chosenLabel === opt.optionLabel }"
-              @tap="chooseAnswer(opt)">
-              <text class="option-label">{{ opt.optionLabel }}</text>
-              <text class="option-text">{{ opt.optionText }}</text>
-            </view>
-          </view>
-          <view v-if="chosenAnswer" class="btn-next" @tap="submitQuizAnswer">
-            <text class="text-white text-md">{{ isLastQuestion ? '完成测试' : '下一题' }}</text>
-          </view>
-        </view>
-      </view>
-    </view>
-
-    <!-- Step 3: 功能导览 -->
-    <view v-if="step === 3" class="step-content animate-fade-in">
       <text class="step-title animate-bounce-in">准备就绪</text>
       <view class="tour-cards">
         <view class="tour-card animate-slide-left">
@@ -88,17 +51,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { getAvailablePets, selectPet, updateOnboardingStep } from '@/api/pet'
-import { getAssessmentQuestions, submitAnswer } from '@/api/learn'
 import { useUserStore } from '@/store/user'
 import { usePetStore } from '@/store/pet'
 import { getUserInfo } from '@/api/user'
 import {
   getOnboardingPayload,
-  normalizePetOptions,
-  normalizeQuestionOptions,
-  wasAnswerCorrect
+  normalizePetOptions
 } from '@/utils/onboardingData.mjs'
 
 const userStore = useUserStore()
@@ -110,18 +70,6 @@ const step = ref(1)
 const pets = ref([])
 const selectedPetId = ref(null)
 
-// Step 2: Assessment quiz
-const quizStarted = ref(false)
-const questions = ref([])
-const currentIndex = ref(0)
-const chosenAnswer = ref('')
-const chosenLabel = ref('')
-const correctCount = ref(0)
-const assessmentTotal = ref(10)
-
-const currentQuestion = computed(() => questions.value[currentIndex.value] || null)
-const isLastQuestion = computed(() => currentIndex.value >= questions.value.length - 1)
-const quizProgress = computed(() => questions.value.length ? ((currentIndex.value + 1) / questions.value.length) * 100 : 0)
 const isImageSrc = value => typeof value === 'string' && /^(https?:|data:|\/static\/)/.test(value)
 
 onMounted(async () => {
@@ -137,52 +85,11 @@ async function confirmPet() {
     const petInfo = getOnboardingPayload(res)
     if (petInfo) {
       petStore.setPetInfo(petInfo)
-      await updateOnboardingStep(1)
+      await updateOnboardingStep(2)
       step.value = 2
     }
   } finally {
     uni.hideLoading()
-  }
-}
-
-async function startQuiz() {
-  uni.showLoading({ title: '准备题目...' })
-  try {
-    const res = await getAssessmentQuestions()
-    questions.value = normalizeQuestionOptions(res)
-    assessmentTotal.value = questions.value.length
-    quizStarted.value = true
-  } finally {
-    uni.hideLoading()
-  }
-}
-
-function chooseAnswer(opt) {
-  chosenLabel.value = opt.optionLabel
-  chosenAnswer.value = opt.answerValue || opt.optionLabel
-}
-
-async function submitQuizAnswer() {
-  if (!chosenAnswer.value) return
-  const q = currentQuestion.value
-  try {
-    const res = await submitAnswer({
-      questionId: q.id,
-      answer: chosenAnswer.value,
-      timeTaken: 0
-    })
-    if (wasAnswerCorrect(res)) {
-      correctCount.value++
-    }
-  } catch (_) { /* ignore errors in assessment */ }
-
-  chosenAnswer.value = ''
-  chosenLabel.value = ''
-  if (isLastQuestion.value) {
-    await updateOnboardingStep(2)
-    step.value = 3
-  } else {
-    currentIndex.value++
   }
 }
 
@@ -298,95 +205,6 @@ async function finishOnboarding() {
   padding: 16px 64px;
   font-size: 18px;
 }
-
-// Quiz
-.quiz-intro {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-}
-.quiz-intro-text { font-size: 16px; color: $text-secondary; }
-
-.quiz-area {
-  flex: 1;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.quiz-progress {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.quiz-progress-bar {
-  flex: 1;
-  height: 8px;
-  background: #EEE;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.quiz-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, $primary, $primary-light);
-  border-radius: 4px;
-  transition: width 0.3s;
-}
-
-.question-card {
-  background: $white;
-  border-radius: $radius-xl;
-  padding: 24px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.06);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.question-text {
-  font-size: 18px;
-  font-weight: 600;
-  color: $text;
-  margin-bottom: 16px;
-  line-height: 1.5;
-}
-.option-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex: 1;
-}
-.option-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-radius: $radius;
-  background: #F8F8FA;
-  border: 2px solid transparent;
-  transition: all 0.2s;
-  cursor: pointer;
-  &.chosen {
-    border-color: $primary;
-    background: rgba($primary, 0.06);
-  }
-}
-.option-label {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: $primary;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-.option-text { font-size: 15px; color: $text; }
 
 // Tour
 .tour-cards {

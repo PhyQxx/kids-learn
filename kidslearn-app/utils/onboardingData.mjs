@@ -9,13 +9,3 @@ export function normalizePetOptions(response) {
   const payload = getOnboardingPayload(response)
   return Array.isArray(payload) ? payload : []
 }
-
-export function normalizeQuestionOptions(response) {
-  const payload = getOnboardingPayload(response)
-  return Array.isArray(payload) ? payload : []
-}
-
-export function wasAnswerCorrect(response) {
-  return !!getOnboardingPayload(response)?.correct
-}
-
