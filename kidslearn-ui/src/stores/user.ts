@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('admin_token') || '')
+  // access token 过期时间戳（毫秒）。与后端 TOKEN_EXPIRE 对齐，0 表示未知。
+  const tokenExpireAt = ref(Number(localStorage.getItem('admin_token_expire') || 0))
   const userInfo = ref<any>(null)
 
   // 从userInfo中获取权限列表
@@ -14,9 +16,26 @@ export const useUserStore = defineStore('user', () => {
     return userInfo.value?.userType === 3 || userInfo.value?.isAdmin === true
   })
 
-  function setToken(val: string) {
+  function setToken(val: string, expireAt?: number) {
     token.value = val
     localStorage.setItem('admin_token', val)
+    // 未传入过期时间时，按后端默认有效期（7200s）估算，留 10s 余量
+    const expire = expireAt ?? (Date.now() + (7200 - 10) * 1000)
+    tokenExpireAt.value = expire
+    localStorage.setItem('admin_token_expire', String(expire))
+  }
+
+  /**
+   * 统一写入 token 对（登录/刷新成功后调用）
+   * @param accessToken 新 access token
+   * @param refreshToken 新 refresh token（可选，滑动续期时仅换 access）
+   * @param expireAt 过期时间戳（毫秒），不传则按默认有效期估算
+   */
+  function setTokens(accessToken: string, refreshToken?: string, expireAt?: number) {
+    setToken(accessToken, expireAt)
+    if (refreshToken) {
+      localStorage.setItem('admin_refresh_token', refreshToken)
+    }
   }
 
   function setUserInfo(info: any) {
@@ -26,7 +45,9 @@ export const useUserStore = defineStore('user', () => {
   function logout() {
     token.value = ''
     userInfo.value = null
+    tokenExpireAt.value = 0
     localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_token_expire')
     localStorage.removeItem('admin_refresh_token')
   }
 
@@ -62,8 +83,8 @@ export const useUserStore = defineStore('user', () => {
   }
 
   return {
-    token, userInfo, permissions, isAdmin,
-    setToken, setUserInfo, logout,
+    token, tokenExpireAt, userInfo, permissions, isAdmin,
+    setToken, setTokens, setUserInfo, logout,
     hasPermission, hasAnyPermission
   }
 })

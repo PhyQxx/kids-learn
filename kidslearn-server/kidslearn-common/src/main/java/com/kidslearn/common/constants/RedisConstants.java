@@ -22,4 +22,10 @@ public class RedisConstants {
     public static final long TOKEN_EXPIRE = 7200;
     /** 刷新Token过期时间（秒） */
     public static final long REFRESH_TOKEN_EXPIRE = 604800;
+    /** 滑动续期阈值：access token 剩余有效期（秒）小于此值时，拦截器签发新 token 下发到响应头 */
+    public static final long TOKEN_REFRESH_THRESHOLD = 1800;
+    /** 滑动续期节流前缀：SET NX EX 防止同一 token 在窗口期内被重复续期 */
+    public static final String TOKEN_REFRESH_LOCK = PREFIX + "tokens:refresh-lock:";
+    /** 滑动续期节流窗口（秒）：同一 access token 在该时间内只续期一次 */
+    public static final long TOKEN_REFRESH_LOCK_SECONDS = 60;
 }

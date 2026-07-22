@@ -6,6 +6,7 @@ import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
+import { initTokenSync } from '@/utils/request'
 import './styles/index.css'
 
 const app = createApp(App)
@@ -24,5 +25,9 @@ app.use(ElementPlus, { locale: zhCn })
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
+
+// 启动 token 无感续期：注册跨标签页同步监听，并在已登录时启动主动刷新定时器。
+// 必须在 pinia 装载之后、app.mount 之前调用（依赖 useUserStore）。
+initTokenSync()
 
 app.mount('#app')

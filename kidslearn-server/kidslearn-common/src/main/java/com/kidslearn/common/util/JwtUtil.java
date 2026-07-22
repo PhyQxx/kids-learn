@@ -83,4 +83,27 @@ public class JwtUtil {
             return true;
         }
     }
+
+    /**
+     * 获取Token过期时间（解析失败返回null）
+     */
+    public static Date getExpiration(String token) {
+        try {
+            return parseToken(token).getExpiration();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 获取Token剩余有效时间（秒）。解析失败或已过期返回 0。
+     */
+    public static long getRemainingSeconds(String token) {
+        Date expiration = getExpiration(token);
+        if (expiration == null) {
+            return 0;
+        }
+        long remainingMs = expiration.getTime() - System.currentTimeMillis();
+        return remainingMs > 0 ? remainingMs / 1000 : 0;
+    }
 }

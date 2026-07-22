@@ -36,6 +36,8 @@ export type LoginPayload = {
 export type TokenPayload = {
   accessToken: string
   refreshToken: string
+  /** access token 有效期（秒），由后端 TokenVO.expiresIn 返回 */
+  expiresIn?: number
   userInfo?: Record<string, unknown>
 }
 
