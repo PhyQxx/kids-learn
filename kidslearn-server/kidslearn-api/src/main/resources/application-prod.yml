@@ -19,3 +19,22 @@ logging:
   level:
     com.kidslearn: info
     com.baomidou.mybatisplus: warn
+
+kidslearn:
+  payment:
+    enabled: false
+    allowed-channels: ""
+  sms:
+    gateway-url: ${SMS_GATEWAY_URL:}
+    gateway-token: ${SMS_GATEWAY_TOKEN:}
+    pepper: ${SMS_CODE_PEPPER:}
+    expires-minutes: 5
+    resend-seconds: 60
+    daily-limit: 10
+    ip-hourly-limit: 20
+    max-attempts: 5
+    lock-minutes: 30
+
+payment:
+  callback:
+    secret: ${PAYMENT_CALLBACK_SECRET:}

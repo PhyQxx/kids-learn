@@ -65,6 +65,8 @@ export default async function checkUpdate(options = {}) {
     }
 
     const isForceUpdate = updateInfo.forceUpdate === 1
+    // 兼容历史数据：无 packageType 时按下载地址后缀推断
+    const packageType = updateInfo.packageType || inferPackageType(updateInfo.downloadUrl)
     uni.showModal({
       title: '发现新版本 v' + updateInfo.versionName,
       content: updateInfo.updateLog || '发现新版本，是否立即更新？',
@@ -72,7 +74,7 @@ export default async function checkUpdate(options = {}) {
       confirmText: '立即更新',
       success: (result) => {
         if (result.confirm) {
-          downloadAndUpdate(updateInfo.downloadUrl, onDownloadStart, onProgress, onDownloadComplete)
+          downloadAndUpdate(updateInfo.downloadUrl, packageType, onDownloadStart, onProgress, onDownloadComplete)
         } else if (result.cancel && isForceUpdate) {
           plus.runtime.quit()
         }
@@ -99,9 +101,22 @@ export default async function checkUpdate(options = {}) {
 }
 
 /**
- * 下载并安装更新包
+ * 根据下载地址后缀推断包类型（兼容历史无 packageType 的版本记录）
  */
-function downloadAndUpdate(url, onDownloadStart, onProgress, onDownloadComplete) {
+function inferPackageType(url) {
+  if (!url) return 'wgt'
+  const lower = url.split('?')[0].toLowerCase()
+  if (lower.endsWith('.apk')) return 'apk'
+  if (lower.endsWith('.ipa')) return 'ipa'
+  return 'wgt'
+}
+
+/**
+ * 下载并安装更新包
+ * @param {string} url - 下载地址
+ * @param {string} packageType - 包类型 wgt/apk/ipa
+ */
+function downloadAndUpdate(url, packageType, onDownloadStart, onProgress, onDownloadComplete) {
   if (!url) {
     uni.showToast({ icon: 'none', title: '下载地址为空' })
     return
@@ -117,7 +132,7 @@ function downloadAndUpdate(url, onDownloadStart, onProgress, onDownloadComplete)
   const downloadTask = plus.downloader.createDownload(url, {}, (d, status) => {
     if (status === 200) {
       console.log('下载更新成功：' + d.filename)
-      installUpdate(d.filename)
+      installUpdate(d.filename, packageType)
       if (onDownloadComplete) {
         onDownloadComplete()
       } else {
@@ -148,20 +163,34 @@ function downloadAndUpdate(url, onDownloadStart, onProgress, onDownloadComplete)
 }
 
 /**
- * 安装更新包（WGT和APK通用）
+ * 安装更新包
+ * - wgt：plus.runtime.install 覆盖资源后重启生效（热更新）
+ * - apk/ipa：调起系统安装器（整包更新）
  */
-function installUpdate(path) {
+function installUpdate(path, packageType) {
   // #ifdef APP-PLUS
-  plus.nativeUI.showWaiting('安装更新中...')
-  plus.runtime.install(path, { force: true }, () => {
-    plus.nativeUI.closeWaiting()
-    console.log('安装更新成功！')
-    plus.nativeUI.alert('更新完成！', () => {
-      plus.runtime.restart()
+  // wgt 资源包：直接安装并重启
+  if (packageType !== 'apk' && packageType !== 'ipa') {
+    plus.nativeUI.showWaiting('安装更新中...')
+    plus.runtime.install(path, { force: true }, () => {
+      plus.nativeUI.closeWaiting()
+      console.log('安装更新成功！')
+      plus.nativeUI.alert('更新完成！', () => {
+        plus.runtime.restart()
+      })
+    }, (e) => {
+      plus.nativeUI.closeWaiting()
+      console.log('安装更新失败！[' + e.code + ']：' + e.message)
+      uni.showToast({ icon: 'none', title: '安装失败：' + e.message })
     })
+    return
+  }
+
+  // apk/ipa 整包：通过系统安装器打开
+  plus.runtime.install(path, { force: true }, () => {
+    console.log('整包下载完成，调起系统安装器')
   }, (e) => {
-    plus.nativeUI.closeWaiting()
-    console.log('安装更新失败！[' + e.code + ']：' + e.message)
+    console.log('整包安装失败！[' + e.code + ']：' + e.message)
     uni.showToast({ icon: 'none', title: '安装失败：' + e.message })
   })
   // #endif

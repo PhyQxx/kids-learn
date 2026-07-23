@@ -239,6 +239,7 @@ export function deleteDecoration(id: number) { return del(`/admin/decoration/${i
 
 // ==================== 成就管理 ====================
 export function getAchievementList(params: PageQuery) { return get<PageResult<AdminRecord>>('/admin/achievement/list', params) }
+export function getAchievementDetail(id: number) { return get<AdminRecord>(`/admin/achievement/${id}/detail`) }
 export function saveAchievement(data: AdminRecord) { return post<void>('/admin/achievement/save', data) }
 export function deleteAchievement(id: number) { return del(`/admin/achievement/${id}`) }
 

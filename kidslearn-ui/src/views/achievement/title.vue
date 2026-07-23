@@ -8,6 +8,14 @@
     </template>
     <div ref="tableBox">
     <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
+      <el-table-column label="图标" width="70">
+        <template #default="{ row }">
+          <div class="thumb-cell" @click="previewImage(row.titleIcon)">
+            <img v-if="isImageUrl(row.titleIcon)" :src="row.titleIcon" class="thumb-img" />
+            <span v-else class="thumb-emoji">{{ row.titleIcon || '👑' }}</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column prop="titleCode" label="称号代码" />
       <el-table-column prop="titleName" label="称号名称" />
       <el-table-column prop="titleColor" label="颜色" width="100">
@@ -38,11 +46,29 @@
         <el-form-item label="称号代码"><el-input v-model="form.titleCode" /></el-form-item>
         <el-form-item label="称号名称"><el-input v-model="form.titleName" /></el-form-item>
         <el-form-item label="展示颜色"><el-color-picker v-model="form.titleColor" /></el-form-item>
-        <el-form-item label="图标URL"><el-input v-model="form.titleIcon" /></el-form-item>
+        <el-form-item label="图标">
+          <ImageInput v-model="form.titleIcon" hint="称号图标" />
+        </el-form-item>
         <el-form-item label="获取方式">
           <el-select v-model="form.obtainType"><el-option label="成就解锁" :value="1" /><el-option label="活动奖励" :value="2" /><el-option label="手动发放" :value="3" /></el-select>
         </el-form-item>
+        <el-form-item label="关联成就">
+          <el-select v-model="form.relatedAchieveId" clearable filterable placeholder="选择成就（成就解锁方式用）" style="width:100%">
+            <el-option v-for="a in achievementList" :key="a.id" :label="a.achieveName" :value="a.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="限时"><el-switch v-model="form.isTimed" :active-value="1" :inactive-value="0" /></el-form-item>
+        <el-form-item v-if="form.isTimed === 1" label="有效时间">
+          <el-date-picker
+            v-model="validRange"
+            type="datetimerange"
+            range-separator="至"
+            start-placeholder="开始时间"
+            end-placeholder="结束时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width:100%"
+          />
+        </el-form-item>
         <el-form-item label="状态"><el-switch v-model="form.status" :active-value="1" :inactive-value="0" /></el-form-item>
       </el-form>
       <template #footer>
@@ -54,12 +80,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTitleList, saveTitle, deleteTitle } from '@/api/request'
+import { getTitleList, saveTitle, deleteTitle, getAchievementList } from '@/api/request'
 import { useTableHeight } from '@/composables/useTableHeight'
+import ImageInput from '@/components/ImageInput.vue'
 
 const { tableBox, tableMaxHeight } = useTableHeight()
+
+const URL_RE = /^(https?:|data:|\/\/|\/static\/)/
+function isImageUrl(value?: string) {
+  return !!value && URL_RE.test(value)
+}
+function previewImage(src?: string) {
+  if (!isImageUrl(src)) return
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer'
+  overlay.onclick = () => document.body.removeChild(overlay)
+  const img = document.createElement('img')
+  img.src = src!
+  img.style.cssText = 'max-width:90%;max-height:90%;object-fit:contain;border-radius:8px'
+  img.onerror = () => document.body.removeChild(overlay)
+  overlay.appendChild(img)
+  document.body.appendChild(overlay)
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -69,10 +113,28 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
+const achievementList = ref<any[]>([])
 
 const form = reactive({
   titleCode: '', titleName: '', titleColor: '#FF6B6B', titleIcon: '',
-  obtainType: 1, isTimed: 0, status: 1
+  obtainType: 1, relatedAchieveId: null as number | null,
+  isTimed: 0, validStart: '' as string, validEnd: '' as string, status: 1
+})
+
+// 有效时间双向绑定（拆分/合并 validStart 与 validEnd）
+const validRange = computed<[string, string] | null>({
+  get() {
+    return form.validStart && form.validEnd ? [form.validStart, form.validEnd] : null
+  },
+  set(val) {
+    if (val && val.length === 2) {
+      form.validStart = val[0]
+      form.validEnd = val[1]
+    } else {
+      form.validStart = ''
+      form.validEnd = ''
+    }
+  }
 })
 
 async function fetchData() {
@@ -83,9 +145,25 @@ async function fetchData() {
   } finally { loading.value = false }
 }
 
+async function fetchAchievements() {
+  try {
+    const res = await getAchievementList({ page: 1, pageSize: 200 })
+    if (res.code === 200) achievementList.value = res.data.list
+  } catch { /* ignore */ }
+}
+
 function openDialog(row?: any) {
-  if (row) { editingId.value = row.id; Object.assign(form, row) }
-  else { editingId.value = null; Object.assign(form, { titleCode: '', titleName: '', titleColor: '#FF6B6B', titleIcon: '', obtainType: 1, isTimed: 0, status: 1 }) }
+  if (row) {
+    editingId.value = row.id
+    Object.assign(form, {
+      titleCode: '', titleName: '', titleColor: '#FF6B6B', titleIcon: '',
+      obtainType: 1, relatedAchieveId: null, isTimed: 0, validStart: '', validEnd: '', status: 1,
+      ...row
+    })
+  } else {
+    editingId.value = null
+    Object.assign(form, { titleCode: '', titleName: '', titleColor: '#FF6B6B', titleIcon: '', obtainType: 1, relatedAchieveId: null, isTimed: 0, validStart: '', validEnd: '', status: 1 })
+  }
   dialogVisible.value = true
 }
 
@@ -104,5 +182,36 @@ async function handleDelete(id: number) {
   if (res.code === 200) { ElMessage.success('删除成功'); fetchData() }
 }
 
-onMounted(() => fetchData())
+onMounted(() => { fetchAchievements(); fetchData() })
 </script>
+
+<style scoped>
+.thumb-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: #f7f8fa;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.thumb-cell:hover {
+  transform: scale(1.05);
+  transition: transform 0.2s;
+}
+
+.thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.thumb-emoji {
+  font-size: 24px;
+  line-height: 1;
+}
+</style>

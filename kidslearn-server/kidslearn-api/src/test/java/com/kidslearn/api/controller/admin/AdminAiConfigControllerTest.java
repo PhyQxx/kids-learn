@@ -12,6 +12,7 @@ import com.kidslearn.api.entity.AppConfig;
 import com.kidslearn.api.mapper.AppConfigMapper;
 import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.impl.AdminOperationLogService;
+import com.kidslearn.api.service.impl.QuestionAudioProperties;
 import com.kidslearn.common.result.R;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,8 @@ class AdminAiConfigControllerTest {
         AdminAiConfigController controller = new AdminAiConfigController(
             mapper,
             mock(AdminOperationLogService.class),
-            mock(AiService.class)
+            mock(AiService.class),
+            mock(QuestionAudioProperties.class)
         );
 
         R<AdminAiConfigController.AiConfigResponse> result = controller.detail();
@@ -40,7 +42,8 @@ class AdminAiConfigControllerTest {
         assertEquals(200, result.getCode());
         assertEquals("deepseek", result.getData().getProvider());
         assertEquals(18, result.getData().getTimeout());
-        AdminAiConfigController.ProviderConfig deepseek = result.getData().getProviders().stream()
+        AdminAiConfigController.ProviderConfig deepseek = result.getData().getCategories().stream()
+            .flatMap(category -> category.getProviders().stream())
             .filter(item -> "deepseek".equals(item.getProvider()))
             .findFirst()
             .orElseThrow();
@@ -59,7 +62,8 @@ class AdminAiConfigControllerTest {
         ));
         AdminOperationLogService logService = mock(AdminOperationLogService.class);
         AiService aiService = mock(AiService.class);
-        AdminAiConfigController controller = new AdminAiConfigController(mapper, logService, aiService);
+        AdminAiConfigController controller = new AdminAiConfigController(
+            mapper, logService, aiService, mock(QuestionAudioProperties.class));
         AdminAiConfigController.AiConfigRequest request = new AdminAiConfigController.AiConfigRequest();
         request.setProvider("openai");
         request.setTimeout(30);
@@ -83,7 +87,7 @@ class AdminAiConfigControllerTest {
             .anyMatch(item -> "ai.openai.base_url".equals(item.getConfigKey()) && "https://api.openai.com".equals(item.getConfigValue())));
         assertTrue(insertCaptor.getAllValues().stream()
             .anyMatch(item -> "ai.openai.model".equals(item.getConfigKey()) && "gpt-4o-mini".equals(item.getConfigValue())));
-        verify(logService).write("ai-config", "save", "app-config", null, "provider=openai");
+        verify(logService).write("ai-config", "save", "app-config", null, "saved");
         verify(aiService).clearCache();
     }
 
@@ -97,7 +101,8 @@ class AdminAiConfigControllerTest {
         AdminAiConfigController controller = new AdminAiConfigController(
             mapper,
             mock(AdminOperationLogService.class),
-            mock(AiService.class)
+            mock(AiService.class),
+            mock(QuestionAudioProperties.class)
         );
         AdminAiConfigController.AiConfigRequest request = new AdminAiConfigController.AiConfigRequest();
         request.setProvider("deepseek");

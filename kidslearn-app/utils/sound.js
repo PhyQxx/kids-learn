@@ -24,7 +24,13 @@ class SoundManager {
    * @param {string} name 音效名称 (tap, success, fail, etc.)
    */
   play(name) {
-    if (!this.enabled || !this.sounds[name]) return
+    let enabled = this.enabled
+    try {
+      const raw = uni.getStorageSync('kidslearn_settings')
+      const settings = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (settings && settings.soundEnabled === false) enabled = false
+    } catch {}
+    if (!enabled || !this.sounds[name]) return
 
     try {
       // 在 UniApp 中使用 InnerAudioContext

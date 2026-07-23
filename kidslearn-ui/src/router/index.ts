@@ -41,7 +41,7 @@ const routes: RouteRecordRaw[] = [
         path: 'pet/list',
         name: 'PetList',
         component: () => import('@/views/pet/list.vue'),
-        meta: { title: '宠物管理' },
+        meta: { title: '宠物种类' },
       },
       {
         path: 'pet/item',
@@ -59,7 +59,7 @@ const routes: RouteRecordRaw[] = [
         path: 'achievement/list',
         name: 'AchievementList',
         component: () => import('@/views/achievement/list.vue'),
-        meta: { title: '成就管理' },
+        meta: { title: '成就定义' },
       },
       {
         path: 'achievement/sticker',

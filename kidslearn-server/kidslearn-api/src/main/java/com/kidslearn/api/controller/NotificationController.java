@@ -53,4 +53,20 @@ public class NotificationController {
         notificationService.markAllAsRead(userId);
         return R.ok();
     }
+
+    @Operation(summary = "获取账号通知偏好")
+    @GetMapping("/preferences")
+    public R<Map<String, Map<String, Boolean>>> preferences(HttpServletRequest request) {
+        return R.ok(notificationService.getPreferences((Long) request.getAttribute("userId")));
+    }
+
+    @Operation(summary = "保存账号通知偏好")
+    @PutMapping("/preferences/{type}")
+    public R<Void> preference(HttpServletRequest request, @PathVariable String type, @RequestBody Map<String, Object> body) {
+        Boolean inApp = body.get("inAppEnabled") instanceof Boolean b ? b : null;
+        Boolean push = body.get("pushEnabled") instanceof Boolean b ? b : null;
+        String pin = body.get("parentPin") instanceof String s ? s : null;
+        notificationService.updatePreference((Long) request.getAttribute("userId"), type, inApp, push, pin);
+        return R.ok();
+    }
 }

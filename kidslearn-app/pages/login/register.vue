@@ -67,6 +67,16 @@
           <input class="input" v-model="password" placeholder="请设置密码（6位以上）" placeholder-class="input-placeholder" type="password" />
         </view>
 
+        <view class="form-group">
+          <text class="text-sm text-bold">家长PIN</text>
+          <input class="input" v-model="parentPin" placeholder="设置6位数字，仅家长使用" placeholder-class="input-placeholder" type="number" maxlength="6" password />
+        </view>
+
+        <view class="consent-row" @tap="guardianConsent = !guardianConsent">
+          <text>{{ guardianConsent ? '☑' : '☐' }}</text>
+          <text class="text-xs text-light">监护人已阅读并同意《用户协议》和《隐私政策》</text>
+        </view>
+
         <view class="btn btn-primary btn-lg btn-block" @tap="doRegister">
           <text class="text-white text-md">注册</text>
         </view>
@@ -95,7 +105,9 @@ const nickname = ref('')
 const phone = ref('')
 const code = ref('')
 const password = ref('')
+const parentPin = ref('')
 const username = ref('')
+const guardianConsent = ref(false)
 const selectedGrade = ref(4)
 const codeSent = ref(false)
 const countdown = ref(60)
@@ -156,6 +168,8 @@ async function doRegister() {
   if (!phone.value) { errorMsg.value = '请输入手机号'; return }
   if (!code.value) { errorMsg.value = '请输入验证码'; return }
   if (!password.value || password.value.length < 6) { errorMsg.value = '密码至少6位'; return }
+  if (!/^\d{6}$/.test(parentPin.value)) { errorMsg.value = '请设置6位数字家长PIN'; return }
+  if (!guardianConsent.value) { errorMsg.value = '请由监护人阅读并同意用户协议和隐私政策'; return }
 
   errorMsg.value = ''
   try {
@@ -164,6 +178,10 @@ async function doRegister() {
       password: password.value,
       nickname: nickname.value,
       phone: phone.value,
+      verifyCode: code.value,
+      verifyPurpose: 'REGISTER',
+      guardianConsent: guardianConsent.value,
+      parentPin: parentPin.value,
       gradeLevel: selectedGrade.value
     }, { 
       showLoading: '星球注册中...', 

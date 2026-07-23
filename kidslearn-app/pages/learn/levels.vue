@@ -96,7 +96,10 @@ async function loadLevels() {
           units.value = groupedUnits
         }
       }
-    } catch (e) { console.log('使用模拟数据') }
+    } catch (e) {
+      units.value = []
+      uni.showToast({ title: '关卡加载失败，请稍后重试', icon: 'none' })
+    }
   }
 }
 

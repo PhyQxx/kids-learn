@@ -27,7 +27,7 @@
                 <text class="text-xs">{{ getMasteryText(item.masteryLevel) }}</text>
               </view>
             </view>
-            <text class="text-xs text-light">已做对 {{ item.continuousCorrectCount || 0 }}/3 次</text>
+            <text class="text-xs text-light">复习阶段 {{ item.continuousCorrectCount || 0 }}/5</text>
           </view>
 
           <rich-text class="wrong-question text-sm" :nodes="item.questionNodes" />
@@ -38,12 +38,14 @@
           <view class="answer-row correct-answer">
             <text class="text-xs">正确答案：{{ item.correctAnswer }}</text>
           </view>
+          <text v-if="item.nextReviewDate" class="text-xs text-light">下次复习：{{ item.nextReviewDate }}</text>
 
           <view class="card-actions">
             <tn-button type="primary" size="sm" shape="round" @click="retryOne(item)">重做消灭错题</tn-button>
             <tn-button size="sm" shape="round" @click="loadExplanation(item)" style="background: #F0F7FF; color: #4A90D9; border: 1px solid #D0E3F7; margin-left: 8px;">
               {{ item.explanationLoading ? '思考中...' : (item.aiExplanation ? '收起讲解' : 'AI讲解') }}
             </tn-button>
+            <tn-button size="sm" shape="round" @click="feedback(item)" style="margin-left: 8px;">题目纠错</tn-button>
           </view>
 
           <view v-if="item.analysisText && !item.aiExplanation" class="analysis-section">
@@ -66,7 +68,7 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
-import { getWrongTopics, getExplainWrong, getSmartReviewQuiz } from '@/api/learn'
+import { getWrongTopics, getExplainWrong, getSmartReviewQuiz, submitQuestionFeedback } from '@/api/learn'
 import { richContentToNodes, richContentToText } from '@/utils/richContent.mjs'
 
 const activeTab = ref(0)
@@ -110,6 +112,7 @@ async function loadWrongTopics() {
           id: w.id,
           questionId: w.questionId,
           subject: w.subjectName || '未知',
+          subjectId: w.subjectId || null,
           question: w.questionText || richContentToText(questionContent),
           questionNodes: richContentToNodes(questionContent),
           analysisText: w.analysisText || '',
@@ -117,6 +120,7 @@ async function loadWrongTopics() {
           correctAnswer: w.correctAnswer || '',
           masteryLevel: w.masteryLevel || 0,
           continuousCorrectCount: w.continuousCorrectCount || 0,
+          nextReviewDate: w.nextReviewDate || '',
           time: '',
           bg: sc.bg,
           color: sc.color,
@@ -132,16 +136,24 @@ async function loadWrongTopics() {
 }
 
 function getMasteryText(level) {
-  if (level === 2) return '已掌握'
-  if (level === 1) return '练习中'
+  if (level >= 5) return '已掌握'
+  if (level >= 1) return '巩固中'
   return '未掌握'
 }
 
-function startSmartReview() {
-  uni.showToast({ title: '智能生成复习卷中...', icon: 'none' })
-  setTimeout(() => {
-    uni.navigateTo({ url: '/pages/learn/adaptive' })
-  }, 1000)
+async function startSmartReview() {
+  try {
+    const subject = tabItems.value[activeTab.value]?.label
+    const subjectItem = wrongList.value.find(item => subject === '全部' || item.subject === subject)
+    const res = await getSmartReviewQuiz(subject === '全部' ? undefined : subjectItem?.subjectId, 15)
+    if (!res?.questionIds?.length) {
+      uni.showToast({ title: '今天没有到期复习任务', icon: 'none' })
+      return
+    }
+    uni.navigateTo({ url: '/pages/learn/adaptive?review=due' })
+  } catch (e) {
+    uni.showToast({ title: e.message || '复习计划加载失败', icon: 'none' })
+  }
 }
 
 function retryOne(item) {
@@ -177,6 +189,19 @@ async function loadExplanation(item) {
   } finally {
     item.explanationLoading = false
   }
+}
+
+function feedback(item) {
+  uni.showModal({
+    title: '题目纠错', content: '', editable: true, placeholderText: '请描述题干、答案或媒体问题',
+    success: async ({ confirm, content }) => {
+      if (!confirm) return
+      try {
+        await submitQuestionFeedback({ questionId: item.questionId, feedbackType: 'OTHER', content })
+        uni.showToast({ title: '反馈已提交', icon: 'success' })
+      } catch (e) { uni.showToast({ title: e.message || '提交失败', icon: 'none' }) }
+    }
+  })
 }
 </script>
 

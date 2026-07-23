@@ -35,7 +35,8 @@ class ChallengeServiceImplTest {
             courseLevelMapper,
             friendMapper,
             leaderboardMapper,
-            userMapper
+            userMapper,
+            mock(LearningAccessService.class)
         );
 
         Challenge challenge = new Challenge();

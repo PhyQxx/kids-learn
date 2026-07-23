@@ -50,6 +50,7 @@ class OrderServiceImplTest {
         order.setProductId(1L);
         order.setPayStatus(0);
         when(orderMapper.selectOne(any())).thenReturn(order);
+        when(orderMapper.updateById(any())).thenReturn(1);
         when(subscriptionService.activateSubscription(7L, 1)).thenReturn(Map.of("status", 1));
 
         Map<String, Object> result = service.handlePaymentCallback("ORD123", 1);

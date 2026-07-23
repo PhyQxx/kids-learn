@@ -8,13 +8,32 @@ function getTodayMinutes(report) {
 }
 
 export async function ensureLearningAccess({
+  fetchAccessStatus,
   fetchTimeControl,
   fetchReport,
   showBlockedMessage,
   now = new Date()
 } = {}) {
+  if (typeof fetchAccessStatus === 'function') {
+    try {
+      const status = await fetchAccessStatus()
+      if (status?.allowed === false) {
+        if (typeof showBlockedMessage === 'function') {
+          showBlockedMessage(status.message || '当前暂时不能开始学习')
+        }
+        return false
+      }
+      return status?.allowed === true
+    } catch (error) {
+      if (typeof showBlockedMessage === 'function') {
+        showBlockedMessage('暂时无法验证家长时间设置，请检查网络后重试')
+      }
+      return false
+    }
+  }
+
   if (typeof fetchTimeControl !== 'function' || typeof fetchReport !== 'function') {
-    return true
+    return false
   }
 
   try {
@@ -36,6 +55,9 @@ export async function ensureLearningAccess({
     }
     return true
   } catch (error) {
-    return true
+    if (typeof showBlockedMessage === 'function') {
+      showBlockedMessage('暂时无法验证家长时间设置，请检查网络后重试')
+    }
+    return false
   }
 }

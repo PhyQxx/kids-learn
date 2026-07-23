@@ -11,4 +11,7 @@ public class ParentProfile extends BaseEntity {
     private String realName;
     private String phone;
     private String relationship;
+    private String parentPinHash;
+    private String consentVersion;
+    private java.time.LocalDateTime consentTime;
 }

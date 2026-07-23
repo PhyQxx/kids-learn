@@ -15,6 +15,8 @@ public interface LearnService {
 
     DailyTaskVO getDailyTasks(Long userId);
 
+    Map<String, Object> getAccessStatus(Long userId);
+
     List<Map<String, Object>> getSubjects(Long userId, Long gradeLevelId);
 
     List<Map<String, Object>> getLevels(Long userId, Long subjectId);
@@ -83,6 +85,7 @@ public interface LearnService {
      * @return 智能复习组卷信息
      */
     SmartReviewQuizVO getSmartReviewQuiz(Long userId, Long subjectId, Integer questionCount);
+    List<Map<String, Object>> getDueReviewQuestions(Long userId, Long subjectId, Integer questionCount);
 
     /**
      * 更新错题掌握度

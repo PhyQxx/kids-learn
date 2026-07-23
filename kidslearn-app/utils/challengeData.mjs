@@ -96,5 +96,7 @@ function clampPercent(value) {
 
 function normalizeChallengeType(type) {
   const upper = String(type || 'RANKED').trim().toUpperCase()
-  return upper === 'FRIEND' || upper === 'FRIENDS' ? 'FRIEND' : 'RANKED'
+  if (upper === 'FRIEND' || upper === 'FRIENDS') return 'FRIEND'
+  if (upper === 'TIMED' || upper === 'COMPREHENSIVE') return upper
+  return 'RANKED'
 }

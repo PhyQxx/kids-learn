@@ -127,6 +127,16 @@ public class AdminGameController {
         return R.ok(new PageResult<>(p.getRecords(), p.getTotal(), page, pageSize));
     }
 
+    @Operation(summary = "成就详情（含分级 tiers，用于编辑回显）")
+    @GetMapping("/achievement/{id}/detail")
+    public R<Map<String, Object>> achievementDetail(@PathVariable Long id) {
+        Achievement achievement = achievementMapper.selectById(id);
+        List<AchievementTier> tiers = achievementTierMapper.selectList(
+            new LambdaQueryWrapper<AchievementTier>().eq(AchievementTier::getAchieveId, id)
+                .orderByAsc(AchievementTier::getTierLevel));
+        return R.ok(Map.of("achievement", achievement, "tiers", tiers));
+    }
+
     @PostMapping("/achievement/save")
     public R<Void> achievementSave(@RequestBody Map<String, Object> body) {
         Achievement achievement = new Achievement();

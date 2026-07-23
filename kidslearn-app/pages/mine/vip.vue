@@ -29,7 +29,7 @@
             :loading="loadingPlanType === plan.planType"
             @click="buyPlan(plan)"
           >
-            开通
+            {{ paymentsEnabled ? '开通' : '筹备中' }}
           </tn-button>
         </view>
       </view>
@@ -69,7 +69,9 @@ import { normalizeVipPlans, vipStatusText } from '@/utils/vipPlans.mjs'
 const plans = ref([])
 const currentSubscription = ref(null)
 const loadingPlanType = ref(null)
-const payChannel = import.meta.env.VITE_PAY_CHANNEL || 'wechat'
+const payChannel = (import.meta.env.VITE_PAY_CHANNEL || '').toLowerCase()
+const paymentsEnabled = import.meta.env.VITE_ENABLE_PAYMENT === 'true'
+  && ['wechat', 'alipay', 'apple'].includes(payChannel)
 
 const currentVipText = computed(() => vipStatusText(currentSubscription.value))
 
@@ -85,7 +87,7 @@ const features = [
 ]
 
 const faqs = [
-  { q: 'VIP可以退款吗？', a: '购买后7天内可以申请退款。' },
+  { q: '什么时候可以购买？', a: '会员购买功能正在筹备，开放后会在页面内通知。' },
   { q: '多设备可以使用吗？', a: 'VIP支持同一账号下的多台设备。' },
   { q: '到期后数据会丢失吗？', a: '学习数据永久保留，VIP内容将不可访问。' }
 ]
@@ -106,6 +108,10 @@ async function loadVipData() {
 
 async function buyPlan(plan) {
   if (!plan?.planType || loadingPlanType.value) return
+  if (!paymentsEnabled) {
+    uni.showToast({ title: '会员购买功能筹备中', icon: 'none' })
+    return
+  }
   loadingPlanType.value = plan.planType
   try {
     const order = await createOrder(plan.planType, payChannel)

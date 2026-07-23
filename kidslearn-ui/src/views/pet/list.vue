@@ -8,6 +8,14 @@
     </template>
     <div ref="tableBox">
     <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
+      <el-table-column label="形象" width="80">
+        <template #default="{ row }">
+          <div class="thumb-cell" @click="previewImage(row.baseImageUrl)">
+            <img v-if="isImageUrl(row.baseImageUrl)" :src="row.baseImageUrl" class="thumb-img" />
+            <span v-else class="thumb-emoji">{{ row.baseImageUrl || '-' }}</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column prop="petCode" label="宠物代码" />
       <el-table-column prop="petName" label="宠物名称" />
       <el-table-column prop="petType" label="类型" width="80">
@@ -40,7 +48,9 @@
         <el-form-item label="类型">
           <el-select v-model="form.petType"><el-option label="动物" :value="1" /><el-option label="植物" :value="2" /><el-option label="幻想" :value="3" /></el-select>
         </el-form-item>
-        <el-form-item label="形象URL"><el-input v-model="form.baseImageUrl" /></el-form-item>
+        <el-form-item label="形象">
+          <ImageInput v-model="form.baseImageUrl" hint="宠物基础形象" />
+        </el-form-item>
         <el-form-item label="进化等级"><el-input v-model="form.evolveLevels" placeholder="如 3,5,7,9" /></el-form-item>
         <el-form-item label="解锁价格"><el-input-number v-model="form.unlockCost" :min="0" /></el-form-item>
         <el-form-item label="默认宠物"><el-switch v-model="form.isDefault" :active-value="1" :inactive-value="0" /></el-form-item>
@@ -56,7 +66,14 @@
     <el-dialog v-model="evoDialogVisible" title="进化配置" width="600">
       <el-table :data="evolutions" stripe>
         <el-table-column prop="evolveLevel" label="进化等级" width="100" />
-        <el-table-column prop="imageUrl" label="形象URL" show-overflow-tooltip />
+        <el-table-column label="进化形象" width="90">
+          <template #default="{ row }">
+            <div class="thumb-cell" @click="previewImage(row.imageUrl)">
+              <img v-if="isImageUrl(row.imageUrl)" :src="row.imageUrl" class="thumb-img" />
+              <span v-else class="thumb-emoji">{{ row.imageUrl || '-' }}</span>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" />
         <el-table-column label="操作" width="120">
           <template #default="{ row }">
@@ -67,9 +84,14 @@
       </el-table>
       <el-button style="margin-top:12px" @click="openEvoDialog()">+ 添加进化阶段</el-button>
       <el-dialog v-model="evoFormVisible" :title="evoEditingId ? '编辑进化' : '新增进化'" width="400" append-to-body>
-        <el-form :model="evoForm" label-width="80px">
+        <el-form :model="evoForm" label-width="90px">
           <el-form-item label="进化等级"><el-input-number v-model="evoForm.evolveLevel" :min="1" :max="10" /></el-form-item>
-          <el-form-item label="形象URL"><el-input v-model="evoForm.imageUrl" /></el-form-item>
+          <el-form-item label="进化形象">
+            <ImageInput v-model="evoForm.imageUrl" hint="宠物进化后形象" />
+          </el-form-item>
+          <el-form-item label="特效图">
+            <ImageInput v-model="evoForm.effectUrl" hint="宠物进化特效图" />
+          </el-form-item>
           <el-form-item label="描述"><el-input v-model="evoForm.description" /></el-form-item>
         </el-form>
         <template #footer>
@@ -86,8 +108,26 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPetList, savePet, deletePet, getPetEvolutions, savePetEvolution, deletePetEvolution } from '@/api/request'
 import { useTableHeight } from '@/composables/useTableHeight'
+import ImageInput from '@/components/ImageInput.vue'
 
 const { tableBox, tableMaxHeight } = useTableHeight()
+
+const URL_RE = /^(https?:|data:|\/\/|\/static\/)/
+function isImageUrl(value?: string) {
+  return !!value && URL_RE.test(value)
+}
+function previewImage(src?: string) {
+  if (!isImageUrl(src)) return
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer'
+  overlay.onclick = () => document.body.removeChild(overlay)
+  const img = document.createElement('img')
+  img.src = src!
+  img.style.cssText = 'max-width:90%;max-height:90%;object-fit:contain;border-radius:8px'
+  img.onerror = () => document.body.removeChild(overlay)
+  overlay.appendChild(img)
+  document.body.appendChild(overlay)
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -107,7 +147,7 @@ const form = reactive({
   petCode: '', petName: '', petType: 1, baseImageUrl: '', evolveLevels: '3,5,7,9',
   unlockCost: 0, isDefault: 0, status: 1
 })
-const evoForm = reactive({ evolveLevel: 3, imageUrl: '', description: '' })
+const evoForm = reactive({ evolveLevel: 3, imageUrl: '', effectUrl: '', description: '' })
 
 async function fetchData() {
   loading.value = true
@@ -147,7 +187,7 @@ async function openEvolution(row: any) {
 
 function openEvoDialog(row?: any) {
   if (row) { evoEditingId.value = row.id; Object.assign(evoForm, row) }
-  else { evoEditingId.value = null; Object.assign(evoForm, { evolveLevel: 3, imageUrl: '', description: '' }) }
+  else { evoEditingId.value = null; Object.assign(evoForm, { evolveLevel: 3, imageUrl: '', effectUrl: '', description: '' }) }
   evoFormVisible.value = true
 }
 
@@ -167,3 +207,35 @@ async function handleDeleteEvo(id: number) {
 
 onMounted(() => fetchData())
 </script>
+
+<style scoped>
+.thumb-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: #f7f8fa;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.thumb-cell:hover {
+  transform: scale(1.05);
+  transition: transform 0.2s;
+}
+
+.thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.thumb-emoji {
+  font-size: 28px;
+  line-height: 1;
+  color: #c0c4cc;
+}
+</style>

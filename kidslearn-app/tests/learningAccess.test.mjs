@@ -31,15 +31,23 @@ test('shows a blocking message when parent time control denies learning', async 
   assert.match(modalMessage, /30/)
 })
 
-test('does not block learning when parent APIs are unavailable', async () => {
+test('blocks new learning when parent APIs are unavailable', async () => {
+  let modalMessage = ''
   const allowed = await ensureLearningAccess({
     fetchTimeControl: async () => { throw new Error('offline') },
     fetchReport: async () => ({ today: { learnMinutes: 30 } }),
-    showBlockedMessage: () => {
-      throw new Error('should not show modal')
-    },
+    showBlockedMessage: message => { modalMessage = message },
     now: '2026-05-24T10:00:00+08:00'
   })
 
-  assert.equal(allowed, true)
+  assert.equal(allowed, false)
+  assert.match(modalMessage, /无法验证/)
+})
+
+test('uses authoritative server access status when available', async () => {
+  const allowed = await ensureLearningAccess({
+    fetchAccessStatus: async () => ({ allowed: false, message: '今日学习已达到 30 分钟上限' }),
+    showBlockedMessage: () => {}
+  })
+  assert.equal(allowed, false)
 })

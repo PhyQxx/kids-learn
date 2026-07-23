@@ -45,7 +45,7 @@ public class FriendServiceImpl implements FriendService {
         List<FriendVO> result = new ArrayList<>();
         for (Friend f : friends) {
             User u = userMap.get(f.getFriendId());
-            if (u != null) {
+            if (u != null && !Integer.valueOf(0).equals(u.getStatus())) {
                 FriendVO vo = new FriendVO();
                 vo.setFriendId(u.getId());
                 vo.setNickname(u.getNickname());
@@ -78,7 +78,7 @@ public class FriendServiceImpl implements FriendService {
         List<FriendRequestVO> result = new ArrayList<>();
         for (Friend r : requests) {
             User u = userMap.get(r.getUserId());
-            if (u != null) {
+            if (u != null && !Integer.valueOf(0).equals(u.getStatus())) {
                 FriendRequestVO vo = new FriendRequestVO();
                 vo.setRequestId(r.getId());
                 vo.setUserId(u.getId());
@@ -100,7 +100,7 @@ public class FriendServiceImpl implements FriendService {
         }
 
         User targetUser = userMapper.selectById(friendId);
-        if (targetUser == null) {
+        if (targetUser == null || Integer.valueOf(0).equals(targetUser.getStatus())) {
             throw new BusinessException("用户不存在");
         }
 

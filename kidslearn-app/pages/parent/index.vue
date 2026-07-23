@@ -50,16 +50,37 @@
           <text class="panel-title">时间管控</text>
           <button class="save-btn" :disabled="saving" @tap="saveControl">{{ saving ? '保存中' : '保存' }}</button>
         </view>
+        <view class="toggle-row">
+          <view>
+            <text class="toggle-title">启用时间管控</text>
+            <text class="toggle-desc">开启后由服务端强制拦截超时学习</text>
+          </view>
+          <switch :checked="control.enabled" color="#FF6B6B" @change="control.enabled = $event.detail.value" />
+        </view>
+        <view class="toggle-row">
+          <view>
+            <text class="toggle-title">每日学习上限</text>
+            <text class="toggle-desc">达到上限后不能开始新题目或练习</text>
+          </view>
+          <switch :checked="control.limitEnabled" color="#FF6B6B" @change="control.limitEnabled = $event.detail.value" />
+        </view>
         <view class="form-row">
           <text class="form-label">每日上限</text>
-          <input class="form-input" type="number" v-model="control.dailyLimitMinutes" />
+          <input class="form-input" type="number" v-model="control.dailyLimitMinutes" :disabled="!control.enabled || !control.limitEnabled" />
           <text class="form-unit">分钟</text>
+        </view>
+        <view class="toggle-row">
+          <view>
+            <text class="toggle-title">限制允许时段</text>
+            <text class="toggle-desc">仅在指定时间范围内可以学习</text>
+          </view>
+          <switch :checked="control.allowedWindowEnabled" color="#FF6B6B" @change="control.allowedWindowEnabled = $event.detail.value" />
         </view>
         <view class="form-row">
           <text class="form-label">允许时段</text>
-          <input class="time-input" v-model="control.allowedStartTime" />
+          <input class="time-input" v-model="control.allowedStartTime" :disabled="!control.enabled || !control.allowedWindowEnabled" />
           <text class="form-separator">至</text>
-          <input class="time-input" v-model="control.allowedEndTime" />
+          <input class="time-input" v-model="control.allowedEndTime" :disabled="!control.enabled || !control.allowedWindowEnabled" />
         </view>
         <view class="toggle-row">
           <view>
@@ -182,9 +203,12 @@ async function saveControl() {
   saving.value = true
   try {
     await saveTimeControl({
+      enabled: control.enabled,
       dailyLimitMinutes: Number(control.dailyLimitMinutes || 0),
+      limitEnabled: control.limitEnabled,
       allowedStartTime: control.allowedStartTime,
       allowedEndTime: control.allowedEndTime,
+      allowedWindowEnabled: control.allowedWindowEnabled,
       restReminder: control.restReminder,
       autoLockAfterTask: control.autoLockAfterTask
     })

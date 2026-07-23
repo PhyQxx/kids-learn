@@ -1,0 +1,1 @@
+package com.kidslearn.api.mapper; import com.baomidou.mybatisplus.core.mapper.BaseMapper; import com.kidslearn.api.entity.ChallengeAnswerRecord; import org.apache.ibatis.annotations.Mapper; @Mapper public interface ChallengeAnswerRecordMapper extends BaseMapper<ChallengeAnswerRecord>{}

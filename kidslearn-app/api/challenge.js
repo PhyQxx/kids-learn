@@ -11,6 +11,15 @@ export const createChallenge = (type = 'RANKED', opponentId) =>
 // 提交挑战结果
 export const submitChallengeResult = (payload) => post('/challenge/submit', payload)
 
+export const getChallengeQuestions = (matchId) => get(`/challenge/matches/${matchId}/questions`)
+export const submitChallengeAnswer = (matchId, payload) => post(`/challenge/matches/${matchId}/answers`, payload)
+export const finishChallenge = (matchId) => post(`/challenge/matches/${matchId}/finish`)
+export const getChallengeStatus = (matchId) => get(`/challenge/matches/${matchId}`)
+export const acceptChallenge = (matchId) => post(`/challenge/matches/${matchId}/accept`)
+export const rejectChallenge = (matchId) => post(`/challenge/matches/${matchId}/reject`)
+
+export const getFriendList = () => get('/friend/list')
+
 // 获取挑战赛记录
 export const getChallengeRecords = () => get('/challenge/records')
 

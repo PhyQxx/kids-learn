@@ -2,6 +2,26 @@ const DEFAULT_FOOD_ICON = '🍽️'
 const DEFAULT_GOODS_ICON = '📦'
 const DEFAULT_DECORATION_ICON = '🎭'
 
+const IMAGE_URL_RE = /^(?:https?:|data:|\/\/|\/static\/)/i
+
+/**
+ * 判断一个字符串是否为真实图片 URL（而非 emoji 文本）。
+ * 形象字段历史上同时承载图片 URL 和 emoji 文本，渲染前需先判定。
+ */
+export function isImageUrl(value) {
+  return typeof value === 'string' && IMAGE_URL_RE.test(value)
+}
+
+/**
+ * 把形象字段解析为可渲染的结构。
+ * 是 URL 返回 { type:'image', src }，是 emoji 返回 { type:'emoji', text }，空值返回 { type:'none' }。
+ */
+export function resolvePetImage(value, emojiFallback = '') {
+  if (isImageUrl(value)) return { type: 'image', src: value }
+  const text = typeof value === 'string' && value.trim() ? value : emojiFallback
+  return text ? { type: 'emoji', text } : { type: 'none' }
+}
+
 function toNumber(value, fallback = 0) {
   const number = Number(value)
   return Number.isFinite(number) ? number : fallback

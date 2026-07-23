@@ -1,10 +1,12 @@
 package com.kidslearn.api.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
 import com.kidslearn.api.realtime.RealtimeSessionRegistry;
 import com.kidslearn.api.service.AiService;
+import com.kidslearn.common.exception.BusinessException;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -187,22 +189,30 @@ public class ParentController {
         Long userId = (Long) request.getAttribute("userId");
 
         TimeControl tc = timeControlMapper.selectOne(
-            new LambdaQueryWrapper<TimeControl>().eq(TimeControl::getChildUserId, userId)
+            new LambdaQueryWrapper<TimeControl>().eq(TimeControl::getUserId, userId)
         );
 
         Map<String, Object> result = new HashMap<>();
         if (tc != null) {
-            result.put("dailyLimitMinutes", tc.getDailyLimit());
-            result.put("allowedStartTime", tc.getForbiddenStart() != null ? tc.getForbiddenStart().toString() : null);
-            result.put("allowedEndTime", tc.getForbiddenEnd() != null ? tc.getForbiddenEnd().toString() : null);
-            result.put("restReminder", tc.getIsEnabled() != null && tc.getIsEnabled() == 1);
+            result.put("dailyLimitMinutes", tc.getDailyLimitMinutes());
+            result.put("enabled", Integer.valueOf(1).equals(tc.getEnabled()));
+            result.put("limitEnabled", Integer.valueOf(1).equals(tc.getLimitEnabled()));
+            result.put("allowedStartTime", tc.getAllowedStartTime() != null ? tc.getAllowedStartTime().toString() : null);
+            result.put("allowedEndTime", tc.getAllowedEndTime() != null ? tc.getAllowedEndTime().toString() : null);
+            result.put("allowedWindowEnabled", Integer.valueOf(1).equals(tc.getAllowedWindowEnabled()));
+            result.put("restReminder", Integer.valueOf(1).equals(tc.getRestReminderEnabled()));
+            result.put("warningBeforeMinutes", tc.getWarningBeforeMinutes());
+            result.put("version", tc.getVersion());
         } else {
+            result.put("enabled", true);
             result.put("dailyLimitMinutes", 60);
+            result.put("limitEnabled", true);
             result.put("allowedStartTime", "08:00");
             result.put("allowedEndTime", "21:00");
+            result.put("allowedWindowEnabled", true);
             result.put("restReminder", true);
         }
-        result.put("autoLockAfterTask", false);
+        result.put("autoLockAfterTask", true);
         return R.ok(result);
     }
 
@@ -214,35 +224,88 @@ public class ParentController {
         Long userId = (Long) request.getAttribute("userId");
 
         TimeControl tc = timeControlMapper.selectOne(
-            new LambdaQueryWrapper<TimeControl>().eq(TimeControl::getChildUserId, userId)
+            new LambdaQueryWrapper<TimeControl>().eq(TimeControl::getUserId, userId)
         );
 
         if (tc == null) {
             tc = new TimeControl();
-            tc.setChildUserId(userId);
-            tc.setIsEnabled(1);
+            tc.setUserId(userId);
+            tc.setEnabled(1);
+            tc.setVersion(0);
         }
 
         if (body.containsKey("dailyLimitMinutes")) {
-            tc.setDailyLimit((Integer) body.get("dailyLimitMinutes"));
+            int dailyLimit = numberValue(body.get("dailyLimitMinutes"), "每日上限必须是数字");
+            if (dailyLimit < 0 || dailyLimit > 1440) {
+                throw new BusinessException("每日上限必须在 0-1440 分钟之间");
+            }
+            tc.setDailyLimitMinutes(dailyLimit);
+        }
+        if (body.containsKey("limitEnabled")) {
+            tc.setLimitEnabled(Boolean.TRUE.equals(body.get("limitEnabled")) ? 1 : 0);
         }
         if (body.containsKey("allowedStartTime")) {
-            tc.setForbiddenStart(LocalTime.parse((String) body.get("allowedStartTime")));
+            tc.setAllowedStartTime(parseTime(body.get("allowedStartTime"), "允许开始时间格式不正确"));
         }
         if (body.containsKey("allowedEndTime")) {
-            tc.setForbiddenEnd(LocalTime.parse((String) body.get("allowedEndTime")));
+            tc.setAllowedEndTime(parseTime(body.get("allowedEndTime"), "允许结束时间格式不正确"));
+        }
+        boolean clearAllowedWindow = Boolean.FALSE.equals(body.get("allowedWindowEnabled"));
+        if (clearAllowedWindow) {
+            tc.setAllowedStartTime(null);
+            tc.setAllowedEndTime(null);
+        }
+        if (body.containsKey("allowedWindowEnabled")) {
+            tc.setAllowedWindowEnabled(Boolean.TRUE.equals(body.get("allowedWindowEnabled")) ? 1 : 0);
         }
         if (body.containsKey("restReminder")) {
-            tc.setIsEnabled((Boolean) body.get("restReminder") ? 1 : 0);
+            tc.setRestReminderEnabled(Boolean.TRUE.equals(body.get("restReminder")) ? 1 : 0);
+        }
+        if (body.containsKey("warningBeforeMinutes")) {
+            int warning = numberValue(body.get("warningBeforeMinutes"), "提醒时间必须是数字");
+            if (warning < 0 || warning > 60) {
+                throw new BusinessException("提醒时间必须在 0-60 分钟之间");
+            }
+            tc.setWarningBeforeMinutes(warning);
+        }
+        if (body.containsKey("enabled")) {
+            tc.setEnabled(Boolean.TRUE.equals(body.get("enabled")) ? 1 : 0);
         }
 
         if (tc.getId() != null) {
             timeControlMapper.updateById(tc);
+            if (clearAllowedWindow) {
+                timeControlMapper.update(null,
+                    new LambdaUpdateWrapper<TimeControl>()
+                        .eq(TimeControl::getId, tc.getId())
+                        .set(TimeControl::getAllowedStartTime, null)
+                        .set(TimeControl::getAllowedEndTime, null)
+                );
+            }
         } else {
             timeControlMapper.insert(tc);
         }
 
         return R.ok(null);
+    }
+
+    private int numberValue(Object value, String message) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        try {
+            return Integer.parseInt(Objects.toString(value, ""));
+        } catch (NumberFormatException e) {
+            throw new BusinessException(message);
+        }
+    }
+
+    private LocalTime parseTime(Object value, String message) {
+        try {
+            return LocalTime.parse(Objects.toString(value, ""));
+        } catch (Exception e) {
+            throw new BusinessException(message);
+        }
     }
 
     @Operation(summary = "获取家庭组信息")
@@ -402,7 +465,7 @@ public class ParentController {
         Subject latestSubject = latestLevel != null && latestLevel.getSubjectId() != null ? subjectMapper.selectById(latestLevel.getSubjectId()) : null;
         TimeControl timeControl = timeControlMapper.selectOne(
             new LambdaQueryWrapper<TimeControl>()
-                .eq(TimeControl::getChildUserId, child.getId())
+                .eq(TimeControl::getUserId, child.getId())
                 .last("LIMIT 1")
         );
         int totalQuestions = sumTotalQuestions(todayRecords);
@@ -417,7 +480,8 @@ public class ParentController {
         map.put("lastActivityAt", latestRecord != null && latestRecord.getPlayTime() != null
             ? latestRecord.getPlayTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) : "");
         map.put("todayMinutes", sumLearningMinutes(todayRecords));
-        map.put("dailyLimitMinutes", timeControl != null && timeControl.getDailyLimit() != null ? timeControl.getDailyLimit() : 60);
+        map.put("dailyLimitMinutes", timeControl != null && timeControl.getDailyLimitMinutes() != null
+            ? timeControl.getDailyLimitMinutes() : 60);
         map.put("completedLevels", (int) todayRecords.stream().filter(r -> Integer.valueOf(1).equals(r.getIsPass())).count());
         map.put("totalQuestions", totalQuestions);
         map.put("correctCount", correctCount);
@@ -434,14 +498,18 @@ public class ParentController {
         if (!online) {
             return "OFFLINE";
         }
-        if (timeControl != null && Integer.valueOf(1).equals(timeControl.getIsEnabled()) && timeControl.getDailyLimit() != null) {
+        if (timeControl != null
+                && Integer.valueOf(1).equals(timeControl.getEnabled())
+                && Integer.valueOf(1).equals(timeControl.getLimitEnabled())
+                && timeControl.getDailyLimitMinutes() != null) {
             DailyStats stats = dailyStatsMapper.selectOne(
                 new LambdaQueryWrapper<DailyStats>()
-                    .eq(DailyStats::getUserId, timeControl.getChildUserId())
+                    .eq(DailyStats::getUserId, timeControl.getUserId())
                     .eq(DailyStats::getStatDate, LocalDate.now())
                     .last("LIMIT 1")
             );
-            if (stats != null && stats.getLearnMinutes() != null && stats.getLearnMinutes() >= timeControl.getDailyLimit()) {
+            if (stats != null && stats.getLearnMinutes() != null
+                    && stats.getLearnMinutes() >= timeControl.getDailyLimitMinutes()) {
                 return "LIMITED";
             }
         }

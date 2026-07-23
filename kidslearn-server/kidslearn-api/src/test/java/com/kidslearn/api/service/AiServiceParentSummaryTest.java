@@ -13,6 +13,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.kidslearn.api.entity.AppConfig;
 import com.kidslearn.api.mapper.AppConfigMapper;
+import com.kidslearn.common.ftp.FtpTool;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -47,7 +48,7 @@ class AiServiceParentSummaryTest {
                 config("ai.openai.model", "test-model"),
                 config("ai.timeout", "3")
             ));
-            AiService aiService = new AiService(appConfigMapper);
+            AiService aiService = new AiService(appConfigMapper, mock(FtpTool.class));
             Logger logger = (Logger) LoggerFactory.getLogger(AiService.class);
             ListAppender<ILoggingEvent> appender = new ListAppender<>();
             appender.start();
@@ -76,7 +77,7 @@ class AiServiceParentSummaryTest {
     }
 
     @Test
-    void treatsEmptyContentWithLengthFinishAsProviderErrorAndFallback() throws IOException {
+    void usesReasoningContentWhenLengthFinishHasNoAssistantContent() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/v1/chat/completions", exchange -> {
             byte[] body = """
@@ -98,7 +99,7 @@ class AiServiceParentSummaryTest {
                 config("ai.custom.model", "mimo-v2.5-pro"),
                 config("ai.timeout", "3")
             ));
-            AiService aiService = new AiService(appConfigMapper);
+            AiService aiService = new AiService(appConfigMapper, mock(FtpTool.class));
             Logger logger = (Logger) LoggerFactory.getLogger(AiService.class);
             ListAppender<ILoggingEvent> appender = new ListAppender<>();
             appender.start();
@@ -117,8 +118,7 @@ class AiServiceParentSummaryTest {
                     .map(ILoggingEvent::getFormattedMessage)
                     .reduce("", (left, right) -> left + "\n" + right);
                 assertTrue(logs.contains("maxTokens=1200"));
-                assertTrue(logs.contains("AI API returned empty assistant content"));
-                assertTrue(logs.contains("finish_reason=length"));
+                assertTrue(logs.contains("AI content empty, using reasoning_content fallback"));
             } finally {
                 logger.detachAppender(appender);
             }
@@ -152,7 +152,7 @@ class AiServiceParentSummaryTest {
                 config("ai.openai.model", "test-model"),
                 config("ai.timeout", "1")
             ));
-            AiService aiService = new AiService(appConfigMapper);
+            AiService aiService = new AiService(appConfigMapper, mock(FtpTool.class));
             Logger logger = (Logger) LoggerFactory.getLogger(AiService.class);
             ListAppender<ILoggingEvent> appender = new ListAppender<>();
             appender.start();

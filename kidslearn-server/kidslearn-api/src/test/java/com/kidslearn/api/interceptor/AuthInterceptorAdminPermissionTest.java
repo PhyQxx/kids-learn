@@ -12,6 +12,7 @@ import com.kidslearn.common.constants.RedisConstants;
 import com.kidslearn.common.util.JwtUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -27,7 +28,7 @@ class AuthInterceptorAdminPermissionTest {
         String token = JwtUtil.generateToken(7L, "ADMIN", 60);
         ValueOperations<String, String> valueOperations = mockValueOperations();
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(RedisConstants.USER_TOKEN + 7L)).thenReturn(token);
+        allowToken(token);
         when(permissionService.hasPermission(7L, "DELETE", "/api/v1/admin/question/9")).thenReturn(false);
 
         MockHttpServletRequest request = request("DELETE", "/api/v1/admin/question/9", token);
@@ -42,7 +43,7 @@ class AuthInterceptorAdminPermissionTest {
         String token = JwtUtil.generateToken(7L, "ADMIN", 60);
         ValueOperations<String, String> valueOperations = mockValueOperations();
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-        when(valueOperations.get(RedisConstants.USER_TOKEN + 7L)).thenReturn(token);
+        allowToken(token);
         when(permissionService.hasPermission(7L, "GET", "/api/v1/admin/question/list")).thenReturn(true);
 
         MockHttpServletRequest request = request("GET", "/api/v1/admin/question/list", token);
@@ -60,5 +61,12 @@ class AuthInterceptorAdminPermissionTest {
     @SuppressWarnings("unchecked")
     private ValueOperations<String, String> mockValueOperations() {
         return mock(ValueOperations.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void allowToken(String token) {
+        SetOperations<String, String> setOperations = mock(SetOperations.class);
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
+        when(setOperations.isMember(RedisConstants.USER_TOKEN + 7L, token)).thenReturn(true);
     }
 }

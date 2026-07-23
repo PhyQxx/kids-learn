@@ -48,6 +48,7 @@ import { ref, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import FunLoadingState from '@/components/common/FunLoadingState.vue'
 import { getNotificationList, markAsRead, markAllAsRead as apiMarkAllRead } from '@/api/notification'
+import { acceptChallenge } from '@/api/challenge'
 
 const loading = ref(false)
 const notifications = ref([])
@@ -59,6 +60,13 @@ function getTypeIcon(type) {
     friend: '👥',
     challenge: '⚔️',
     learning: '📚',
+    CHALLENGE_INVITE: '⚔️',
+    CHALLENGE_RESULT: '🏁',
+    ACHIEVEMENT_UNLOCKED: '🏆',
+    LEARNING_REMINDER: '📚',
+    TIME_CONTROL_WARNING: '⏰',
+    ACCOUNT_SECURITY: '🔐',
+    SYSTEM_ANNOUNCEMENT: '📢',
   }
   return icons[type] || '📣'
 }
@@ -98,6 +106,16 @@ async function readNotification(item) {
       item.isRead = true
     } catch (e) {
       console.error('标记已读失败', e)
+    }
+  }
+  if (item.actionType === 'OPEN_CHALLENGE' && item.actionTarget) {
+    if (item.type === 'CHALLENGE_INVITE') {
+      try {
+        await acceptChallenge(Number(item.actionTarget))
+        uni.navigateTo({ url: `/pages/learn/quiz?challengeMatchId=${item.actionTarget}` })
+      } catch (e) { uni.showToast({ title: e.message || '挑战已失效', icon: 'none' }) }
+    } else {
+      uni.navigateTo({ url: '/pages/challenge/index' })
     }
   }
 }

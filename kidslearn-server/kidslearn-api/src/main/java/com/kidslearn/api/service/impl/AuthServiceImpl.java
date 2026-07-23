@@ -14,7 +14,6 @@ import com.kidslearn.common.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,7 +38,7 @@ public class AuthServiceImpl implements AuthService {
     private final com.kidslearn.api.mapper.AdminRoleMapper adminRoleMapper;
     private final StringRedisTemplate redisTemplate;
     private final PasswordHashService passwordHashService;
-    private final Environment applicationEnvironment;
+    private final SmsVerificationService smsVerificationService;
 
     @Override
     public TokenVO login(LoginDTO dto) {
@@ -79,6 +78,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public TokenVO register(RegisterDTO dto) {
+        if (dto.getParentPin() == null || !dto.getParentPin().matches("^\\d{6}$")) {
+            throw new BusinessException("家长PIN必须是6位数字");
+        }
         // check username unique
         Long count = userMapper.selectCount(
             new LambdaQueryWrapper<User>().eq(User::getUsername, dto.getUsername())
@@ -86,6 +88,17 @@ public class AuthServiceImpl implements AuthService {
         if (count > 0) {
             throw new BusinessException("用户名已存在");
         }
+        String phone = SmsVerificationService.normalizePhone(dto.getPhone());
+        Long phoneCount = parentProfileMapper.selectCount(
+            new LambdaQueryWrapper<ParentProfile>().eq(ParentProfile::getPhone, phone)
+        );
+        if (phoneCount > 0) {
+            throw new BusinessException("该手机号已绑定其他账号");
+        }
+        if (!Boolean.TRUE.equals(dto.getGuardianConsent())) {
+            throw new BusinessException("需要监护人同意后才能注册");
+        }
+        smsVerificationService.verifyAndConsume(phone, SmsVerificationService.Purpose.REGISTER, dto.getVerifyCode());
 
         // admin registration not allowed
         if (dto.getUserType() != null && dto.getUserType() == 3) {
@@ -133,8 +146,11 @@ public class AuthServiceImpl implements AuthService {
         ParentProfile parentProfile = new ParentProfile();
         parentProfile.setUserId(user.getId());
         parentProfile.setRealName(dto.getRealName());
-        parentProfile.setPhone(dto.getPhone());
+        parentProfile.setPhone(phone);
         parentProfile.setRelationship(dto.getRelationship());
+        parentProfile.setParentPinHash(passwordHashService.hash(dto.getParentPin()));
+        parentProfile.setConsentVersion("2026-07-22-v1");
+        parentProfile.setConsentTime(LocalDateTime.now());
         parentProfileMapper.insert(parentProfile);
 
         // assign default pet
@@ -153,8 +169,9 @@ public class AuthServiceImpl implements AuthService {
                 throw new BusinessException("无效的刷新Token");
             }
             User user = userMapper.selectById(userId);
-            if (user == null) {
-                throw new BusinessException("用户不存在");
+            if (user == null || Integer.valueOf(0).equals(user.getStatus())) {
+                redisTemplate.opsForSet().remove(RedisConstants.USER_TOKEN + "refresh:" + userId, refreshToken);
+                throw new BusinessException("账号不可用");
             }
             // 移除旧 refreshToken
             redisTemplate.opsForSet().remove(RedisConstants.USER_TOKEN + "refresh:" + userId, refreshToken);
@@ -195,32 +212,25 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void sendVerifyCode(String phone) {
-        // 检查是否频繁发送（60秒间隔限制）
-        String lastSendKey = RedisConstants.SMS_CODE + "last:" + phone;
-        if (Boolean.TRUE.equals(redisTemplate.hasKey(lastSendKey))) {
-            throw new BusinessException("验证码发送过于频繁，请稍后再试");
+    @Transactional
+    public void resetPassword(String rawPhone, String verifyCode, String newPassword) {
+        String phone = SmsVerificationService.normalizePhone(rawPhone);
+        if (newPassword == null || newPassword.length() < 6 || newPassword.length() > 50) {
+            throw new BusinessException("新密码长度必须为6-50位");
         }
-
-        // 生成6位随机验证码
-        String code = String.format("%06d", new java.util.Random().nextInt(1000000));
-
-        // 存储到Redis，5分钟有效
-        String codeKey = RedisConstants.SMS_CODE + phone;
-        redisTemplate.opsForValue().set(codeKey, code, 5, TimeUnit.MINUTES);
-
-        // 记录发送时间，60秒间隔
-        redisTemplate.opsForValue().set(lastSendKey, "1", 60, TimeUnit.SECONDS);
-
-        // TODO: 调用实际的短信发送服务（如阿里云、腾讯云短信）
-        // 目前开发模式下，将验证码打印到日志
-        log.info("验证码已生成 - 手机号: {}, 验证码: {}", phone, code);
-
-        // 开发环境提示
-        if (applicationEnvironment.getActiveProfiles().length > 0
-            && applicationEnvironment.getActiveProfiles()[0].equals("dev")) {
-            log.warn("【开发模式】验证码为: {}", code);
+        ParentProfile profile = parentProfileMapper.selectOne(
+            new LambdaQueryWrapper<ParentProfile>().eq(ParentProfile::getPhone, phone).last("LIMIT 1")
+        );
+        if (profile == null) throw new BusinessException("手机号未绑定账号");
+        smsVerificationService.verifyAndConsume(phone, SmsVerificationService.Purpose.PASSWORD_RESET, verifyCode);
+        User user = userMapper.selectById(profile.getUserId());
+        if (user == null || Integer.valueOf(0).equals(user.getStatus())) {
+            throw new BusinessException("账号不可用");
         }
+        user.setPassword(passwordHashService.hash(newPassword));
+        userMapper.updateById(user);
+        redisTemplate.delete(RedisConstants.USER_TOKEN + user.getId());
+        redisTemplate.delete(RedisConstants.USER_TOKEN + "refresh:" + user.getId());
     }
 
     private TokenVO buildToken(User user) {

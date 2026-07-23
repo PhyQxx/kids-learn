@@ -71,8 +71,8 @@ final class QuestionRandomizer {
                 opt.put("optionLabel", optionLabel);
                 opt.put("answerValue", optionLabel);
             } else if (hasCustomLabel && isSingleLetter) {
-                // 选择题：optionLabel 是 A/B/C/D
-                opt.put("optionLabel", optionLabel);
+                // 选择题：显示标签按打乱后的顺序重新编号，提交值保留原始答案标签
+                opt.put("optionLabel", String.valueOf((char) ('A' + i)));
                 opt.put("answerValue", optionLabel);
             } else {
                 // 判断题或其他：optionLabel 为空，使用 optionContent 作为显示和提交值

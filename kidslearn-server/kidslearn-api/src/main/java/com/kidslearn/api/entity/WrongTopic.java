@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -23,4 +24,7 @@ public class WrongTopic extends BaseEntity {
     private Integer masteryLevel; // 掌握度级别: 0未掌握 1练习中 2已掌握
     private Integer continuousCorrectCount; // 连续做对次数
     private LocalDateTime lastReviewTime; // 最后复习时间
+    private LocalDate nextReviewDate;
+    private Integer reviewCount;
+    private Integer lastReviewResult;
 }

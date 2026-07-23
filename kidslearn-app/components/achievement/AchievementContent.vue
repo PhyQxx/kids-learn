@@ -43,15 +43,42 @@
           :class="ach.status"
         >
           <view class="achieve-icon-wrap" :class="ach.rarity">
-            <text class="achieve-index">{{ String(achievements.indexOf(ach) + 1).padStart(2, '0') }}</text>
+            <image v-if="resolvePetImage(ach.icon).type === 'image'" class="achieve-icon-img" :src="ach.icon" mode="aspectFit" />
+            <text v-else-if="resolvePetImage(ach.icon).type === 'emoji'" class="achieve-emoji">{{ ach.icon }}</text>
+            <text v-else class="achieve-index">{{ String(achievements.indexOf(ach) + 1).padStart(2, '0') }}</text>
           </view>
           <view class="achieve-info">
-            <text class="text-sm text-bold">{{ ach.name }}</text>
+            <view class="achieve-name-row">
+              <text class="text-sm text-bold">{{ ach.name }}</text>
+              <text v-if="ach.tierInfo.hasTiers" class="tier-badge">{{ tierBadgeName(ach.tierInfo.tiers[ach.tierInfo.currentTierIndex]?.level) }}</text>
+            </view>
             <text class="text-xs text-light">{{ ach.desc }}</text>
-            <view v-if="ach.status === 'progress'" class="achieve-progress">
+
+            <!-- 分级成就：多档进度 -->
+            <view v-if="ach.tierInfo.hasTiers" class="tier-progress-list">
+              <view
+                v-for="(tier, tIdx) in ach.tierInfo.tiers"
+                :key="tIdx"
+                class="tier-progress-item"
+                :class="{ achieved: tier.achieved, current: tIdx === ach.tierInfo.currentTierIndex && ach.status !== 'done' }"
+              >
+                <view class="tier-dot" :class="{ filled: tier.achieved }"></view>
+                <text class="tier-label">{{ tier.name || tierBadgeName(tier.level) }}</text>
+                <text class="tier-target">{{ tier.target }}</text>
+              </view>
+            </view>
+
+            <!-- 非分级成就：单一进度条 -->
+            <view v-else-if="ach.status === 'progress'" class="achieve-progress">
               <tn-line-progress :percent="ach.percent" :height="10" :show-percent="false" style="flex: 1;" />
               <text class="text-xs text-light">{{ ach.current }}/{{ ach.target }}</text>
             </view>
+
+            <!-- 奖励预览 -->
+            <view v-if="ach.rewardText" class="reward-preview">
+              <text class="text-xs reward-text">🎁 {{ ach.rewardText }}</text>
+            </view>
+
             <view v-if="ach.status === 'done'" class="done-badge">
               <text class="text-xs text-success">已达成</text>
             </view>
@@ -76,6 +103,8 @@
 import { computed, ref, watch, onMounted } from 'vue'
 import { getAchievements, getMyProgress, receiveReward } from '@/api/achievement'
 import { claimAchievementReward, claimAllAchievementRewards } from '@/utils/achievementClaim.mjs'
+import { resolvePetImage } from '@/utils/petFeature.mjs'
+import { resolveTiers, tierBadgeName, describeRewards } from '@/utils/achievementFeature.mjs'
 import FunLoadingState from '@/components/common/FunLoadingState.vue'
 
 const loading = ref(true)
@@ -85,7 +114,9 @@ const tabItems = ref([
   { label: '全部' },
   { label: '学习' },
   { label: '收集' },
-  { label: '社交' }
+  { label: '社交' },
+  { label: '时长' },
+  { label: '特殊' }
 ])
 
 const completedCount = ref(0)
@@ -104,7 +135,7 @@ const claimAllLabel = computed(() => {
 
 async function loadData() {
   loading.value = true
-  const typeMap = [null, 1, 2, 3]
+  const typeMap = [null, 1, 2, 3, 4, 5]
   try {
     const results = await Promise.allSettled([
       getAchievements(typeMap[activeTab.value]),
@@ -115,8 +146,18 @@ async function loadData() {
       const list = results[0].value
       if (Array.isArray(list) && list.length > 0) {
         achievements.value = list.map(a => {
-          const targetValue = getAchievementTarget(a)
           const currentValue = Number(a.currentValue || 0)
+          const rawTiers = a.tiers || []
+          const tierInfo = resolveTiers(rawTiers, currentValue)
+          const targetValue = tierInfo.hasTiers ? tierInfo.totalTarget : getAchievementTarget(a)
+          // 奖励预览：分级成就取当前档位奖励，非分级取第一档或直接 rewardJson
+          let rewardText = ''
+          if (tierInfo.hasTiers && tierInfo.tiers.length > 0) {
+            const currentTier = tierInfo.tiers[Math.min(tierInfo.currentTierIndex, tierInfo.tiers.length - 1)]
+            rewardText = currentTier?.rewardText || ''
+          } else if (rawTiers.length > 0) {
+            rewardText = describeRewards(rawTiers[0].rewardJson)
+          }
           return {
             id: a.id,
             name: a.achieveName,
@@ -124,9 +165,10 @@ async function loadData() {
             icon: a.achieveIcon || '🏅',
             achieveType: a.achieveType,
             isTiered: a.isTiered,
-            tiers: a.tiers || [],
+            tierInfo,
+            rewardText,
             status: a.isCompleted ? 'done' : (currentValue > 0 ? 'progress' : 'locked'),
-            rarity: ['bronze', 'silver', 'gold', 'legendary'][(a.achieveType || 1) - 1] || 'bronze',
+            rarity: a.isCompleted ? 'gold' : (currentValue > 0 ? 'silver' : 'bronze'),
             claimed: a.isReceived || false,
             percent: targetValue > 0 ? Math.min(100, Math.round(currentValue / targetValue * 100)) : 0,
             current: currentValue,
@@ -299,6 +341,7 @@ async function claimAllRewards() {
 }
 
 .achieve-emoji { font-size: 24px; }
+.achieve-icon-img { width: 32px; height: 32px; }
 
 .achieve-info {
   flex: 1;
@@ -306,6 +349,77 @@ async function claimAllRewards() {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+
+.achieve-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tier-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #B8860B;
+  background: #FFF3CD;
+  padding: 1px 6px;
+  border-radius: 8px;
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+/* 分级多档进度 */
+.tier-progress-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tier-progress-item {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #F5F5F5;
+  border: 1px solid transparent;
+
+  &.achieved {
+    background: #E8F5E9;
+    border-color: rgba(76, 175, 80, 0.3);
+
+    .tier-label, .tier-target { color: #2E7D32; }
+  }
+
+  &.current {
+    background: #FFF8E1;
+    border-color: rgba(255, 193, 7, 0.5);
+
+    .tier-label, .tier-target { color: #F57F17; font-weight: 600; }
+  }
+}
+
+.tier-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #DDD;
+
+  &.filled { background: #4CAF50; }
+}
+
+.tier-label { font-size: 11px; color: #999; }
+.tier-target { font-size: 11px; color: #999; font-weight: 600; }
+
+/* 奖励预览 */
+.reward-preview {
+  margin-top: 2px;
+}
+
+.reward-text {
+  color: #E6A23C;
+  font-weight: 500;
 }
 
 .achieve-progress {

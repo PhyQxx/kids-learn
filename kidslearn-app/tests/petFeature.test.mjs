@@ -3,9 +3,11 @@ import assert from 'node:assert/strict'
 
 import {
   applyPetPurchaseBalance,
+  isImageUrl,
   normalizeDecorations,
   normalizeInventoryItems,
   normalizeShopItems,
+  resolvePetImage,
   toggleDecorationEquip
 } from '../utils/petFeature.mjs'
 
@@ -93,4 +95,32 @@ test('applies purchase response balances without guessing when response includes
     diamond: 3,
     nickname: 'Kid'
   })
+})
+
+test('isImageUrl tells real image URLs apart from emoji and plain text', () => {
+  assert.equal(isImageUrl('https://cdn.example.com/cat.png'), true)
+  assert.equal(isImageUrl('http://cdn.example.com/cat.png'), true)
+  assert.equal(isImageUrl('data:image/png;base64,iVBORw0KG'), true)
+  assert.equal(isImageUrl('/static/pet/cat.png'), true)
+  assert.equal(isImageUrl('//cdn.example.com/cat.png'), true)
+
+  assert.equal(isImageUrl('🐱'), false)
+  assert.equal(isImageUrl('hat'), false)
+  assert.equal(isImageUrl(''), false)
+  assert.equal(isImageUrl(undefined), false)
+  assert.equal(isImageUrl(null), false)
+})
+
+test('resolvePetImage returns render-ready structure for url, emoji and empty', () => {
+  assert.deepEqual(resolvePetImage('https://cdn.example.com/cat.png'), {
+    type: 'image',
+    src: 'https://cdn.example.com/cat.png'
+  })
+
+  assert.deepEqual(resolvePetImage('🐱'), { type: 'emoji', text: '🐱' })
+
+  assert.deepEqual(resolvePetImage('', '🐾'), { type: 'emoji', text: '🐾' })
+
+  assert.deepEqual(resolvePetImage(''), { type: 'none' })
+  assert.deepEqual(resolvePetImage(undefined), { type: 'none' })
 })

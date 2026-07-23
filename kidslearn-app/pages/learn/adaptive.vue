@@ -91,7 +91,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
-import { getAdaptiveQuestions, retryWrong } from '@/api/learn'
+import { getAdaptiveQuestions, getDueReviewQuestions, retryWrong } from '@/api/learn'
 import { richContentToNodes, richContentToText } from '@/utils/richContent.mjs'
 import { resolveQuestionSpeech } from '@/utils/questionSpeech.mjs'
 import {
@@ -109,6 +109,7 @@ const masteredThis = ref(false)
 const masteredCount = ref(0)
 const correctCount = ref(0)
 const subjectIdParam = ref(null)
+const dueReview = ref(false)
 const questions = ref([])
 let questionAudio = null
 const isSpeaking = ref(false)
@@ -138,7 +139,7 @@ async function loadQuestions() {
     const res = await loadQuestionsWithOfflineCache({
       levelId: `adaptive:${subjectIdParam.value || 'all'}`,
       gradeLevelId: 'wrong-topics',
-      fetchQuestions: () => getAdaptiveQuestions(subjectIdParam.value),
+      fetchQuestions: () => dueReview.value ? getDueReviewQuestions(subjectIdParam.value, 15) : getAdaptiveQuestions(subjectIdParam.value),
       storage: uni
     })
     if (res.fromCache) {
@@ -174,6 +175,7 @@ onMounted(async () => {
   const pages = getCurrentPages()
   const page = pages[pages.length - 1]
   const sid = page.$page?.options?.subjectId
+  dueReview.value = page.$page?.options?.review === 'due'
   if (sid) subjectIdParam.value = sid
   await loadQuestions()
 })

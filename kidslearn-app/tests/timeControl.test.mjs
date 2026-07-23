@@ -16,19 +16,25 @@ test('normalizes parent time control with practical defaults', () => {
   })
 
   assert.deepEqual(control, {
+    enabled: true,
     dailyLimitMinutes: 45,
+    limitEnabled: true,
     allowedStartTime: '07:30',
     allowedEndTime: '20:15',
+    allowedWindowEnabled: true,
     restReminder: true,
     autoLockAfterTask: true
   })
 
   assert.deepEqual(normalizeTimeControl({}), {
+    enabled: true,
     dailyLimitMinutes: 60,
+    limitEnabled: true,
     allowedStartTime: '08:00',
     allowedEndTime: '21:00',
+    allowedWindowEnabled: true,
     restReminder: true,
-    autoLockAfterTask: false
+    autoLockAfterTask: true
   })
 })
 
@@ -66,6 +72,27 @@ test('allows learning inside limits and supports overnight windows', () => {
   assert.equal(evaluateLearningAccess({
     timeControl: { dailyLimitMinutes: 60, allowedStartTime: '21:00', allowedEndTime: '07:00', restReminder: true },
     todayMinutes: 20,
+    now: '2026-05-24T22:00:00+08:00'
+  }).allowed, true)
+})
+
+test('disabled controls and disabled sub-rules do not block learning', () => {
+  assert.equal(evaluateLearningAccess({
+    timeControl: { enabled: false, dailyLimitMinutes: 1, allowedStartTime: '08:00', allowedEndTime: '09:00' },
+    todayMinutes: 100,
+    now: '2026-05-24T22:00:00+08:00'
+  }).allowed, true)
+
+  assert.equal(evaluateLearningAccess({
+    timeControl: {
+      enabled: true,
+      dailyLimitMinutes: 1,
+      limitEnabled: false,
+      allowedStartTime: '08:00',
+      allowedEndTime: '09:00',
+      allowedWindowEnabled: false
+    },
+    todayMinutes: 100,
     now: '2026-05-24T22:00:00+08:00'
   }).allowed, true)
 })

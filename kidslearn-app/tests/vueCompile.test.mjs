@@ -3,11 +3,10 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { parse, compileScript } from '../node_modules/@vue/compiler-sfc/dist/compiler-sfc.esm-browser.js'
 import compilerSfc from '../node_modules/@vue/compiler-sfc/dist/compiler-sfc.cjs.js'
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)))
-const { compileStyleAsync } = compilerSfc
+const { parse, compileScript, compileStyleAsync } = compilerSfc
 
 const vueFiles = collectVueFiles(appRoot)
   .filter(file => !file.includes('node_modules'))

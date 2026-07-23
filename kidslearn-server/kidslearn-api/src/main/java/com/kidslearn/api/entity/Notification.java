@@ -22,6 +22,11 @@ public class Notification {
 
     private String content;
 
+    private String eventId;
+    private String actionType;
+    private String actionTarget;
+    private LocalDateTime expireTime;
+
     private Integer isRead;
 
     private LocalDateTime readTime;

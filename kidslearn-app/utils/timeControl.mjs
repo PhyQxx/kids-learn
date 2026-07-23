@@ -1,9 +1,12 @@
 const DEFAULT_TIME_CONTROL = {
+  enabled: true,
   dailyLimitMinutes: 60,
+  limitEnabled: true,
   allowedStartTime: '08:00',
   allowedEndTime: '21:00',
+  allowedWindowEnabled: true,
   restReminder: true,
-  autoLockAfterTask: false
+  autoLockAfterTask: true
 }
 
 function toInteger(value, fallback = 0) {
@@ -56,7 +59,11 @@ function isWithinWindow(currentMinutes, startMinutes, endMinutes) {
 
 export function normalizeTimeControl(raw = {}) {
   return {
+    enabled: raw.enabled !== undefined ? Boolean(raw.enabled) : DEFAULT_TIME_CONTROL.enabled,
     dailyLimitMinutes: toInteger(raw.dailyLimitMinutes, DEFAULT_TIME_CONTROL.dailyLimitMinutes),
+    limitEnabled: raw.limitEnabled !== undefined
+      ? Boolean(raw.limitEnabled)
+      : toInteger(raw.dailyLimitMinutes, DEFAULT_TIME_CONTROL.dailyLimitMinutes) > 0,
     allowedStartTime: normalizeClockTime(
       raw.allowedStartTime ?? raw.forbiddenStart,
       DEFAULT_TIME_CONTROL.allowedStartTime
@@ -65,6 +72,9 @@ export function normalizeTimeControl(raw = {}) {
       raw.allowedEndTime ?? raw.forbiddenEnd,
       DEFAULT_TIME_CONTROL.allowedEndTime
     ),
+    allowedWindowEnabled: raw.allowedWindowEnabled !== undefined
+      ? Boolean(raw.allowedWindowEnabled)
+      : DEFAULT_TIME_CONTROL.allowedWindowEnabled,
     restReminder: raw.restReminder !== undefined
       ? Boolean(raw.restReminder)
       : DEFAULT_TIME_CONTROL.restReminder,
@@ -75,20 +85,15 @@ export function normalizeTimeControl(raw = {}) {
 }
 
 export function evaluateLearningAccess({ timeControl, todayMinutes = 0, now = new Date() } = {}) {
-  // 临时禁用学习时段限制
-  return {
-    allowed: true,
-    reasonCode: 'ALLOWED',
-    message: ''
-  }
-
-  // 以下是原始代码，恢复时取消注释
-  /*
   const control = normalizeTimeControl(timeControl)
   const learnedMinutes = toInteger(todayMinutes, 0)
 
+  if (!control.enabled) {
+    return { allowed: true, reasonCode: 'ALLOWED', message: '' }
+  }
+
   if (
-    control.restReminder &&
+    control.limitEnabled &&
     control.dailyLimitMinutes > 0 &&
     learnedMinutes >= control.dailyLimitMinutes
   ) {
@@ -102,7 +107,7 @@ export function evaluateLearningAccess({ timeControl, todayMinutes = 0, now = ne
   const currentMinutes = getCurrentMinutes(now)
   const startMinutes = toMinutes(control.allowedStartTime)
   const endMinutes = toMinutes(control.allowedEndTime)
-  if (!isWithinWindow(currentMinutes, startMinutes, endMinutes)) {
+  if (control.allowedWindowEnabled && !isWithinWindow(currentMinutes, startMinutes, endMinutes)) {
     return {
       allowed: false,
       reasonCode: 'OUTSIDE_ALLOWED_TIME',
@@ -115,5 +120,4 @@ export function evaluateLearningAccess({ timeControl, todayMinutes = 0, now = ne
     reasonCode: 'ALLOWED',
     message: ''
   }
-  */
 }

@@ -8,6 +8,14 @@
     </template>
     <div ref="tableBox">
     <el-table :data="tableData" stripe v-loading="loading" :max-height="tableMaxHeight">
+      <el-table-column label="图标" width="80">
+        <template #default="{ row }">
+          <div class="thumb-cell" @click="previewImage(row.imageUrl)">
+            <img v-if="isImageUrl(row.imageUrl)" :src="row.imageUrl" class="thumb-img" />
+            <span v-else class="thumb-emoji">{{ row.imageUrl || '-' }}</span>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column prop="itemCode" label="道具代码" />
       <el-table-column prop="itemName" label="道具名称" />
       <el-table-column prop="itemType" label="类型" width="80">
@@ -39,7 +47,9 @@
         <el-form-item label="道具名称"><el-input v-model="form.itemName" /></el-form-item>
         <el-form-item label="类型"><el-select v-model="form.itemType"><el-option label="食物" :value="1" /><el-option label="玩具" :value="2" /></el-select></el-form-item>
         <el-form-item label="效果描述"><el-input v-model="form.effectDesc" /></el-form-item>
-        <el-form-item label="图片URL"><el-input v-model="form.imageUrl" /></el-form-item>
+        <el-form-item label="图标">
+          <ImageInput v-model="form.imageUrl" hint="宠物道具图标" />
+        </el-form-item>
         <el-form-item label="价格"><el-input-number v-model="form.price" :min="0" /></el-form-item>
         <el-form-item label="稀有度"><el-select v-model="form.rarity"><el-option label="普通" :value="1" /><el-option label="稀有" :value="2" /><el-option label="传说" :value="3" /></el-select></el-form-item>
         <el-form-item label="效果值"><el-input-number v-model="form.effectValue" :min="0" /></el-form-item>
@@ -58,8 +68,26 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getPetItemList, savePetItem, deletePetItem } from '@/api/request'
 import { useTableHeight } from '@/composables/useTableHeight'
+import ImageInput from '@/components/ImageInput.vue'
 
 const { tableBox, tableMaxHeight } = useTableHeight()
+
+const URL_RE = /^(https?:|data:|\/\/|\/static\/)/
+function isImageUrl(value?: string) {
+  return !!value && URL_RE.test(value)
+}
+function previewImage(src?: string) {
+  if (!isImageUrl(src)) return
+  const overlay = document.createElement('div')
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:pointer'
+  overlay.onclick = () => document.body.removeChild(overlay)
+  const img = document.createElement('img')
+  img.src = src!
+  img.style.cssText = 'max-width:90%;max-height:90%;object-fit:contain;border-radius:8px'
+  img.onerror = () => document.body.removeChild(overlay)
+  overlay.appendChild(img)
+  document.body.appendChild(overlay)
+}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -106,3 +134,35 @@ async function handleDelete(id: number) {
 
 onMounted(() => fetchData())
 </script>
+
+<style scoped>
+.thumb-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: #f7f8fa;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.thumb-cell:hover {
+  transform: scale(1.05);
+  transition: transform 0.2s;
+}
+
+.thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.thumb-emoji {
+  font-size: 28px;
+  line-height: 1;
+  color: #c0c4cc;
+}
+</style>

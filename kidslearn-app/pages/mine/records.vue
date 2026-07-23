@@ -161,21 +161,9 @@ async function loadData() {
       return
     }
   } catch (e) {
-    console.log('records: 使用模拟数据')
+    allRecords.value = []
+    uni.showToast({ title: '学习记录加载失败，请稍后重试', icon: 'none' })
   }
-  // 模拟数据
-  const now = Date.now()
-  const DAY = 24 * 60 * 60 * 1000
-  allRecords.value = [
-    { id: 1, course: '加减法进阶', subject: '数学', level: 8, icon: '🔢', bg: '#E8F0FE', score: 95, stars: 3, timestamp: now - 2 * 60 * 60 * 1000 },
-    { id: 2, course: '拼音组合', subject: '语文', level: 5, icon: '📖', bg: '#FFF0F0', score: 80, stars: 2, timestamp: now - 3 * 60 * 60 * 1000 },
-    { id: 3, course: '字母认知', subject: '英语', level: 3, icon: '🔤', bg: '#E0F7F7', score: 70, stars: 2, timestamp: now - 5 * 60 * 60 * 1000 },
-    { id: 4, course: '图形认知', subject: '逻辑', level: 2, icon: '🧩', bg: '#F3E8FF', score: 90, stars: 3, timestamp: now - DAY },
-    { id: 5, course: '古诗词', subject: '语文', level: 7, icon: '📖', bg: '#FFF0F0', score: 60, stars: 1, timestamp: now - 2 * DAY },
-    { id: 6, course: '科学探秘', subject: '科学', level: 4, icon: '🔬', bg: '#E8F8F0', score: 85, stars: 3, timestamp: now - 4 * DAY },
-    { id: 7, course: '乘法口诀', subject: '数学', level: 6, icon: '🔢', bg: '#E8F0FE', score: 88, stars: 3, timestamp: now - 10 * DAY },
-    { id: 8, course: '单词拼写', subject: '英语', level: 5, icon: '🔤', bg: '#E0F7F7', score: 92, stars: 3, timestamp: now - 15 * DAY }
-  ].map(r => ({ ...r, time: formatTime(r.timestamp) }))
 }
 
 onMounted(() => loadData())

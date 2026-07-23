@@ -13,6 +13,7 @@ import com.kidslearn.api.realtime.RealtimeEventPublisher;
 import com.kidslearn.api.service.AchievementService;
 import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.PetService;
+import com.kidslearn.api.service.EntitlementService;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -101,7 +102,11 @@ class LearnServiceImplPracticeModeTest {
             mock(RealtimeEventPublisher.class),
             mock(PetService.class),
             mock(AiService.class),
-            practiceModeMapper
+            practiceModeMapper,
+            mock(EntitlementService.class),
+            mock(LearningAccessService.class),
+            mock(PracticeSessionMapper.class),
+            mock(UserQuestionRecordMapper.class)
         );
     }
 }

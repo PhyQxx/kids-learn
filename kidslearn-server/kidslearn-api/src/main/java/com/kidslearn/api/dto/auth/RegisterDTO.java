@@ -2,6 +2,8 @@ package com.kidslearn.api.dto.auth;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.AssertTrue;
 import lombok.Data;
 
 @Data
@@ -30,9 +32,24 @@ public class RegisterDTO {
     @Size(max = 20, message = "姓名最长20位")
     private String realName;
 
-    @Size(max = 20, message = "手机号最长20位")
+    @NotBlank(message = "手机号不能为空")
+    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
     private String phone;
 
     @Size(max = 20, message = "关系最长20位")
     private String relationship;
+
+    @NotBlank(message = "请设置家长PIN")
+    @Pattern(regexp = "^\\d{6}$", message = "家长PIN必须是6位数字")
+    private String parentPin;
+
+    @NotBlank(message = "验证码不能为空")
+    @Pattern(regexp = "^\\d{6}$", message = "验证码必须是6位数字")
+    private String verifyCode;
+
+    @Pattern(regexp = "^REGISTER$", message = "验证码用途不正确")
+    private String verifyPurpose = "REGISTER";
+
+    @AssertTrue(message = "需要监护人同意后才能注册")
+    private Boolean guardianConsent;
 }

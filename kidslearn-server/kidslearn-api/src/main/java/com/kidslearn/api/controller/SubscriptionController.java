@@ -1,6 +1,7 @@
 package com.kidslearn.api.controller;
 
 import com.kidslearn.api.service.SubscriptionService;
+import com.kidslearn.api.service.EntitlementService;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -20,6 +21,7 @@ import java.util.Map;
 public class SubscriptionController {
 
     private final SubscriptionService subscriptionService;
+    private final EntitlementService entitlementService;
 
     @Operation(summary = "获取会员套餐")
     @GetMapping("/plans")
@@ -33,5 +35,11 @@ public class SubscriptionController {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(subscriptionService.getCurrentSubscription(userId));
     }
-}
 
+    @Operation(summary = "获取当前账号权益")
+    @GetMapping("/entitlements")
+    public R<Map<String, Object>> getEntitlements(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(entitlementService.getUserEntitlements(userId));
+    }
+}

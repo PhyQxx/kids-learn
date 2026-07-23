@@ -7,6 +7,7 @@ import com.kidslearn.api.dto.learn.SmartReviewQuizVO;
 import com.kidslearn.api.dto.learn.SubmitAnswerDTO;
 import com.kidslearn.api.dto.learn.SubmitVideoProgressDTO;
 import com.kidslearn.api.service.LearnService;
+import com.kidslearn.api.service.QuestionFeedbackService;
 import com.kidslearn.common.result.PageResult;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,12 +27,20 @@ import java.util.Map;
 public class LearnController {
 
     private final LearnService learnService;
+    private final QuestionFeedbackService questionFeedbackService;
 
     @Operation(summary = "获取今日任务")
     @GetMapping("/daily-tasks")
     public R<DailyTaskVO> getDailyTasks(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(learnService.getDailyTasks(userId));
+    }
+
+    @Operation(summary = "查询当前学习访问状态")
+    @GetMapping("/access-status")
+    public R<Map<String, Object>> getAccessStatus(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.getAccessStatus(userId));
     }
 
     @Operation(summary = "获取学科列表")
@@ -253,6 +262,14 @@ public class LearnController {
         return R.ok(learnService.getSmartReviewQuiz(userId, subjectId, questionCount));
     }
 
+    @Operation(summary = "获取今日到期复习题目")
+    @GetMapping("/review/due-questions")
+    public R<List<Map<String, Object>>> getDueReviewQuestions(HttpServletRequest request,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(defaultValue = "15") Integer questionCount) {
+        return R.ok(learnService.getDueReviewQuestions((Long) request.getAttribute("userId"), subjectId, questionCount));
+    }
+
     @Operation(summary = "更新错题掌握度")
     @PostMapping("/review/mastery")
     public R<Map<String, Object>> updateWrongTopicMastery(
@@ -261,5 +278,15 @@ public class LearnController {
             @RequestParam boolean isCorrect) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(learnService.updateWrongTopicMastery(userId, wrongTopicId, isCorrect));
+    }
+
+    @Operation(summary = "提交题目纠错反馈")
+    @PostMapping("/question-feedback")
+    public R<Map<String, Object>> questionFeedback(HttpServletRequest request, @RequestBody Map<String, Object> body) {
+        Long questionId = body.get("questionId") instanceof Number n ? n.longValue() : null;
+        if (questionId == null) return R.fail("题目ID不能为空");
+        Long id = questionFeedbackService.submit((Long) request.getAttribute("userId"), questionId,
+            String.valueOf(body.getOrDefault("feedbackType", "OTHER")), String.valueOf(body.getOrDefault("content", "")));
+        return R.ok(Map.of("feedbackId", id, "status", "PENDING"));
     }
 }

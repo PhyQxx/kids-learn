@@ -52,22 +52,6 @@
                 "dSYMs" : false
             },
             "sdkConfigs" : {}
-        },
-        "nativePlugins" : {
-            "Tellsea-XfyunVoicePlugin" : {
-                "__plugin_info__" : {
-                    "name" : "讯飞语音播报插件（在线语音合成流式版） - [试用版，仅用于自定义调试基座]",
-                    "description" : "讯飞语音播报插件，在线语音合成流式版",
-                    "platforms" : "Android",
-                    "url" : "https://ext.dcloud.net.cn/plugin?id=8287",
-                    "android_package_name" : "",
-                    "ios_bundle_id" : "",
-                    "isCloud" : true,
-                    "bought" : 0,
-                    "pid" : "8287",
-                    "parameters" : {}
-                }
-            }
         }
     },
     "quickapp" : {},

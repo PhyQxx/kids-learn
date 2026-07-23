@@ -47,34 +47,50 @@
           <el-menu-item v-if="hasPerm('admin:title:read')" index="/achievement/title">称号管理</el-menu-item>
         </el-sub-menu>
 
-        <el-menu-item v-if="hasAnyPerm(['admin:dashboard:read', 'admin:*'])" index="/ranking">
-          <el-icon><Trophy /></el-icon>
-          <template #title>排行榜</template>
-        </el-menu-item>
+        <el-sub-menu v-if="hasAnyPerm(['admin:dashboard:read', 'admin:order:read', 'admin:challenge:read'])" index="operation">
+          <template #title>
+            <el-icon><Promotion /></el-icon>
+            <span>运营管理</span>
+          </template>
+          <el-menu-item v-if="hasAnyPerm(['admin:dashboard:read', 'admin:*'])" index="/ranking">排行榜管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:challenge:read')" index="/challenge">挑战赛管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:order:read')" index="/order">订单管理</el-menu-item>
+        </el-sub-menu>
 
-        <el-menu-item v-if="hasAnyPerm(['admin:order:read', 'admin:*'])" index="/order">
-          <el-icon><Document /></el-icon>
-          <template #title>订单管理</template>
-        </el-menu-item>
-
-        <el-menu-item v-if="hasAnyPerm(['admin:challenge:read', 'admin:*'])" index="/challenge">
-          <el-icon><VideoPlay /></el-icon>
-          <template #title>挑战赛管理</template>
-        </el-menu-item>
-
-        <el-sub-menu v-if="hasAnyPerm(['admin:user:read', 'admin:role:read', 'admin:config:read', 'admin:log:read'])" index="system">
+        <el-sub-menu v-if="hasAnyPerm(['admin:user:read', 'admin:role:read', 'admin:config:read', 'admin:log:read', 'admin:dict:read', 'admin:version:read'])" index="system">
           <template #title>
             <el-icon><Setting /></el-icon>
             <span>系统管理</span>
           </template>
-          <el-menu-item v-if="hasPerm('admin:user:read')" index="/system/user">用户管理</el-menu-item>
-          <el-menu-item v-if="hasPerm('admin:role:read')" index="/system/role">角色管理</el-menu-item>
-          <el-menu-item v-if="hasPerm('admin:config:read')" index="/system/config">系统配置</el-menu-item>
-          <el-menu-item v-if="hasPerm('admin:config:read')" index="/system/ai">AI配置</el-menu-item>
-          <el-menu-item v-if="hasPerm('admin:config:read')" index="/system/feedback-audio">反馈语音配置</el-menu-item>
-          <el-menu-item v-if="hasPerm('admin:log:read')" index="/system/log">操作日志</el-menu-item>
-          <el-menu-item v-if="hasPerm('admin:dict:read')" index="/system/dict">字典管理</el-menu-item>
-          <el-menu-item v-if="hasPerm('admin:version:read')" index="/system/version">版本管理</el-menu-item>
+
+          <el-sub-menu v-if="hasAnyPerm(['admin:user:read', 'admin:role:read'])" index="system-auth">
+            <template #title>
+              <el-icon><Lock /></el-icon>
+              <span>权限管理</span>
+            </template>
+            <el-menu-item v-if="hasPerm('admin:user:read')" index="/system/user">用户管理</el-menu-item>
+            <el-menu-item v-if="hasPerm('admin:role:read')" index="/system/role">角色管理</el-menu-item>
+          </el-sub-menu>
+
+          <el-sub-menu v-if="hasAnyPerm(['admin:config:read', 'admin:dict:read'])" index="system-config">
+            <template #title>
+              <el-icon><Tools /></el-icon>
+              <span>配置管理</span>
+            </template>
+            <el-menu-item v-if="hasPerm('admin:config:read')" index="/system/config">系统配置</el-menu-item>
+            <el-menu-item v-if="hasPerm('admin:config:read')" index="/system/ai">AI配置</el-menu-item>
+            <el-menu-item v-if="hasPerm('admin:config:read')" index="/system/feedback-audio">反馈语音配置</el-menu-item>
+            <el-menu-item v-if="hasPerm('admin:dict:read')" index="/system/dict">字典管理</el-menu-item>
+          </el-sub-menu>
+
+          <el-sub-menu v-if="hasAnyPerm(['admin:log:read', 'admin:version:read'])" index="system-ops">
+            <template #title>
+              <el-icon><Monitor /></el-icon>
+              <span>运维管理</span>
+            </template>
+            <el-menu-item v-if="hasPerm('admin:log:read')" index="/system/log">操作日志</el-menu-item>
+            <el-menu-item v-if="hasPerm('admin:version:read')" index="/system/version">版本管理</el-menu-item>
+          </el-sub-menu>
         </el-sub-menu>
       </el-menu>
     </el-aside>

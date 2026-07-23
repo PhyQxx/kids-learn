@@ -7,18 +7,22 @@
           <text class="settings-group-mark">账号</text>
           <text class="text-md text-bold">账号设置</text>
         </view>
-        <view class="setting-item" @tap="editPhone">
+        <view class="setting-item" @tap="goSecurity('phone')">
           <text class="text-sm">手机号</text>
           <view class="setting-right">
             <text class="text-sm text-light">{{ maskedPhone }}</text>
             <text class="menu-arrow">进入</text>
           </view>
         </view>
-        <view class="setting-item" @tap="editPassword">
+        <view class="setting-item" @tap="goSecurity('password')">
           <text class="text-sm">修改密码</text>
           <view class="setting-right">
             <text class="menu-arrow">进入</text>
           </view>
+        </view>
+        <view class="setting-item" @tap="goSecurity('pin')">
+          <text class="text-sm">家长PIN与登录设备</text>
+          <view class="setting-right"><text class="menu-arrow">进入</text></view>
         </view>
         <view class="setting-item" @tap="editProfile">
           <text class="text-sm">孩子资料</text>
@@ -52,15 +56,15 @@
         </view>
         <view class="setting-item">
           <text class="text-sm">学习提醒</text>
-          <tn-switch v-model="settings.studyReminder" active-color="#FF6B6B" />
+          <tn-switch v-model="settings.studyReminder" active-color="#FF6B6B" @change="saveNotificationPreference('LEARNING_REMINDER', $event)" />
         </view>
         <view class="setting-item">
           <text class="text-sm">成就通知</text>
-          <tn-switch v-model="settings.achievementNotify" active-color="#FF6B6B" />
+          <tn-switch v-model="settings.achievementNotify" active-color="#FF6B6B" @change="saveNotificationPreference('ACHIEVEMENT_UNLOCKED', $event)" />
         </view>
         <view class="setting-item">
           <text class="text-sm">排行榜变动</text>
-          <tn-switch v-model="settings.rankNotify" active-color="#FF6B6B" />
+          <tn-switch v-model="settings.rankNotify" active-color="#FF6B6B" @change="saveNotificationPreference('RANKING_CHANGE', $event)" />
         </view>
       </view>
 
@@ -125,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import GradeSelectPopup from '@/components/GradeSelectPopup.vue'
 import { useUserStore } from '@/store/user'
@@ -133,6 +137,8 @@ import { useLearnStore } from '@/store/learn'
 import { getUserInfo, updateChildProfile } from '@/api/user'
 import doCheckUpdate from '@/utils/update.mjs'
 import manifest from '@/manifest.json'
+import { getNotificationPreferences, updateNotificationPreference } from '@/api/notification'
+import { applyRuntimeSettings } from '@/utils/runtimeSettings.js'
 
 const SETTINGS_KEY = 'kidslearn_settings'
 
@@ -160,10 +166,27 @@ const defaultSettings = {
 
 const settings = ref(loadSettings() || { ...defaultSettings })
 
+async function loadNotificationPreferences() {
+  try {
+    const result = await getNotificationPreferences()
+    settings.value.studyReminder = result?.LEARNING_REMINDER?.inAppEnabled ?? true
+    settings.value.achievementNotify = result?.ACHIEVEMENT_UNLOCKED?.inAppEnabled ?? true
+    settings.value.rankNotify = result?.RANKING_CHANGE?.inAppEnabled ?? false
+  } catch (e) { console.log('通知偏好加载失败', e) }
+}
+
+async function saveNotificationPreference(type, value) {
+  try { await updateNotificationPreference(type, { inAppEnabled: Boolean(value) }) }
+  catch (e) { uni.showToast({ title: e.message || '通知设置保存失败', icon: 'none' }); await loadNotificationPreferences() }
+}
+
+onMounted(loadNotificationPreferences)
+
 // 监听设置变化，自动保存到本地存储
 watch(settings, (newVal) => {
   try {
     uni.setStorageSync(SETTINGS_KEY, JSON.stringify(newVal))
+    applyRuntimeSettings(newVal)
   } catch {}
 }, { deep: true })
 
@@ -198,8 +221,8 @@ async function handleGradeConfirm(grade) {
 }
 
 const maskedPhone = computed(() => {
-  const phone = userStore.userInfo?.phone || '13812345678'
-  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+  const phone = userStore.userInfo?.phone
+  return phone ? phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2') : '未绑定'
 })
 
 // 刷新用户信息
@@ -211,31 +234,7 @@ getUserInfo().then(info => {
   }
 }).catch(() => {})
 
-function editPhone() { uni.showToast({ title: '修改手机号功能开发中', icon: 'none' }) }
-
-function editPassword() {
-  uni.showModal({
-    title: '修改密码',
-    editable: true,
-    placeholderText: '请输入新密码（6-20位）',
-    success: async (res) => {
-      if (res.confirm && res.content) {
-        const newPwd = res.content.trim()
-        if (newPwd.length < 6 || newPwd.length > 20) {
-          uni.showToast({ title: '密码长度需6-20位', icon: 'none' })
-          return
-        }
-        try {
-          const { updatePassword } = await import('@/api/user')
-          await updatePassword({ password: newPwd })
-          uni.showToast({ title: '密码修改成功', icon: 'success' })
-        } catch (e) {
-          uni.showToast({ title: e.message || '修改失败', icon: 'none' })
-        }
-      }
-    }
-  })
-}
+function goSecurity(section) { uni.navigateTo({ url: `/pages/mine/security?section=${section}` }) }
 
 function editProfile() {
   uni.navigateTo({ url: '/pages/onboarding/index?mode=edit' })
@@ -282,6 +281,7 @@ function clearCache() {
           const token = uni.getStorageSync('token')
           const refreshToken = uni.getStorageSync('refresh_token')
           const userInfo = uni.getStorageSync('userInfo')
+          const runtimeSettings = uni.getStorageSync(SETTINGS_KEY)
 
           // 清除所有本地存储
           uni.clearStorageSync()
@@ -290,6 +290,7 @@ function clearCache() {
           if (token) uni.setStorageSync('token', token)
           if (refreshToken) uni.setStorageSync('refresh_token', refreshToken)
           if (userInfo) uni.setStorageSync('userInfo', userInfo)
+          if (runtimeSettings) uni.setStorageSync(SETTINGS_KEY, runtimeSettings)
 
           uni.showToast({ title: '缓存已清除', icon: 'success' })
         } catch (e) {

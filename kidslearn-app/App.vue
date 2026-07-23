@@ -3,9 +3,11 @@ import { useRealtimeStore } from '@/store/realtime'
 import { useUserStore } from '@/store/user'
 import { getPostAuthRedirectUrl } from '@/utils/onboardingFlow.mjs'
 import checkUpdate from '@/utils/update.mjs'
+import { applyRuntimeSettings } from '@/utils/runtimeSettings.js'
 
 export default {
   onLaunch() {
+    applyRuntimeSettings()
     console.log('趣学星球 App Launch')
     // 检查应用更新（静默检查，不显示提示）
     // #ifdef APP-PLUS
@@ -23,6 +25,7 @@ export default {
     }
   },
   onShow() {
+    applyRuntimeSettings()
     console.log('App Show')
     const token = uni.getStorageSync('token')
     if (token) {
@@ -81,6 +84,14 @@ uni-page-head {
 
 .page-leave-active {
   animation: pageSlideOut 0.3s ease-in;
+}
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 /* 淡入淡出动画 */

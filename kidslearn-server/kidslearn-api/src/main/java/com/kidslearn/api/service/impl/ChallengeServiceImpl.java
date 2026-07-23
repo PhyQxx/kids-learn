@@ -50,10 +50,12 @@ public class ChallengeServiceImpl implements ChallengeService {
     private final FriendMapper friendMapper;
     private final LeaderboardMapper leaderboardMapper;
     private final UserMapper userMapper;
+    private final LearningAccessService learningAccessService;
 
     @Override
     @Transactional
     public Map<String, Object> createChallenge(Long userId, CreateChallengeDTO dto) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.CHALLENGE);
         String challengeType = normalizeType(dto != null ? dto.getType() : null);
         Challenge challenge = ensureActiveChallenge(challengeType);
         User opponent = selectOpponent(userId, challengeType, dto != null ? dto.getOpponentId() : null);
@@ -73,6 +75,7 @@ public class ChallengeServiceImpl implements ChallengeService {
     @Override
     @Transactional
     public Map<String, Object> submitChallengeResult(Long userId, SubmitChallengeDTO dto) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.CHALLENGE);
         if (dto == null || dto.getChallengeId() == null) {
             throw new BusinessException("挑战不存在");
         }
@@ -179,7 +182,7 @@ public class ChallengeServiceImpl implements ChallengeService {
         boolean containsMe = false;
         for (Leaderboard row : rows) {
             User user = userMapper.selectById(row.getUserId());
-            if (user == null) {
+            if (user == null || Integer.valueOf(0).equals(user.getStatus())) {
                 continue;
             }
             containsMe = containsMe || user.getId().equals(userId);
@@ -251,14 +254,7 @@ public class ChallengeServiceImpl implements ChallengeService {
             );
         }
 
-        if (candidates.isEmpty()) {
-            User dummy = new User();
-            dummy.setId(0L);
-            dummy.setNickname("挑战机器人");
-            dummy.setAvatar("🤖");
-            dummy.setLevel(5);
-            return dummy;
-        }
+        if (candidates.isEmpty()) throw new BusinessException("暂时没有真实对手");
 
         Collections.shuffle(candidates);
         return candidates.get(0);
@@ -270,12 +266,7 @@ public class ChallengeServiceImpl implements ChallengeService {
                 .eq(CourseLevel::getStatus, 1)
                 .last("LIMIT 50")
         );
-        if (levels.isEmpty()) {
-            CourseLevel dummy = new CourseLevel();
-            dummy.setId(1L);
-            dummy.setLevelName("基础挑战关卡");
-            return dummy;
-        }
+        if (levels.isEmpty()) throw new BusinessException("当前没有可用挑战关卡");
         Collections.shuffle(levels);
         return levels.get(0);
     }
@@ -426,7 +417,7 @@ public class ChallengeServiceImpl implements ChallengeService {
     }
 
     private String currentSeasonKey() {
-        return String.valueOf(currentWeekNumber());
+        return ChallengeSeasonCatalog.current(LocalDate.now()).key();
     }
 
     private int currentWeekNumber() {
@@ -437,8 +428,7 @@ public class ChallengeServiceImpl implements ChallengeService {
 
     private String seasonRemainingText() {
         LocalDate now = LocalDate.now();
-        LocalDate sunday = now.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
-        long days = now.until(sunday, java.time.temporal.ChronoUnit.DAYS);
+        long days = now.until(ChallengeSeasonCatalog.current(now).end(), java.time.temporal.ChronoUnit.DAYS);
         if (days == 0) return "今晚结算";
         return "剩 " + days + " 天结算";
     }

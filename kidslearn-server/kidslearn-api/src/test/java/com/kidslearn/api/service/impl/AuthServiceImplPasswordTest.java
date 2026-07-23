@@ -11,6 +11,7 @@ import cn.hutool.crypto.digest.DigestUtil;
 import com.kidslearn.api.dto.auth.LoginDTO;
 import com.kidslearn.api.entity.User;
 import com.kidslearn.api.mapper.ChildProfileMapper;
+import com.kidslearn.api.mapper.AdminRoleMapper;
 import com.kidslearn.api.mapper.GradeLevelMapper;
 import com.kidslearn.api.mapper.ParentProfileMapper;
 import com.kidslearn.api.mapper.PetMapper;
@@ -20,6 +21,7 @@ import com.kidslearn.api.mapper.UserPetMapper;
 import com.kidslearn.common.exception.BusinessException;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.ValueOperations;
 
 class AuthServiceImplPasswordTest {
@@ -37,6 +39,9 @@ class AuthServiceImplPasswordTest {
         @SuppressWarnings("unchecked")
         ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        @SuppressWarnings("unchecked")
+        SetOperations<String, String> setOperations = mock(SetOperations.class);
+        when(redisTemplate.opsForSet()).thenReturn(setOperations);
 
         User user = new User();
         user.setId(7L);
@@ -54,8 +59,10 @@ class AuthServiceImplPasswordTest {
             userLoginLogMapper,
             petMapper,
             userPetMapper,
+            mock(AdminRoleMapper.class),
             redisTemplate,
-            new PasswordHashService()
+            new PasswordHashService(),
+            mock(SmsVerificationService.class)
         );
 
         LoginDTO dto = new LoginDTO();
@@ -95,8 +102,10 @@ class AuthServiceImplPasswordTest {
             mock(UserLoginLogMapper.class),
             mock(PetMapper.class),
             mock(UserPetMapper.class),
+            mock(AdminRoleMapper.class),
             redisTemplate,
-            new PasswordHashService()
+            new PasswordHashService(),
+            mock(SmsVerificationService.class)
         );
     }
 }

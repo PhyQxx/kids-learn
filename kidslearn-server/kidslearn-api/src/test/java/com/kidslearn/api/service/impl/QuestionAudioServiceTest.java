@@ -31,8 +31,8 @@ class QuestionAudioServiceTest {
         QuestionMapper questionMapper = Mockito.mock(QuestionMapper.class);
         FtpTool ftpTool = Mockito.mock(FtpTool.class);
         FakeAudioGenerator audioGenerator = new FakeAudioGenerator(tempDir);
-        QuestionAudioProperties properties = new QuestionAudioProperties();
-        properties.setEngine("fake");
+        QuestionAudioProperties properties = Mockito.mock(QuestionAudioProperties.class);
+        when(properties.getEngine()).thenReturn("fake");
         QuestionAudioService service = new QuestionAudioService(questionMapper, ftpTool, properties,
                 Map.of("fake", audioGenerator));
 

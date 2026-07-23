@@ -41,4 +41,22 @@ public class AdminFileController {
             "fileName", storedFileName
         ));
     }
+
+    @Operation(summary = "Upload app release package (wgt/apk/ipa)")
+    @PostMapping("/upload-package")
+    public R<Map<String, String>> uploadAppPackage(@RequestParam("file") MultipartFile file) throws IOException {
+        AppPackageValidator.validate(file);
+
+        String ext = AppPackageValidator.extension(file.getOriginalFilename());
+        String serviceDir = "/app/release/" + LocalDate.now().format(DAY_FORMAT);
+        String fileName = UUID.randomUUID().toString().replace("-", "")
+            + "." + ext;
+
+        String storedFileName = ftpTool.upload(serviceDir, fileName, file.getInputStream());
+        return R.ok(Map.of(
+            "url", ftpTool.buildPublicUrl(serviceDir, storedFileName),
+            "fileName", storedFileName,
+            "packageType", ext
+        ));
+    }
 }

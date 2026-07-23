@@ -8,6 +8,7 @@
     "pages": [
         { "path": "pages/login/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
         { "path": "pages/login/register", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
+        { "path": "pages/login/forgot-password", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
         { "path": "pages/onboarding/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "" } },
         { "path": "pages/main/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "趣学星球" } },
         { "path": "pages/learn/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "学习中心" } },
@@ -31,6 +32,7 @@
         { "path": "pages/mine/wrong", "style": { "navigationStyle": "custom", "navigationBarTitleText": "错题本" } },
         { "path": "pages/mine/vip", "style": { "navigationStyle": "custom", "navigationBarTitleText": "VIP" } },
         { "path": "pages/mine/settings", "style": { "navigationStyle": "custom", "navigationBarTitleText": "设置" } },
+        { "path": "pages/mine/security", "style": { "navigationStyle": "custom", "navigationBarTitleText": "账号安全" } },
         { "path": "pages/notification/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "消息通知" } }
     ],
     "globalStyle": {

@@ -184,7 +184,9 @@
               :class="{ selected: pickedPetId === pet.id }"
               @tap="pickedPetId = pet.id">
               <view class="pet-picker-bg">
-                <text class="pet-emoji">{{ pet.imageUrl }}</text>
+                <image v-if="resolvePetImage(pet.imageUrl).type === 'image'"
+                  class="pet-emoji-img" :src="pet.imageUrl" mode="aspectFit" />
+                <text v-else class="pet-emoji">{{ resolvePetImage(pet.imageUrl).text || '🐾' }}</text>
               </view>
               <text class="text-md text-bold" style="margin-top:12px; color:#34495E;">{{ pet.petName }}</text>
             </view>
@@ -205,7 +207,7 @@ import { ref, computed, onMounted } from 'vue'
 import { usePetStore } from '@/store/pet'
 import { useUserStore } from '@/store/user'
 import { getPetStatus, getInventory, getDecorationInventory, feedPet as feedPetApi, playPet as playPetApi, bathPet as bathPetApi, getAvailablePets, selectPet } from '@/api/pet'
-import { normalizeInventoryItems, normalizeDecorations } from '@/utils/petFeature.mjs'
+import { normalizeInventoryItems, normalizeDecorations, resolvePetImage } from '@/utils/petFeature.mjs'
 import FunLoadingState from '@/components/common/FunLoadingState.vue'
 import { soundManager } from '@/utils/sound'
 
@@ -679,6 +681,7 @@ function syncUserBalance(petRes) {
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 .pet-picker-item .pet-emoji { font-size: 48px; }
+.pet-picker-item .pet-emoji-img { width: 64px; height: 64px; }
 
 @include respond-md {
   .pet-layout { grid-template-columns: 300px 1fr; gap: 16px; }

@@ -42,7 +42,7 @@
           </view>
           <text class="text-sm text-light challenge-desc">{{ c.desc }}</text>
           <view class="challenge-meta">
-            <text class="text-xs text-light">👥 {{ getPlayerCount(c.type) }}人参与</text>
+            <text class="text-xs text-light">👥 {{ getPlayerCount(c.type) }}人已完成对战</text>
             <text class="text-xs" style="color: #F1C40F; font-weight: bold;">胜 +{{ c.reward }}分</text>
           </view>
         </view>
@@ -103,10 +103,8 @@
           <view class="radar-scan">
             <text class="radar-icon animate-spin">📡</text>
           </view>
-          <text class="text-lg text-bold" style="margin: 24px 0 8px;">寻找实力相当的对手...</text>
-          <view class="candidate-names">
-            <text class="candidate-text animate-fade-in-out">{{ currentCandidate }}</text>
-          </view>
+          <text class="text-lg text-bold" style="margin: 24px 0 8px;">正在创建挑战赛...</text>
+          <text class="text-sm text-light">没有真实对手时，成绩会安全等待他人接力</text>
           <tn-button style="margin-top: 30px;" shape="round" plain @click="cancelMatch">取消匹配</tn-button>
         </template>
 
@@ -120,8 +118,8 @@
               </view>
               <view class="vs-text animate-pop-in">VS</view>
               <view class="vs-avatar right animate-slide-in-right">
-                <text class="avatar-emoji">{{ matchedOpponent?.opponent?.nickname?.slice(0, 1) || '对' }}</text>
-                <text class="avatar-name">{{ matchedOpponent?.opponent?.nickname || '神秘对手' }}</text>
+                <text class="avatar-emoji">{{ matchedOpponent?.opponent?.nickname?.slice(0, 1) || '⏳' }}</text>
+                <text class="avatar-name">{{ matchedOpponent?.opponent?.nickname || '等待真实对手' }}</text>
               </view>
             </view>
             <view class="vs-ready-text animate-pulse">准备进入战场...</view>
@@ -135,7 +133,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
-import { createChallenge, getChallengeDashboard, getChallengeRecords } from '@/api/challenge'
+import { createChallenge, getChallengeDashboard, getChallengeRecords, getFriendList } from '@/api/challenge'
 import { normalizeChallengeDashboard, normalizeChallengeRecords } from '@/utils/challengeData.mjs'
 import { useUserStore } from '@/store/user'
 import { soundManager } from '@/utils/sound'
@@ -143,29 +141,23 @@ import { soundManager } from '@/utils/sound'
 const userStore = useUserStore()
 
 const challenges = ref([
-  { id: 1, type: 'FRIEND', name: '好友对战', icon: '👥', tag: '好友', tagBg: '#E8F0FE', tagColor: '#4A90D9', color: '#4A90D9', desc: '匹配好友或同水平对手', reward: 20 },
+  { id: 1, type: 'FRIEND', name: '好友对战', icon: '👥', tag: '好友', tagBg: '#E8F0FE', tagColor: '#4A90D9', color: '#4A90D9', desc: '选择已确认好友发起异步挑战', reward: 10 },
   { id: 2, type: 'RANKED', name: '排位赛', icon: '🏆', tag: '排位', tagBg: '#F3E8FF', tagColor: '#9B59B6', color: '#9B59B6', desc: '赢得积分挑战更高段位', reward: 20 },
-  { id: 3, type: 'RANKED', name: '限时挑战', icon: '⏱️', tag: '限时', tagBg: '#FFE8E8', tagColor: '#E74C3C', color: '#E74C3C', desc: '快速答题冲击高分', reward: 20 },
-  { id: 4, type: 'RANKED', name: '综合挑战', icon: '🎯', tag: '综合', tagBg: '#E8F8F0', tagColor: '#2ECC71', color: '#2ECC71', desc: '随机学科知识对决', reward: 20 }
+  { id: 3, type: 'TIMED', name: '限时挑战', icon: '⏱️', tag: '限时', tagBg: '#FFE8E8', tagColor: '#E74C3C', color: '#E74C3C', desc: '独立匹配池，快速答题冲击高分', reward: 20 },
+  { id: 4, type: 'COMPREHENSIVE', name: '综合挑战', icon: '🎯', tag: '综合', tagBg: '#E8F8F0', tagColor: '#2ECC71', color: '#2ECC71', desc: '独立匹配池，随机知识综合对决', reward: 20 }
 ])
 
 const matching = ref(false)
 const matchState = ref('idle') // idle, searching, vs
 const matchedOpponent = ref(null)
-const currentCandidate = ref('宇宙探索者')
 const dashboard = ref(normalizeChallengeDashboard())
 const history = ref([])
-
-const candidates = ['数学小达人', '英语狂热者', '逻辑之王', '小小科学家', '诗词才子', '星际旅行者', '知识冒险家']
-let candidateTimer = null
 
 function getPlayerCount(type) {
   if (type === 'FRIEND') {
     return dashboard.value.players.friend || 0
   } else {
-    // 将排位赛的人数粗略分配给不同的模式以显示不同数字
-    const baseRanked = dashboard.value.players.ranked || 0
-    return Math.floor(baseRanked * 0.8) + Math.floor(Math.random() * 5)
+    return dashboard.value.players.ranked || 0
   }
 }
 
@@ -188,23 +180,37 @@ async function loadRecords() {
 
 let matchTimer = null
 async function startChallenge(type) {
+  let opponentId = null
+  if (type === 'FRIEND') {
+    try {
+      const friends = await getFriendList()
+      if (!Array.isArray(friends) || friends.length === 0) {
+        uni.showToast({ title: '暂无已确认好友，请先添加好友', icon: 'none' })
+        return
+      }
+      const selected = await new Promise((resolve) => {
+        uni.showActionSheet({
+          itemList: friends.map(item => item.nickname || item.friendName || `好友 ${item.friendId || item.id}`),
+          success: ({ tapIndex }) => resolve(friends[tapIndex]),
+          fail: () => resolve(null)
+        })
+      })
+      if (!selected) return
+      opponentId = selected.friendId || selected.userId || selected.id
+    } catch (e) {
+      uni.showToast({ title: e.message || '好友列表加载失败', icon: 'none' })
+      return
+    }
+  }
   matching.value = true
   matchState.value = 'searching'
   soundManager.play('tap')
-  
-  // 模拟滚动候选人
-  let candidateIdx = 0
-  candidateTimer = setInterval(() => {
-    candidateIdx = (candidateIdx + 1) % candidates.length
-    currentCandidate.value = candidates[candidateIdx]
-  }, 200)
 
   matchTimer = setTimeout(async () => {
     try {
-      const result = await createChallenge({ type, opponentId: null })
-      clearInterval(candidateTimer)
+      const result = await createChallenge({ type, opponentId })
       
-      if (result && result.challengeId) {
+      if (result && result.matchId) {
         matchedOpponent.value = result
         matchState.value = 'vs'
         soundManager.play('popup') // 匹配成功音效
@@ -213,10 +219,8 @@ async function startChallenge(type) {
         setTimeout(() => {
           matching.value = false
           matchState.value = 'idle'
-          const levelId = result.level?.id || 1
-          const opponentId = result.opponent?.id || ''
           uni.navigateTo({
-            url: `/pages/learn/quiz?levelId=${levelId}&challengeId=${result.challengeId}&opponentId=${opponentId}`
+            url: `/pages/learn/quiz?challengeMatchId=${result.matchId}`
           })
         }, 2000)
       } else {
@@ -225,7 +229,6 @@ async function startChallenge(type) {
         uni.showToast({ title: '暂时没有找到对手，请重试', icon: 'none' })
       }
     } catch (e) {
-      clearInterval(candidateTimer)
       matching.value = false
       matchState.value = 'idle'
       uni.showToast({ title: e.message || '匹配失败', icon: 'none' })
@@ -235,7 +238,6 @@ async function startChallenge(type) {
 
 function cancelMatch() {
   if (matchTimer) clearTimeout(matchTimer)
-  if (candidateTimer) clearInterval(candidateTimer)
   matching.value = false
   matchState.value = 'idle'
 }
@@ -250,7 +252,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (candidateTimer) clearInterval(candidateTimer)
   if (matchTimer) clearTimeout(matchTimer)
 })
 </script>

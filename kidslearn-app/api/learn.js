@@ -3,6 +3,8 @@ import { get, post } from './request'
 // 获取今日任务
 export const getDailyTasks = () => get('/learn/daily-tasks')
 
+export const getLearningAccessStatus = () => get('/learn/access-status')
+
 // 获取学科列表 (gradeLevelId: 年级ID，可选)
 export const getSubjects = (gradeLevelId) => get('/learn/subjects', { gradeLevelId })
 
@@ -81,7 +83,10 @@ export const completePracticeSession = (sessionId) => post(`/learn/practice/comp
 // 获取智能复习组卷
 export const getSmartReviewQuiz = (subjectId, questionCount = 15) => 
   get('/learn/review/smart-quiz', { subjectId, questionCount })
+export const getDueReviewQuestions = (subjectId, questionCount = 15) =>
+  get('/learn/review/due-questions', { subjectId, questionCount })
 
 // 更新错题掌握度
 export const updateWrongTopicMastery = (wrongTopicId, isCorrect) => 
   post(`/learn/review/mastery?wrongTopicId=${wrongTopicId}&isCorrect=${isCorrect}`)
+export const submitQuestionFeedback = (payload) => post('/learn/question-feedback', payload)

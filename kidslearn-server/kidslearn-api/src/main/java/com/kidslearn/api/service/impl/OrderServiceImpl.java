@@ -6,8 +6,10 @@ import com.kidslearn.api.mapper.OrderMapper;
 import com.kidslearn.api.service.OrderService;
 import com.kidslearn.api.service.SubscriptionService;
 import com.kidslearn.common.exception.BusinessException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +22,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
 
     public static final int PRODUCT_TYPE_SUBSCRIPTION = 1;
@@ -32,10 +33,42 @@ public class OrderServiceImpl implements OrderService {
 
     private final OrderMapper orderMapper;
     private final SubscriptionService subscriptionService;
+    private final Environment environment;
+    private final boolean paymentEnabled;
+    private final java.util.Set<String> allowedChannels;
+
+    @Autowired
+    public OrderServiceImpl(OrderMapper orderMapper, SubscriptionService subscriptionService,
+            Environment environment,
+            @Value("${kidslearn.payment.enabled:false}") boolean paymentEnabled,
+            @Value("${kidslearn.payment.allowed-channels:}") String allowedChannels) {
+        this.orderMapper = orderMapper;
+        this.subscriptionService = subscriptionService;
+        this.environment = environment;
+        this.paymentEnabled = paymentEnabled;
+        this.allowedChannels = java.util.Arrays.stream(allowedChannels.split(","))
+            .map(String::trim).filter(value -> !value.isBlank()).map(String::toLowerCase)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    OrderServiceImpl(OrderMapper orderMapper, SubscriptionService subscriptionService) {
+        this.orderMapper = orderMapper;
+        this.subscriptionService = subscriptionService;
+        this.environment = null;
+        this.paymentEnabled = true;
+        this.allowedChannels = java.util.Set.of("mock", "wechat", "alipay", "apple");
+    }
 
     @Override
     @Transactional
     public Map<String, Object> createOrder(Long userId, Integer planType, String payChannel) {
+        String normalizedChannel = payChannel == null ? "" : payChannel.trim().toLowerCase();
+        if (!paymentEnabled || normalizedChannel.isBlank() || !allowedChannels.contains(normalizedChannel)) {
+            throw new BusinessException("会员购买功能筹备中");
+        }
+        if (isProduction() && "mock".equals(normalizedChannel)) {
+            throw new BusinessException("生产环境禁止模拟支付");
+        }
         SubscriptionPlan plan = SubscriptionPlanCatalog.requirePlan(planType);
         Order order = new Order();
         order.setOrderNo(generateOrderNo(userId));
@@ -43,13 +76,17 @@ public class OrderServiceImpl implements OrderService {
         order.setProductType(PRODUCT_TYPE_SUBSCRIPTION);
         order.setProductId(Long.valueOf(plan.planType()));
         order.setAmount(plan.amount());
-        order.setPayChannel(payChannel == null || payChannel.isBlank() ? "mock" : payChannel);
+        order.setPayChannel(normalizedChannel);
         order.setPayStatus(PAY_STATUS_PENDING);
         orderMapper.insert(order);
 
         Map<String, Object> result = toOrderMap(order);
         result.put("plan", plan.planCode());
         return result;
+    }
+
+    private boolean isProduction() {
+        return environment != null && java.util.List.of(environment.getActiveProfiles()).contains("prod");
     }
 
     @Override

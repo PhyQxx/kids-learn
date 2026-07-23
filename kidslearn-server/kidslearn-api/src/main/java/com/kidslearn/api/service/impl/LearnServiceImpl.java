@@ -4,13 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.kidslearn.api.dto.learn.*;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
-import com.kidslearn.api.entity.TimeControl;
 import com.kidslearn.api.realtime.RealtimeEventPublisher;
 import com.kidslearn.api.service.AchievementService;
 import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.LearnService;
 import com.kidslearn.api.service.PetService;
-import com.kidslearn.api.service.SubscriptionService;
+import com.kidslearn.api.service.EntitlementService;
 import com.kidslearn.common.exception.BusinessException;
 import com.kidslearn.common.util.RichContentUtil;
 import lombok.RequiredArgsConstructor;
@@ -51,10 +50,15 @@ public class LearnServiceImpl implements LearnService {
     private final PetService petService;
     private final AiService aiService;
     private final PracticeModeMapper practiceModeMapper;
-    private final SubscriptionService subscriptionService;
-    private final TimeControlMapper timeControlMapper;
+    private final EntitlementService entitlementService;
+    private final LearningAccessService learningAccessService;
     private final PracticeSessionMapper practiceSessionMapper;
     private final UserQuestionRecordMapper userQuestionRecordMapper;
+
+    @Override
+    public Map<String, Object> getAccessStatus(Long userId) {
+        return learningAccessService.getAccessStatus(userId);
+    }
 
     @Override
     public DailyTaskVO getDailyTasks(Long userId) {
@@ -159,17 +163,7 @@ public class LearnServiceImpl implements LearnService {
             return List.of();
         }
 
-        // VIP权限控制：非VIP用户只能看免费视频
-        Map<String, Object> subscription = subscriptionService.getCurrentSubscription(userId);
-        boolean isVip = Boolean.TRUE.equals(subscription.get("active"));
-        if (!isVip) {
-            videos = videos.stream()
-                .filter(v -> v.getIsFree() != null && v.getIsFree() == 1)
-                .collect(Collectors.toList());
-            if (videos.isEmpty()) {
-                return List.of();
-            }
-        }
+        boolean premiumAllowed = entitlementService.has(userId, EntitlementService.Code.COURSE_PREMIUM);
 
         List<Long> videoIds = videos.stream().map(CourseVideo::getId).collect(Collectors.toList());
         Map<Long, UserVideoProgress> progressByVideoId = userVideoProgressMapper.selectList(
@@ -182,8 +176,9 @@ public class LearnServiceImpl implements LearnService {
             .map(video -> {
                 Map<String, Object> map = toVideoMap(video, progressByVideoId.get(video.getId()));
                 // 非VIP用户标记付费视频为锁定状态
-                if (!isVip && (video.getIsFree() == null || video.getIsFree() != 1)) {
+                if (!premiumAllowed && (video.getIsFree() == null || video.getIsFree() != 1)) {
                     map.put("locked", true);
+                    map.remove("videoUrl");
                 }
                 return map;
             })
@@ -193,12 +188,16 @@ public class LearnServiceImpl implements LearnService {
     @Override
     @Transactional
     public Map<String, Object> submitVideoProgress(Long userId, SubmitVideoProgressDTO dto) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.VIDEO);
         if (dto == null || dto.getVideoId() == null) {
             throw new BusinessException("Video id is required");
         }
         CourseVideo video = courseVideoMapper.selectById(dto.getVideoId());
         if (video == null || video.getStatus() == null || video.getStatus() != 1) {
             throw new BusinessException("Video not found");
+        }
+        if (video.getIsFree() == null || video.getIsFree() != 1) {
+            entitlementService.require(userId, EntitlementService.Code.COURSE_PREMIUM);
         }
 
         UserVideoProgress record = userVideoProgressMapper.selectOne(
@@ -362,8 +361,7 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public List<Map<String, Object>> getQuestions(Long userId, Long levelId) {
-        // 时间控制检查
-        checkTimeControl(userId);
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.LEVEL_QUIZ);
 
         CourseLevel level = courseLevelMapper.selectById(levelId);
         if (level == null || level.getSubjectId() == null) {
@@ -460,6 +458,7 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public Map<String, Object> submitAnswer(Long userId, SubmitAnswerDTO dto) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.LEVEL_QUIZ);
         Question question = questionMapper.selectById(dto.getQuestionId());
         if (question == null) {
             throw new BusinessException("题目不存在");
@@ -745,13 +744,15 @@ public class LearnServiceImpl implements LearnService {
                 .eq(WrongTopic::getQuestionId, questionId)
         );
         if (existing != null) {
-            existing.setTimes(existing.getTimes() + 1);
+            existing.setTimes((existing.getTimes() == null ? 0 : existing.getTimes()) + 1);
             existing.setWrongAnswer(wrongAnswer);
             existing.setCorrectAnswer(correctAnswer);
             existing.setLastWrongTime(LocalDateTime.now());
             existing.setIsMastered(0);
             existing.setContinuousCorrectCount(0);
             existing.setMasteryLevel(0);
+            existing.setNextReviewDate(LocalDate.now().plusDays(1));
+            existing.setLastReviewResult(0);
             wrongTopicMapper.updateById(existing);
         } else {
             WrongTopic wt = new WrongTopic();
@@ -764,6 +765,9 @@ public class LearnServiceImpl implements LearnService {
             wt.setIsMastered(0);
             wt.setContinuousCorrectCount(0);
             wt.setMasteryLevel(0);
+            wt.setNextReviewDate(LocalDate.now().plusDays(1));
+            wt.setReviewCount(0);
+            wt.setLastReviewResult(0);
             wrongTopicMapper.insert(wt);
         }
     }
@@ -818,12 +822,16 @@ public class LearnServiceImpl implements LearnService {
             map.put("wrongCount", wt.getTimes());
             map.put("masteryLevel", wt.getMasteryLevel());
             map.put("continuousCorrectCount", wt.getContinuousCorrectCount());
+            map.put("nextReviewDate", wt.getNextReviewDate());
+            map.put("reviewCount", wt.getReviewCount());
+            map.put("due", wt.getNextReviewDate() == null || !wt.getNextReviewDate().isAfter(LocalDate.now()));
             Question q = questionMapper.selectById(wt.getQuestionId());
             if (q != null) {
                 map.put("questionContent", q.getQuestionContent());
                 map.put("questionText", RichContentUtil.toPlainText(q.getQuestionContent()));
                 map.put("analysisText", RichContentUtil.toPlainText(q.getAnalysis()));
                 if (q.getSubjectId() != null) {
+                    map.put("subjectId", q.getSubjectId());
                     Subject subject = subjectMapper.selectById(q.getSubjectId());
                     if (subject != null) map.put("subjectName", subject.getSubjectName());
                 }
@@ -1076,6 +1084,7 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public List<Map<String, Object>> getAdaptiveQuestions(Long userId, Long subjectId) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.ADAPTIVE);
         List<Question> selectedQuestions = new ArrayList<>();
         Random random = new Random();
 
@@ -1193,6 +1202,7 @@ public class LearnServiceImpl implements LearnService {
     @Override
     @Transactional
     public Map<String, Object> retryWrong(Long userId, Long questionId, String answer) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.WRONG_RETRY);
         Question question = questionMapper.selectById(questionId);
         if (question == null) {
             throw new BusinessException("题目不存在");
@@ -1214,22 +1224,22 @@ public class LearnServiceImpl implements LearnService {
         result.put("explanation", question.getAnalysis());
         result.put("explanationText", RichContentUtil.toPlainText(question.getAnalysis()));
 
+        WrongTopic wt = wrongTopicMapper.selectOne(new LambdaQueryWrapper<WrongTopic>()
+            .eq(WrongTopic::getUserId, userId).eq(WrongTopic::getQuestionId, questionId).last("LIMIT 1"));
         if (isCorrect) {
-            WrongTopic wt = wrongTopicMapper.selectOne(
-                new LambdaQueryWrapper<WrongTopic>()
-                    .eq(WrongTopic::getUserId, userId)
-                    .eq(WrongTopic::getQuestionId, questionId)
-            );
-            if (wt != null) {
-                wt.setIsMastered(1);
-                wrongTopicMapper.updateById(wt);
-            }
-            result.put("mastered", true);
+            Map<String, Object> mastery = wt == null ? Map.of("mastered", false) : updateWrongTopicMastery(userId, wt.getId(), true);
+            result.put("mastered", mastery.get("mastered"));
+            result.put("nextReviewDate", mastery.get("nextReviewDate"));
             result.put("gold", 3);
             result.put("exp", 3);
             petService.addPetExp(userId, 1);
         } else {
-            saveWrongTopic(userId, questionId, answer, correctAnswer);
+            if (wt == null) saveWrongTopic(userId, questionId, answer, correctAnswer);
+            else {
+                wt.setWrongAnswer(answer);
+                wt.setCorrectAnswer(correctAnswer);
+                updateWrongTopicMastery(userId, wt.getId(), false);
+            }
             result.put("mastered", false);
             result.put("gold", 0);
             result.put("exp", 0);
@@ -1240,6 +1250,7 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public List<Map<String, Object>> getAssessmentQuestions(Long userId) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.ASSESSMENT);
         User user = userMapper.selectById(userId);
         ChildProfile profile = childProfileMapper.selectOne(new LambdaQueryWrapper<ChildProfile>().eq(ChildProfile::getUserId, userId));
         Long gradeLevelId = profile != null && profile.getGradeLevel() != null ? profile.getGradeLevel().longValue() : null;
@@ -1303,6 +1314,7 @@ public class LearnServiceImpl implements LearnService {
     @Override
     @Transactional
     public Map<String, Object> startPractice(Long userId, Long practiceModeId) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.PRACTICE);
         PracticeMode mode = practiceModeMapper.selectById(practiceModeId);
         // 兜底模式（id 未在 practice_mode 表中）解析出标准模式和学科
         StandardModeInfo stdInfo = mode == null ? parseStandardModeId(practiceModeId) : null;
@@ -1390,6 +1402,7 @@ public class LearnServiceImpl implements LearnService {
     @Override
     @Transactional
     public Map<String, Object> submitPracticeAnswer(Long userId, Long practiceSessionId, SubmitAnswerDTO dto) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.PRACTICE);
         log.info("专项练习答题 - userId: {}, sessionId: {}, questionId: {}", userId, practiceSessionId, dto.getQuestionId());
 
         PracticeSession session = practiceSessionMapper.selectById(practiceSessionId);
@@ -1470,6 +1483,7 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public Map<String, Object> resumePractice(Long userId, Long sessionId) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.PRACTICE);
         PracticeSession session = practiceSessionMapper.selectById(sessionId);
         if (session == null || !userId.equals(session.getUserId())) {
             throw new BusinessException("练习会话不存在");
@@ -1669,20 +1683,41 @@ public class LearnServiceImpl implements LearnService {
 
     @Override
     public SmartReviewQuizVO getSmartReviewQuiz(Long userId, Long subjectId, Integer questionCount) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.WRONG_RETRY);
         LambdaQueryWrapper<WrongTopic> wrapper = new LambdaQueryWrapper<WrongTopic>()
             .eq(WrongTopic::getUserId, userId)
             .eq(WrongTopic::getIsMastered, 0)
+            .and(w -> w.isNull(WrongTopic::getNextReviewDate).or().le(WrongTopic::getNextReviewDate, LocalDate.now()))
             .orderByAsc(WrongTopic::getContinuousCorrectCount)
-            .orderByAsc(WrongTopic::getLastReviewTime)
-            .last("LIMIT " + questionCount);
+            .orderByAsc(WrongTopic::getNextReviewDate);
 
         List<WrongTopic> topics = wrongTopicMapper.selectList(wrapper);
+        if (subjectId != null) {
+            topics = topics.stream().filter(wt -> {
+                Question q = questionMapper.selectById(wt.getQuestionId());
+                return q != null && subjectId.equals(q.getSubjectId());
+            }).toList();
+        }
+        int safeCount = Math.max(1, Math.min(questionCount == null ? 15 : questionCount, 50));
+        topics = topics.stream().limit(safeCount).toList();
 
         SmartReviewQuizVO vo = new SmartReviewQuizVO();
         vo.setTotalQuestions(topics.size());
         vo.setEstimatedMinutes((topics.size() * 2));
         vo.setQuestionIds(topics.stream().map(WrongTopic::getQuestionId).collect(Collectors.toList()));
         return vo;
+    }
+
+    @Override
+    public List<Map<String, Object>> getDueReviewQuestions(Long userId, Long subjectId, Integer questionCount) {
+        learningAccessService.checkAccess(userId, LearningAccessService.Scene.WRONG_RETRY);
+        int limit = Math.max(1, Math.min(questionCount == null ? 15 : questionCount, 50));
+        return wrongTopicMapper.selectList(new LambdaQueryWrapper<WrongTopic>()
+                .eq(WrongTopic::getUserId, userId).eq(WrongTopic::getIsMastered, 0)
+                .and(w -> w.isNull(WrongTopic::getNextReviewDate).or().le(WrongTopic::getNextReviewDate, LocalDate.now()))
+                .orderByAsc(WrongTopic::getNextReviewDate))
+            .stream().map(wt -> questionMapper.selectById(wt.getQuestionId())).filter(Objects::nonNull)
+            .filter(q -> subjectId == null || subjectId.equals(q.getSubjectId())).limit(limit).map(this::formatQuestion).toList();
     }
 
     @Override
@@ -1693,27 +1728,35 @@ public class LearnServiceImpl implements LearnService {
         }
 
         wt.setLastReviewTime(LocalDateTime.now());
+        wt.setReviewCount((wt.getReviewCount() == null ? 0 : wt.getReviewCount()) + 1);
+        wt.setLastReviewResult(isCorrect ? 1 : 0);
         if (isCorrect) {
             wt.setContinuousCorrectCount((wt.getContinuousCorrectCount() == null ? 0 : wt.getContinuousCorrectCount()) + 1);
-            if (wt.getContinuousCorrectCount() >= 3) {
+            int stage = Math.min(5, wt.getContinuousCorrectCount());
+            int[] intervals = {1, 3, 7, 14, 30};
+            wt.setNextReviewDate(LocalDate.now().plusDays(intervals[stage - 1]));
+            if (stage >= 5) {
                 wt.setIsMastered(1);
-                wt.setMasteryLevel(2);
+                wt.setMasteryLevel(5);
             } else {
-                wt.setMasteryLevel(1);
+                wt.setMasteryLevel(stage);
             }
         } else {
             wt.setContinuousCorrectCount(0);
             wt.setMasteryLevel(0);
-            wt.setTimes(wt.getTimes() + 1);
+            wt.setTimes((wt.getTimes() == null ? 0 : wt.getTimes()) + 1);
             wt.setLastWrongTime(LocalDateTime.now());
+            wt.setNextReviewDate(LocalDate.now().plusDays(1));
         }
 
         wrongTopicMapper.updateById(wt);
 
         Map<String, Object> res = new HashMap<>();
-        res.put("mastered", wt.getIsMastered() == 1);
+        res.put("mastered", Integer.valueOf(1).equals(wt.getIsMastered()));
         res.put("continuousCorrectCount", wt.getContinuousCorrectCount());
         res.put("masteryLevel", wt.getMasteryLevel());
+        res.put("nextReviewDate", wt.getNextReviewDate());
+        res.put("reviewCount", wt.getReviewCount());
         return res;
     }
 
@@ -1831,66 +1874,4 @@ public class LearnServiceImpl implements LearnService {
         return recentIds;
     }
 
-    /**
-     * 检查用户是否超过每日学习时间限制
-     * @throws BusinessException 如果超过限制
-     */
-    private void checkTimeControl(Long userId) {
-        TimeControl tc = timeControlMapper.selectOne(
-            new LambdaQueryWrapper<TimeControl>()
-                .eq(TimeControl::getChildUserId, userId)
-                .last("LIMIT 1")
-        );
-        if (tc == null || tc.getIsEnabled() == null || tc.getIsEnabled() != 1) {
-            return; // 未配置或未启用时间控制
-        }
-
-        // 检查禁止时段（forbiddenStart ~ forbiddenEnd 期间不允许学习）
-        if (tc.getForbiddenStart() != null && tc.getForbiddenEnd() != null) {
-            java.time.LocalTime now = java.time.LocalTime.now();
-            java.time.LocalTime start = tc.getForbiddenStart();
-            java.time.LocalTime end = tc.getForbiddenEnd();
-
-            boolean inForbiddenRange;
-            if (start.isBefore(end)) {
-                // 正常时段，如 22:00 - 23:00
-                inForbiddenRange = !now.isBefore(start) && !now.isAfter(end);
-            } else {
-                // 跨天时段，如 22:00 - 06:00
-                inForbiddenRange = !now.isBefore(start) || !now.isAfter(end);
-            }
-            if (inForbiddenRange) {
-                throw new BusinessException("当前为禁止学习时段（" + start + " - " + end + "），休息一下吧");
-            }
-        }
-
-        // 检查每日时长上限
-        if (tc.getDailyLimit() == null || tc.getDailyLimit() <= 0) {
-            return; // 未设置时长限制
-        }
-
-        // 统计今日已学习时长（秒），使用 answerTime 字段
-        LocalDateTime todayStart = LocalDate.now().atStartOfDay();
-        List<LearningRecord> todayRecords = learningRecordMapper.selectList(
-            new LambdaQueryWrapper<LearningRecord>()
-                .eq(LearningRecord::getUserId, userId)
-                .ge(LearningRecord::getCreateTime, todayStart)
-                .select(LearningRecord::getAnswerTime)
-        );
-
-        long totalSeconds = todayRecords.stream()
-            .mapToLong(r -> r.getAnswerTime() != null ? r.getAnswerTime() : 0)
-            .sum();
-        int usedMinutes = (int) (totalSeconds / 60);
-
-        if (usedMinutes >= tc.getDailyLimit()) {
-            int remaining = 0;
-            throw new BusinessException("今日学习已达 " + usedMinutes + " 分钟，已超上限（" + tc.getDailyLimit() + " 分钟），明天再来吧");
-        }
-
-        // 距离上限不足5分钟时提醒（不拦截）
-        if (usedMinutes >= tc.getDailyLimit() - 5) {
-            log.info("用户{}今日学习已达{}分钟，距上限{}分钟不足5分钟", userId, usedMinutes, tc.getDailyLimit());
-        }
-    }
 }

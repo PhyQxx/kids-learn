@@ -27,8 +27,9 @@
     <!-- 顶部栏右侧 -->
     <template #topbar-right>
       <view class="notification-entry" @tap="goNotifications">
-        <view class="notification-signal"></view>
+        <view v-if="unreadCount > 0" class="notification-signal"></view>
         <text>通知</text>
+        <text v-if="unreadCount > 0" class="notification-count">{{ unreadCount > 99 ? '99+' : unreadCount }}</text>
       </view>
     </template>
 
@@ -54,13 +55,14 @@
 
 <script setup>
 import { ref, computed, provide, onMounted, reactive } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '@/store/user'
 import { useLearnStore } from '@/store/learn'
 import { getUserInfo, updateChildProfile } from '@/api/user'
-import { getParentReport, getTimeControl } from '@/api/parent'
+import { getLearningAccessStatus } from '@/api/learn'
 import { ensureLearningAccess } from '@/utils/learningAccess.mjs'
 import { soundManager } from '@/utils/sound'
+import { getUnreadCount } from '@/api/notification'
 
 import AppLayout from '@/components/AppLayout.vue'
 import HomeContent from '@/components/home/HomeContent.vue'
@@ -77,6 +79,12 @@ const learnStore = useLearnStore()
 const activeTab = ref('home')
 const loadedTabs = reactive(new Set(['home']))
 const showGradePopup = ref(false)
+const unreadCount = ref(0)
+
+async function refreshUnreadCount() {
+  try { unreadCount.value = Number((await getUnreadCount())?.count || 0) } catch { unreadCount.value = 0 }
+}
+onShow(refreshUnreadCount)
 
 // 向子组件暴露年级弹窗状态，避免签到弹窗同时弹出
 provide('gradePopupVisible', showGradePopup)
@@ -143,8 +151,7 @@ function showLearningBlocked(message) {
 
 async function goSubject(subject) {
   const allowed = await ensureLearningAccess({
-    fetchTimeControl: getTimeControl,
-    fetchReport: getParentReport,
+    fetchAccessStatus: getLearningAccessStatus,
     showBlockedMessage: showLearningBlocked
   })
   if (!allowed) return
@@ -154,7 +161,12 @@ async function goSubject(subject) {
   uni.navigateTo({ url: `/pages/learn/practice/index?subjectId=${subject.id}&subjectName=${encodeURIComponent(subject.name)}` })
 }
 
-function goCourses(subject) {
+async function goCourses(subject) {
+  const allowed = await ensureLearningAccess({
+    fetchAccessStatus: getLearningAccessStatus,
+    showBlockedMessage: showLearningBlocked
+  })
+  if (!allowed) return
   learnStore.setSubject(subject)
   uni.navigateTo({ url: `/pages/learn/levels?subjectId=${subject.id}&subjectName=${encodeURIComponent(subject.name)}` })
 }
@@ -295,6 +307,18 @@ onLoad((query) => {
   border-radius: 50%;
   background: #FF6B4A;
   border: 2px solid #EEF3FF;
+}
+
+.notification-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #E74C3C;
+  color: #fff;
+  font-size: 10px;
+  line-height: 18px;
+  text-align: center;
 }
 
 .greeting-text {

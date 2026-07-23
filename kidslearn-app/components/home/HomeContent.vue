@@ -7,7 +7,12 @@
         <view class="mission-panel" @tap="$emit('go-learn')">
           <image class="mission-art" src="/static/redesign/mission-island.png" mode="aspectFill" />
           <view class="mission-copy">
-            <text class="mission-eyebrow">今日小目标</text>
+            <view class="mission-title-row">
+              <text class="mission-eyebrow">今日小目标</text>
+              <view class="mission-detail-trigger" @tap.stop="openTaskDrawer">
+                <text class="mission-detail-icon">📋</text>
+              </view>
+            </view>
             <text class="mission-progress-copy">已完成 <text class="mission-progress-number">{{ completedTasks }}/{{ totalTasks }}</text> 个</text>
           </view>
           <view class="mission-action">
@@ -109,6 +114,12 @@
     </template>
 
     <CheckinPopup v-if="showCheckin" :auto-close-if-done="checkinAutoOpen" @close="onCheckinClose" />
+    <TaskDetailDrawer
+      v-if="showTaskDrawer"
+      :tasks="learnStore.dailyTasks"
+      @close="onTaskDrawerClose"
+      @go-learn="onTaskDrawerGoLearn"
+    />
   </view>
 </template>
 
@@ -125,6 +136,7 @@ import { getMyProgress } from '@/api/achievement'
 import { createHomeDataRequests } from '@/utils/homeData.mjs'
 import { getAutoCheckinDecision } from '@/utils/promptFlow.mjs'
 import CheckinPopup from '@/components/common/CheckinPopup.vue'
+import TaskDetailDrawer from '@/components/home/TaskDetailDrawer.vue'
 import FunLoadingState from '@/components/common/FunLoadingState.vue'
 
 defineEmits(['go-subject', 'go-learn'])
@@ -141,6 +153,7 @@ const totalTasks = ref(5)
 const myRank = ref(null)
 const achievementCount = ref(0)
 const showCheckin = ref(false)
+const showTaskDrawer = ref(false)
 const checkinAutoOpen = ref(false)
 const checkinAutoOpened = ref(false)
 const pendingAutoCheckin = ref(false)
@@ -319,6 +332,19 @@ function tryAutoOpenCheckin() {
 function onCheckinClose() {
   showCheckin.value = false
   fetchCheckinStatus()
+}
+
+function openTaskDrawer() {
+  showTaskDrawer.value = true
+}
+
+function onTaskDrawerClose() {
+  showTaskDrawer.value = false
+}
+
+function onTaskDrawerGoLearn() {
+  showTaskDrawer.value = false
+  switchTab('learn')
 }
 
 function goRanking() { switchTab('ranking') }
@@ -636,6 +662,32 @@ function goAdaptivePractice(wp) {
   line-height: 1.2;
   font-weight: 800;
   letter-spacing: -0.5px;
+}
+
+.mission-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mission-detail-trigger {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(69, 91, 124, 0.10);
+  cursor: pointer;
+  &:active { transform: scale(0.92); }
+}
+
+.mission-detail-icon {
+  font-size: 15px;
+  line-height: 1;
 }
 
 .mission-progress-copy {

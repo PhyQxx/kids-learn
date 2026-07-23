@@ -18,6 +18,9 @@ public class NotificationVO {
 
     /** 内容 */
     private String content;
+    private String actionType;
+    private String actionTarget;
+    private LocalDateTime expireTime;
 
     /** 是否已读 */
     private Boolean isRead;

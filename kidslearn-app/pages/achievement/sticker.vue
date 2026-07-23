@@ -11,7 +11,7 @@
         </view>
         <view class="progress-wrap">
           <view class="progress-bar" style="width: 160px; background: rgba(255,255,255,0.3);">
-            <view class="progress-fill" :style="{ width: (ownedCount / totalCount * 100) + '%' }"></view>
+            <view class="progress-fill" :style="{ width: (totalCount ? ownedCount / totalCount * 100 : 0) + '%' }"></view>
           </view>
         </view>
       </view>
@@ -22,7 +22,7 @@
       </tn-tabs>
 
       <!-- 贴纸网格 -->
-      <view class="sticker-grid">
+      <view v-if="currentStickers.length" class="sticker-grid">
         <view
           v-for="sticker in currentStickers"
           :key="sticker.id"
@@ -30,11 +30,16 @@
           :class="{ owned: sticker.owned }"
           @tap="sticker.owned && previewSticker(sticker)"
         >
-          <text class="sticker-index">{{ sticker.owned ? String(sticker.id).padStart(2, '0') : '--' }}</text>
+          <template v-if="sticker.owned && resolvePetImage(sticker.icon).type === 'image'">
+            <image class="sticker-emoji-img" :src="sticker.icon" mode="aspectFit" />
+          </template>
+          <text v-else-if="sticker.owned && resolvePetImage(sticker.icon).type === 'emoji'" class="sticker-emoji">{{ sticker.icon }}</text>
+          <text v-else class="sticker-index">{{ sticker.owned ? String(sticker.id).padStart(2, '0') : '--' }}</text>
           <text class="text-xs">{{ sticker.owned ? sticker.name : '待收集' }}</text>
           <view v-if="sticker.owned && sticker.rarity === 'legendary'" class="legendary-glow"></view>
         </view>
       </view>
+      <view v-else class="empty-state"><text>还没有可展示的贴纸</text></view>
     </view>
   </AppLayout>
 </template>
@@ -43,6 +48,7 @@
 import { ref, computed, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { getStickers } from '@/api/achievement'
+import { resolvePetImage } from '@/utils/petFeature.mjs'
 
 const activeTab = ref(0)
 const tabItems = ref([
@@ -53,33 +59,7 @@ const tabItems = ref([
   { label: '节日' }
 ])
 
-const allStickers = ref([
-  // 动物
-  { id: 1, name: '小狗', icon: '🐶', owned: true, category: 'animals', rarity: 'common' },
-  { id: 2, name: '小猫', icon: '🐱', owned: true, category: 'animals', rarity: 'common' },
-  { id: 3, name: '兔子', icon: '🐰', owned: true, category: 'animals', rarity: 'common' },
-  { id: 4, name: '狐狸', icon: '🦊', owned: true, category: 'animals', rarity: 'rare' },
-  { id: 5, name: '小熊', icon: '🐻', owned: false, category: 'animals', rarity: 'common' },
-  { id: 6, name: '熊猫', icon: '🐼', owned: false, category: 'animals', rarity: 'rare' },
-  { id: 7, name: '考拉', icon: '🐨', owned: true, category: 'animals', rarity: 'rare' },
-  { id: 8, name: '狮子', icon: '🦁', owned: false, category: 'animals', rarity: 'legendary' },
-  // 自然
-  { id: 9, name: '彩虹', icon: '🌈', owned: true, category: 'nature', rarity: 'common' },
-  { id: 10, name: '星星', icon: '⭐', owned: true, category: 'nature', rarity: 'common' },
-  { id: 11, name: '樱花', icon: '🌸', owned: false, category: 'nature', rarity: 'rare' },
-  { id: 12, name: '向日葵', icon: '🌻', owned: true, category: 'nature', rarity: 'common' },
-  { id: 13, name: '月亮', icon: '🌙', owned: false, category: 'nature', rarity: 'legendary' },
-  // 太空
-  { id: 14, name: '火箭', icon: '🚀', owned: true, category: 'space', rarity: 'rare' },
-  { id: 15, name: '地球', icon: '🌍', owned: true, category: 'space', rarity: 'common' },
-  { id: 16, name: '土星', icon: '🪐', owned: false, category: 'space', rarity: 'rare' },
-  { id: 17, name: '银河', icon: '🌌', owned: false, category: 'space', rarity: 'legendary' },
-  // 节日
-  { id: 18, name: '圣诞树', icon: '🎄', owned: false, category: 'festival', rarity: 'rare' },
-  { id: 19, name: '南瓜', icon: '🎃', owned: true, category: 'festival', rarity: 'common' },
-  { id: 20, name: '礼物', icon: '🎁', owned: true, category: 'festival', rarity: 'common' },
-  { id: 21, name: '烟花', icon: '🎆', owned: false, category: 'festival', rarity: 'legendary' }
-])
+const allStickers = ref([])
 
 const ownedCount = computed(() => allStickers.value.filter(s => s.owned).length)
 const totalCount = computed(() => allStickers.value.length)
@@ -101,14 +81,15 @@ onMounted(async () => {
       allStickers.value = res.map(s => ({
         id: s.id,
         name: s.stickerName || s.name,
-        icon: s.iconUrl || s.icon || '',
+        icon: s.stickerUrl || s.iconUrl || s.icon || '',
         owned: s.owned || s.status === 'OWNED',
         category: s.seriesCode || s.category || 'animals',
         rarity: s.rarity || 'common'
       }))
     }
   } catch (e) {
-    console.log('sticker: 使用模拟数据')
+    allStickers.value = []
+    uni.showToast({ title: '贴纸加载失败，请稍后重试', icon: 'none' })
   }
 })
 </script>
@@ -167,6 +148,7 @@ onMounted(async () => {
 }
 
 .sticker-emoji { font-size: 36px; }
+.sticker-emoji-img { width: 44px; height: 44px; }
 .sticker-index { color: #5F3BB8; font-size: 22px; font-weight: 900; letter-spacing: 1px; }
 
 .legendary-glow {

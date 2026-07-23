@@ -20,5 +20,5 @@ public interface AuthService {
      * 发送手机验证码
      * @param phone 手机号
      */
-    void sendVerifyCode(String phone);
+    void resetPassword(String phone, String verifyCode, String newPassword);
 }

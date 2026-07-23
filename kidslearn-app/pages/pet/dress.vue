@@ -4,7 +4,8 @@
       <view class="dress-layout">
         <!-- 宠物预览 -->
         <view class="preview-panel">
-          <text class="pet-emoji animate-float">{{ petStore.currentImageUrl }}</text>
+          <image v-if="isImageUrl(petStore.currentImageUrl)" class="pet-emoji-img animate-float" :src="petStore.currentImageUrl" mode="aspectFit" />
+          <text v-else class="pet-emoji animate-float">{{ petStore.currentImageUrl }}</text>
           <text class="text-lg text-bold">{{ petStore.name }}</text>
           <view class="equipped-list">
             <text class="text-sm text-light">已装备：</text>
@@ -26,7 +27,8 @@
               :class="{ owned: item.owned, equipped: item.equipped }"
               @tap="toggleEquip(item)"
             >
-              <text class="item-emoji">{{ item.icon }}</text>
+              <image v-if="isImageUrl(item.icon)" class="item-emoji-img" :src="item.icon" mode="aspectFit" />
+              <text v-else class="item-emoji">{{ item.icon }}</text>
               <text class="text-sm">{{ item.name }}</text>
               <text v-if="item.owned" class="text-xs text-success">{{ item.equipped ? '已装备' : '点击装备' }}</text>
               <text v-else class="text-xs text-light">未拥有</text>
@@ -46,7 +48,7 @@ import { ref, computed, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { usePetStore } from '@/store/pet'
 import { getPetStatus, getDecorations, getDecorationInventory, dressPet } from '@/api/pet'
-import { normalizeDecorations, toggleDecorationEquip } from '@/utils/petFeature.mjs'
+import { normalizeDecorations, toggleDecorationEquip, isImageUrl } from '@/utils/petFeature.mjs'
 
 const petStore = usePetStore()
 
@@ -153,6 +155,7 @@ async function toggleEquip(item) {
 }
 
 .pet-emoji { font-size: 100px; }
+.pet-emoji-img { width: 140px; height: 140px; }
 
 .equipped-list {
   display: flex;
@@ -194,6 +197,7 @@ async function toggleEquip(item) {
 }
 
 .item-emoji { font-size: 36px; }
+.item-emoji-img { width: 48px; height: 48px; }
 
 .empty-hint {
   text-align: center;

@@ -17,7 +17,8 @@
       <view v-if="currentItems.length > 0" class="shop-grid">
         <view v-for="item in currentItems" :key="item.id" class="shop-card card">
           <view class="shop-icon-wrap" :style="{ background: item.bg }">
-            <text class="shop-emoji">{{ item.icon }}</text>
+            <image v-if="isImageUrl(item.icon)" class="shop-emoji-img" :src="item.icon" mode="aspectFit" />
+            <text v-else class="shop-emoji">{{ item.icon }}</text>
           </view>
           <text class="text-sm text-bold">{{ item.name }}</text>
           <text v-if="item.effectDesc" class="text-xs text-light">{{ item.effectDesc }}</text>
@@ -47,7 +48,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import AppLayout from '@/components/AppLayout.vue'
 import { useUserStore } from '@/store/user'
 import { getShopItems, buyItem as buyItemApi, getDecorations, buyDecoration as buyDecoApi } from '@/api/pet'
-import { applyPetPurchaseBalance, normalizeShopItems } from '@/utils/petFeature.mjs'
+import { applyPetPurchaseBalance, normalizeShopItems, isImageUrl } from '@/utils/petFeature.mjs'
 
 const userStore = useUserStore()
 const activeTab = ref(0)
@@ -175,6 +176,7 @@ function handleBuy(item) {
 }
 
 .shop-emoji { font-size: 28px; }
+.shop-emoji-img { width: 40px; height: 40px; }
 
 .shop-meta {
   display: flex;

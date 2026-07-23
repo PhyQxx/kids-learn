@@ -2,16 +2,39 @@
   <view v-if="visible" class="gate-mask" @tap.stop>
     <view class="gate-dialog" @tap.stop>
       <image class="gate-art" src="/static/redesign/rank-island.png" mode="aspectFill" />
-      <text class="gate-title">验证家长密码</text>
-      <text class="gate-desc">进入家长模式前需要确认当前账号密码</text>
+      <text class="gate-title">{{ configured ? '验证家长PIN' : '设置家长PIN' }}</text>
+      <text class="gate-desc">{{ configured ? '请输入该账号的6位家长PIN' : '首次使用需用账号密码设置独立家长PIN' }}</text>
       <input
+        v-if="!configured"
         class="gate-input"
         v-model="password"
         type="password"
         password
-        placeholder="请输入密码"
+        placeholder="请输入账号密码"
+        placeholder-class="gate-placeholder"
+        :disabled="loading"
+      />
+      <input
+        class="gate-input"
+        v-model="pin"
+        type="number"
+        password
+        maxlength="6"
+        placeholder="请输入6位家长PIN"
         placeholder-class="gate-placeholder"
         :focus="visible"
+        :disabled="loading"
+        @confirm="confirm"
+      />
+      <input
+        v-if="!configured"
+        class="gate-input"
+        v-model="confirmPin"
+        type="number"
+        password
+        maxlength="6"
+        placeholder="再次输入家长PIN"
+        placeholder-class="gate-placeholder"
         :disabled="loading"
         @confirm="confirm"
       />
@@ -28,7 +51,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { verifyPassword } from '@/api/auth'
+import { getParentPinStatus, setupParentPin, verifyParentPin } from '@/api/auth'
 
 const props = defineProps({
   targetUrl: { type: String, default: '/pages/parent/index' }
@@ -36,39 +59,66 @@ const props = defineProps({
 
 const visible = ref(false)
 const password = ref('')
+const pin = ref('')
+const confirmPin = ref('')
+const configured = ref(true)
 const errorText = ref('')
 const loading = ref(false)
 
-function open() {
+async function open() {
   password.value = ''
+  pin.value = ''
+  confirmPin.value = ''
   errorText.value = ''
-  loading.value = false
+  loading.value = true
   visible.value = true
+  try {
+    const status = await getParentPinStatus()
+    configured.value = status?.configured !== false
+  } catch (error) {
+    errorText.value = error?.msg || error?.message || '暂时无法验证家长PIN状态'
+  } finally {
+    loading.value = false
+  }
 }
 
 function close() {
   if (loading.value) return
   visible.value = false
   password.value = ''
+  pin.value = ''
+  confirmPin.value = ''
   errorText.value = ''
 }
 
 async function confirm() {
   if (loading.value) return
-  const value = password.value.trim()
-  if (!value) {
-    errorText.value = '请输入密码'
+  const value = pin.value.trim()
+  if (!/^\d{6}$/.test(value)) {
+    errorText.value = '请输入6位数字家长PIN'
+    return
+  }
+  if (!configured.value && !password.value.trim()) {
+    errorText.value = '请输入账号密码'
+    return
+  }
+  if (!configured.value && confirmPin.value.trim() !== value) {
+    errorText.value = '两次输入的家长PIN不一致'
     return
   }
   loading.value = true
   errorText.value = ''
   try {
-    await verifyPassword(value)
+    if (configured.value) {
+      await verifyParentPin(value)
+    } else {
+      await setupParentPin(password.value.trim(), value)
+    }
     loading.value = false
     close()
     uni.navigateTo({ url: props.targetUrl })
   } catch (error) {
-    errorText.value = error?.msg || error?.message || '密码验证失败'
+    errorText.value = error?.msg || error?.message || '家长PIN验证失败'
   } finally {
     loading.value = false
   }

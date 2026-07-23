@@ -51,8 +51,10 @@
         <view class="question-area">
           <view class="question-speech" :class="{ speaking: isSpeaking }" @tap="questionToSpeech()">
             <text class="question-audio-label">听题</text>
-            <view v-if="isSpeaking" class="sound-wave">
-              <view class="sound-bar" v-for="i in 4" :key="i"></view>
+            <view class="sound-wave" :class="{ silent: !isSpeaking }">
+              <template v-if="isSpeaking">
+                <view class="sound-bar" v-for="i in 4" :key="i"></view>
+              </template>
             </view>
             <text class="speech-hint">{{ isSpeaking ? '正在播放...' : '点这里听题' }}</text>
           </view>
@@ -177,11 +179,17 @@
 
       <!-- 结果屏 -->
       <view v-if="screen === 'result'" class="screen result-screen">
-        <image class="result-world-art" src="/static/redesign/achievement-cabinet.png" mode="aspectFill" />
+        <text class="result-emoji">{{ resultEmoji }}</text>
 
         <!-- 星级 (闯关时显示) -->
         <view class="result-stars" v-if="!isPractice">
-          <text class="result-rating">{{ earnedStars }}/3 星评价</text>
+          <text
+            v-for="i in 3"
+            :key="i"
+            class="result-star"
+            :class="{ filled: i <= earnedStars, animate: showRewardAnimation }"
+            :style="{ animationDelay: (0.2 * i) + 's' }"
+          >★</text>
         </view>
 
         <text class="result-title text-title text-bold">{{ resultTitle }}</text>
@@ -190,19 +198,19 @@
         <!-- 奖励卡片 -->
         <view class="reward-row" :class="{ 'animate-slide-up': showRewardAnimation }">
           <view class="reward-card card">
-            <text class="reward-kind">金币</text>
+            <text class="reward-emoji">🪙</text>
             <AnimatedNumber v-if="showRewardAnimation" :value="rewards.gold" :duration="800" prefix="+" class="reward-value text-md text-bold" />
             <text v-else class="reward-value text-md text-bold">+{{ rewards.gold }}</text>
             <text class="reward-label text-xs text-light">金币</text>
           </view>
           <view class="reward-card card">
-            <text class="reward-kind">经验</text>
+            <text class="reward-emoji">⚡</text>
             <AnimatedNumber v-if="showRewardAnimation" :value="rewards.exp" :duration="800" prefix="+" class="reward-value text-md text-bold" />
             <text v-else class="reward-value text-md text-bold">+{{ rewards.exp }}</text>
             <text class="reward-label text-xs text-light">经验</text>
           </view>
           <view class="reward-card card" v-if="!isPractice">
-            <text class="reward-kind">贴纸</text>
+            <text class="reward-emoji">🌟</text>
             <AnimatedNumber v-if="showRewardAnimation" :value="rewards.stickers" :duration="600" prefix="x" class="reward-value text-md text-bold" />
             <text v-else class="reward-value text-md text-bold">x{{ rewards.stickers }}</text>
             <text class="reward-label text-xs text-light">贴纸</text>
@@ -227,13 +235,17 @@
 
         <view v-if="challengeResult" class="challenge-result card">
           <view class="challenge-result-main">
-            <text class="challenge-result-icon">PK</text>
+            <text class="challenge-result-icon">{{ challengeResult.settled ? (challengeResult.isWin ? '🏆' : '🤝') : '⏳' }}</text>
             <view>
-              <text class="text-md text-bold">{{ challengeResult.isWin ? 'PK 获胜' : 'PK 已完成' }}</text>
-              <text class="text-xs text-light">对手得分 {{ challengeResult.opponentScore }} · 段位积分 {{ challengeResult.rankDelta >= 0 ? '+' : '' }}{{ challengeResult.rankDelta }}</text>
+              <text class="text-md text-bold">{{ challengeResult.settled ? (challengeResult.isWin ? '挑战获胜' : '挑战完成') : '成绩已锁定' }}</text>
+              <text class="text-xs text-light">
+                {{ challengeResult.settled
+                  ? `对手 ${challengeResult.opponentScore} 分 · 段位 ${challengeResult.rankDelta >= 0 ? '+' : ''}${challengeResult.rankDelta}`
+                  : '等待对手完成挑战' }}
+              </text>
             </view>
           </view>
-          <text class="text-sm text-bold text-primary">+{{ challengeResult.rewardGold }} 金币</text>
+          <text v-if="challengeResult.settled" class="text-sm text-bold text-primary">+{{ challengeResult.rewardGold }} 🪙</text>
         </view>
 
         <view class="result-actions">
@@ -287,7 +299,7 @@ import { useLearnStore } from '@/store/learn'
 import { useUserStore } from '@/store/user'
 import { usePetStore } from '@/store/pet'
 import { getQuestions, submitAnswer, completeLevel, getHint, startPractice, resumePractice, submitPracticeAnswer, completePracticeSession, getExplainWrong } from '@/api/learn'
-import { submitChallengeResult } from '@/api/challenge'
+import { getChallengeQuestions, submitChallengeAnswer, finishChallenge } from '@/api/challenge'
 import { getUserInfo } from '@/api/user'
 import { getFeedbackAudioConfig } from '@/api/app'
 import { resolveQuestionSpeech } from '@/utils/questionSpeech.mjs'
@@ -410,7 +422,7 @@ const showQuestionCardPopup = ref(false)
 const levelId = ref(null)
 const pageGradeLevelId = ref(null)
 const challengeId = ref(null)
-const opponentId = ref(null)
+const challengeAnswerPromises = []
 const isPractice = ref(false)
 const practiceModeId = ref(null)
 // 练习模式：后端会话ID（断点续做核心）
@@ -534,6 +546,9 @@ onMounted(async () => {
   const page = pages[pages.length - 1]
   const options = page.$page?.options || {}
 
+  // 默认无倒计时，仅练习模式按 options.timeLimit 开启，避免闯关/关卡模式继承默认 60s 被强制结束
+  timeLimit.value = 0
+
   if (options.practiceModeId) {
     isPractice.value = true
     practiceModeId.value = options.practiceModeId
@@ -587,11 +602,27 @@ onMounted(async () => {
       uni.showToast({ title: e?.message || '加载练习失败', icon: 'none' })
     }
   } else {
+    challengeId.value = options.challengeMatchId || null
     levelId.value = options.levelId || learnStore.currentLevel?.id
     pageGradeLevelId.value = options.gradeLevelId || userStore.userInfo?.gradeLevelId || null
-    challengeId.value = options.challengeId || null
-    opponentId.value = options.opponentId || null
-    if (levelId.value) {
+    if (challengeId.value) {
+      try {
+        const res = await getChallengeQuestions(Number(challengeId.value))
+        questions.value = Array.isArray(res) ? res.map(q => normalizeQuizQuestion(q)) : []
+        levelName.value = '挑战赛'
+        levelEmoji.value = '🏆'
+        // 闯关总倒计时：每题平均 30 秒
+        if (questions.value.length > 0) {
+          timeLimit.value = questions.value.length * 30
+        }
+        if (questions.value[0]) {
+          preloadQuestionAudio(questions.value[0])
+          resetInteractionState()
+        }
+      } catch (e) {
+        uni.showToast({ title: e?.message || '挑战题目加载失败', icon: 'none' })
+      }
+    } else if (levelId.value) {
       try {
         const res = await loadQuestionsWithOfflineCache({
           levelId: levelId.value,
@@ -611,7 +642,8 @@ onMounted(async () => {
           }
         }
       } catch (e) {
-        console.log('quiz: 使用模拟题目')
+        questions.value = []
+        uni.showToast({ title: '题目加载失败，请稍后重试', icon: 'none' })
       }
     }
   }
@@ -849,7 +881,11 @@ function selectOption(opt) {
     const q = currentQuestion.value
     const answerTime = Math.round((Date.now() - (questionStartTime.value || startTime.value)) / 1000)
     if (q.id) {
-      submitAnswer({ questionId: q.id, answer, answerTime }).then(res => {
+      const request = challengeId.value
+        ? submitChallengeAnswer(Number(challengeId.value), { snapshotId: Number(q.id), answer, durationMs: answerTime * 1000 })
+        : submitAnswer({ questionId: q.id, answer, answerTime })
+      if (challengeId.value) challengeAnswerPromises.push(request)
+      request.then(res => {
         if (res?.correct) {
           correctCount.value++
           totalScore.value += (q.score || 10)
@@ -897,9 +933,12 @@ function submitCurrentAnswer(answer, displayAnswer = answer) {
 
   if (q.id) {
     // 练习模式走专门的会话接口（同步 user_question_record + 推进 session 进度）
-    const submitPromise = isPractice.value && practiceSessionId.value
-      ? submitPracticeAnswer(practiceSessionId.value, { questionId: q.id, answer, answerTime })
-      : submitAnswer({ questionId: q.id, answer, answerTime })
+    const submitPromise = challengeId.value
+      ? submitChallengeAnswer(Number(challengeId.value), { snapshotId: Number(q.id), answer, durationMs: answerTime * 1000 })
+      : isPractice.value && practiceSessionId.value
+        ? submitPracticeAnswer(practiceSessionId.value, { questionId: q.id, answer, answerTime })
+        : submitAnswer({ questionId: q.id, answer, answerTime })
+    if (challengeId.value) challengeAnswerPromises.push(submitPromise)
     submitPromise.then(res => {
       const isCorrect = res?.correct || false
       const correctAnswer = res?.correctAnswer || ''
@@ -1115,6 +1154,9 @@ function startQuiz() {
 async function finishQuiz() {
   clearInterval(timer)
   stopQuestionSpeech()
+  if (challengeAnswerPromises.length) {
+    await Promise.allSettled(challengeAnswerPromises)
+  }
   usedTime.value = Math.round((Date.now() - startTime.value) / 1000)
 
   // Calculate stars
@@ -1127,7 +1169,7 @@ async function finishQuiz() {
   const wrongCount = totalQuestions.value - correctCount.value
 
   // 提交关卡完成 (仅闯关模式)
-  if (levelId.value && !isPractice.value) {
+  if (levelId.value && !isPractice.value && !challengeId.value) {
     try {
       const res = await completeLevel(levelId.value, totalScore.value, usedTime.value, wrongCount)
       if (res) {
@@ -1197,27 +1239,31 @@ async function finishQuiz() {
 async function submitChallengeIfNeeded() {
   if (!challengeId.value) return
   try {
-    const res = await submitChallengeResult({
-      challengeId: Number(challengeId.value),
-      opponentId: opponentId.value ? Number(opponentId.value) : null,
-      userScore: totalScore.value
-    })
+    const res = await finishChallenge(Number(challengeId.value))
     if (!res) return
+    const settled = !!res.settled
     challengeResult.value = {
+      settled,
       isWin: !!res.isWin,
-      opponentScore: res.opponentScore || 0,
+      myScore: res.myScore,
+      opponentScore: res.opponentScore,
       rankDelta: res.rankDelta || 0,
       rewardGold: res.rewardGold || 0
     }
-    rewards.value = {
-      ...rewards.value,
-      gold: rewards.value.gold + challengeResult.value.rewardGold
+    if (settled) {
+      rewards.value = {
+        ...rewards.value,
+        gold: rewards.value.gold + challengeResult.value.rewardGold
+      }
     }
     try {
       const userInfo = await getUserInfo()
       if (userInfo) userStore.setUserInfo(userInfo)
     } catch (e) {
       console.log('挑战奖励后更新用户信息失败:', e)
+    }
+    if (!settled) {
+      uni.showToast({ title: '成绩已锁定，等待对手完成', icon: 'none' })
     }
   } catch (e) {
     console.log('挑战结算失败:', e)
@@ -1413,7 +1459,7 @@ onUnmounted(() => {
   max-width: 680px;
   margin: 0 auto;
   overflow-y: auto;
-  padding: 0 28px 20px;
+  padding: 12px 28px 20px;
   box-sizing: border-box;
 }
 
@@ -1439,6 +1485,10 @@ onUnmounted(() => {
   justify-content: center;
   gap: 4px;
   height: 28px;
+
+  &.silent {
+    gap: 0;
+  }
 }
 .sound-bar {
   width: 4px;
@@ -1722,78 +1772,89 @@ onUnmounted(() => {
 
 /* ===== 结果屏 ===== */
 .result-screen {
-  gap: 12px;
+  gap: 8px;
+  justify-content: center;
+  padding: 16px 20px;
+  overflow: hidden;
 }
 
-.result-emoji { font-size: 80px; display: block; }
+.result-emoji { font-size: 44px; line-height: 1; display: block; text-align: center; }
 
 .result-stars {
   display: flex;
-  gap: 8px;
-  font-size: 40px;
+  gap: 6px;
+  margin-top: -2px;
 }
 
 .result-star {
+  font-size: 28px;
   color: #E0E0E0;
   transition: all 0.3s ease;
 
   &.filled { color: $gold; }
   &.animate { animation: popIn 0.5s ease backwards; }
-  &:nth-child(1).animate { animation-delay: 0.2s; }
-  &:nth-child(2).animate { animation-delay: 0.4s; }
-  &:nth-child(3).animate { animation-delay: 0.6s; }
 }
 
 .reward-row {
   display: flex;
-  gap: 12px;
-  margin: 4px 0;
+  gap: 10px;
+  margin: 2px 0;
+  width: 100%;
+  max-width: 320px;
 }
 
 .reward-card {
-  padding: 12px 20px;
+  flex: 1;
+  padding: 8px 6px;
   text-align: center;
-  min-width: 80px;
+  min-width: 0;
 }
 
-.reward-emoji { font-size: 24px; display: block; margin-bottom: 4px; }
+.reward-emoji { font-size: 20px; display: block; margin-bottom: 2px; line-height: 1; }
 .reward-value { display: block; }
 .reward-label { display: block; margin-top: 2px; }
 
 .result-stats {
-  width: 300px;
-  padding: 16px;
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 14px;
 }
 
 .stat-row {
   display: flex;
   justify-content: space-between;
-  padding: 6px 0;
+  padding: 4px 0;
 
   & + .stat-row { border-top: 1px solid #F5F5F5; }
 }
 
 .challenge-result {
-  width: 360px;
-  padding: 14px 18px;
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
 }
 
 .challenge-result-main {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
-.challenge-result-icon { font-size: 30px; }
+.challenge-result-icon { font-size: 24px; line-height: 1; }
 
 .result-actions {
   display: flex;
+  justify-content: center;
+  align-items: center;
   gap: 12px;
-  margin-top: 4px;
+  margin-top: 2px;
+  width: 100%;
+  max-width: 320px;
 }
 
 /* ===== 反馈蒙层 ===== */
@@ -2166,9 +2227,7 @@ onUnmounted(() => {
   .option-btn { min-height: 64px; }
   .match-panel { grid-template-columns: 1fr; }
   .voice-actions { flex-direction: column; }
-  .result-stats { width: 100%; }
-  .challenge-result { width: 100%; }
-  .result-actions { width: 100%; flex-direction: column; }
+  .result-actions { flex-direction: column; }
   .card-grid { grid-template-columns: repeat(5, 1fr); gap: 8px; }
   .grid-cell { font-size: 14px; }
 }

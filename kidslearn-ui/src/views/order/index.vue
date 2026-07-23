@@ -8,8 +8,7 @@
           <el-select v-model="filterStatus" placeholder="订单状态" clearable @change="fetchData" style="width:120px">
             <el-option label="待支付" :value="0" />
             <el-option label="已支付" :value="1" />
-            <el-option label="已取消" :value="2" />
-            <el-option label="已退款" :value="3" />
+            <el-option label="已退款" :value="2" />
           </el-select>
           <el-button :icon="Refresh" @click="fetchData" :loading="loading">刷新</el-button>
         </div>
@@ -23,7 +22,7 @@
         <el-table-column prop="planName" label="套餐" width="120" />
         <el-table-column prop="amount" label="金额" width="100">
           <template #default="{ row }">
-            <span style="color:#E6A23C;font-weight:600">¥{{ (row.amount / 100).toFixed(2) }}</span>
+            <span style="color:#E6A23C;font-weight:600">¥{{ Number(row.amount).toFixed(2) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
@@ -51,7 +50,7 @@
         <el-descriptions-item label="订单号" :span="2">{{ currentOrder.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="用户">{{ currentOrder.username }}</el-descriptions-item>
         <el-descriptions-item label="套餐">{{ currentOrder.planName }}</el-descriptions-item>
-        <el-descriptions-item label="金额">¥{{ (currentOrder.amount / 100).toFixed(2) }}</el-descriptions-item>
+        <el-descriptions-item label="金额">¥{{ Number(currentOrder.amount).toFixed(2) }}</el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="statusType(currentOrder.status)">{{ statusText(currentOrder.status) }}</el-tag>
         </el-descriptions-item>
@@ -84,11 +83,11 @@ const detailVisible = ref(false)
 const currentOrder = ref<any>(null)
 
 function statusText(status: number) {
-  return ['待支付', '已支付', '已取消', '已退款'][status] || '未知'
+  return ['待支付', '已支付', '已退款'][status] || '未知'
 }
 
-function statusType(status: number): 'warning' | 'success' | 'info' | 'danger' {
-  const types: ('warning' | 'success' | 'info' | 'danger')[] = ['warning', 'success', 'info', 'danger']
+function statusType(status: number): 'warning' | 'success' | 'danger' {
+  const types: ('warning' | 'success' | 'danger')[] = ['warning', 'success', 'danger']
   return types[status] || 'info'
 }
 

@@ -105,11 +105,13 @@ class ParentAiSummaryControllerTest {
         when(userMapper.selectById(22L)).thenReturn(child);
 
         TimeControl timeControl = new TimeControl();
-        timeControl.setChildUserId(22L);
-        timeControl.setDailyLimit(40);
-        timeControl.setIsEnabled(1);
-        timeControl.setForbiddenStart(LocalTime.of(8, 0));
-        timeControl.setForbiddenEnd(LocalTime.of(21, 0));
+        timeControl.setUserId(22L);
+        timeControl.setDailyLimitMinutes(40);
+        timeControl.setLimitEnabled(1);
+        timeControl.setEnabled(1);
+        timeControl.setAllowedWindowEnabled(1);
+        timeControl.setAllowedStartTime(LocalTime.of(8, 0));
+        timeControl.setAllowedEndTime(LocalTime.of(21, 0));
         when(timeControlMapper.selectOne(any())).thenReturn(timeControl);
         when(realtimeSessionRegistry.connectedUserIds()).thenReturn(Set.of(22L));
 

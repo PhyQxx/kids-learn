@@ -26,6 +26,7 @@
       </view>
       <view class="link-area">
         <text class="link-text" @tap="goRegister">没有账号？去注册</text>
+        <text class="link-text" @tap="goForgotPassword">忘记密码</text>
       </view>
     </view>
     <GlobalLoadingOverlay />
@@ -69,6 +70,10 @@ async function handleLogin() {
 
 function goRegister() {
   uni.navigateTo({ url: '/pages/login/register' })
+}
+
+function goForgotPassword() {
+  uni.navigateTo({ url: '/pages/login/forgot-password' })
 }
 </script>
 
@@ -193,7 +198,9 @@ function goRegister() {
 }
 
 .link-area {
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 24px;
 }
 
 .link-text {
