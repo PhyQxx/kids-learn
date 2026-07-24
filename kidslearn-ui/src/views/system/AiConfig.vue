@@ -96,7 +96,7 @@
             </el-table-column>
             <el-table-column label="操作" width="70" align="center">
               <template #default="{ row }">
-                <el-button type="danger" link @click="removeProvider(cat, row)">删除</el-button>
+                <el-button type="danger" link @click="removeProvider(cat, row as AiProviderConfig)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
