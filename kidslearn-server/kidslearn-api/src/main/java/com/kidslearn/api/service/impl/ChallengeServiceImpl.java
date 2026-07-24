@@ -1,6 +1,7 @@
 package com.kidslearn.api.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.kidslearn.api.dto.challenge.CreateChallengeDTO;
 import com.kidslearn.api.dto.challenge.SubmitChallengeDTO;
 import com.kidslearn.api.entity.Challenge;
@@ -15,6 +16,7 @@ import com.kidslearn.api.mapper.CourseLevelMapper;
 import com.kidslearn.api.mapper.FriendMapper;
 import com.kidslearn.api.mapper.LeaderboardMapper;
 import com.kidslearn.api.mapper.UserMapper;
+import com.kidslearn.api.service.ChallengeSeasonService;
 import com.kidslearn.api.service.ChallengeService;
 import com.kidslearn.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
@@ -51,6 +53,7 @@ public class ChallengeServiceImpl implements ChallengeService {
     private final LeaderboardMapper leaderboardMapper;
     private final UserMapper userMapper;
     private final LearningAccessService learningAccessService;
+    private final ChallengeSeasonService challengeSeasonService;
 
     @Override
     @Transactional
@@ -146,7 +149,7 @@ public class ChallengeServiceImpl implements ChallengeService {
             "total", records.size()
         ));
         result.put("season", Map.of(
-            "name", "第 " + currentWeekNumber() + " 周挑战赛",
+            "name", challengeSeasonService.current().name(),
             "remainingText", seasonRemainingText()
         ));
         result.put("players", playersMap);
@@ -306,12 +309,9 @@ public class ChallengeServiceImpl implements ChallengeService {
     }
 
     private void addGold(Long userId, int gold) {
-        User user = userMapper.selectById(userId);
-        if (user == null) {
-            return;
-        }
-        user.setGold(safeInt(user.getGold()) + gold);
-        userMapper.updateById(user);
+        if (gold <= 0) return;
+        // 原子自增，避免并发结算丢失更新
+        userMapper.update(null, new UpdateWrapper<User>().eq("id", userId).setSql("gold = gold + " + gold));
     }
 
     private Map<String, Object> toRecordMap(ChallengeRecord record, User opponent) {
@@ -417,18 +417,12 @@ public class ChallengeServiceImpl implements ChallengeService {
     }
 
     private String currentSeasonKey() {
-        return ChallengeSeasonCatalog.current(LocalDate.now()).key();
-    }
-
-    private int currentWeekNumber() {
-        // Simple implementation: week of year
-        LocalDate now = LocalDate.now();
-        return now.get(java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+        return challengeSeasonService.current().key();
     }
 
     private String seasonRemainingText() {
         LocalDate now = LocalDate.now();
-        long days = now.until(ChallengeSeasonCatalog.current(now).end(), java.time.temporal.ChronoUnit.DAYS);
+        long days = now.until(challengeSeasonService.current(now).end(), java.time.temporal.ChronoUnit.DAYS);
         if (days == 0) return "今晚结算";
         return "剩 " + days + " 天结算";
     }

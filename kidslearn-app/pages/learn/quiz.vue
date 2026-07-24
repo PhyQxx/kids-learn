@@ -289,6 +289,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { onBackPress } from '@dcloudio/uni-app'
 import AppLayout from '@/components/AppLayout.vue'
 import RewardOverlay from '@/components/common/RewardOverlay.vue'
 import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
@@ -423,6 +424,8 @@ const levelId = ref(null)
 const pageGradeLevelId = ref(null)
 const challengeId = ref(null)
 const challengeAnswerPromises = []
+// 退出兜底结算进行中标志，防止 onBackPress 与 exitQuiz 重复触发
+const isExiting = ref(false)
 const isPractice = ref(false)
 const practiceModeId = ref(null)
 // 练习模式：后端会话ID（断点续做核心）
@@ -1271,11 +1274,50 @@ async function submitChallengeIfNeeded() {
   }
 }
 
-function exitQuiz() {
-  clearInterval(timer)
-  stopQuestionSpeech()
-  stopFeedbackAudio()
-  uni.navigateBack()
+async function exitQuiz() {
+  // 防止 onBackPress 与点击退出按钮重复触发
+  if (isExiting.value) return
+  // 未进入答题屏（仍在开始页）或闯关模式：无需兜底结算，直接退出
+  const needSettle = screen.value === 'quiz' && (challengeId.value || practiceSessionId.value)
+  if (!needSettle) {
+    clearInterval(timer)
+    stopQuestionSpeech()
+    stopFeedbackAudio()
+    uni.navigateBack()
+    return
+  }
+  const tip = challengeId.value
+    ? '退出后将按已答内容结算挑战成绩，未答题目按 0 分计。'
+    : '退出后将保存本次练习进度。'
+  uni.showModal({
+    title: '确定退出？',
+    content: tip,
+    confirmText: '退出',
+    cancelText: '继续答题',
+    success: async (res) => {
+      if (!res.confirm) return
+      isExiting.value = true
+      clearInterval(timer)
+      stopQuestionSpeech()
+      stopFeedbackAudio()
+      try {
+        // 兜底结算：挑战按已答内容 finish；练习完成会话保存进度
+        if (challengeId.value) {
+          await submitChallengeIfNeeded()
+        } else if (practiceSessionId.value) {
+          try {
+            await completePracticeSession(practiceSessionId.value)
+          } catch (e) {
+            console.log('退出时完成练习会话失败', e)
+          }
+        }
+      } catch (e) {
+        console.log('退出结算失败', e)
+      } finally {
+        uni.navigateBack()
+      }
+    }
+  })
 }
 
 function goNextLevel() {
@@ -1306,6 +1348,12 @@ onUnmounted(() => {
   clearInterval(timer)
   stopQuestionSpeech()
   stopFeedbackAudio()
+})
+
+// 拦截系统返回键（App 端硬件返回 / 手势返回），走 exitQuiz 的二次确认 + 兜底结算流程
+onBackPress(() => {
+  exitQuiz()
+  return true
 })
 </script>
 

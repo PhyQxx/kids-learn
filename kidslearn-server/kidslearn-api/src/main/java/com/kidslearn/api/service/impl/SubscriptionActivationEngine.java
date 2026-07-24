@@ -6,6 +6,8 @@ import java.time.LocalDateTime;
 public final class SubscriptionActivationEngine {
 
     public static final int STATUS_ACTIVE = 1;
+    /** 订阅已过期（由定时任务翻新，不依赖此状态做权益判定，权益判定看 endTime 兜底） */
+    public static final int STATUS_EXPIRED = 2;
     public static final LocalDateTime PERMANENT_END_TIME = LocalDateTime.of(9999, 12, 31, 23, 59, 59);
 
     private SubscriptionActivationEngine() {}

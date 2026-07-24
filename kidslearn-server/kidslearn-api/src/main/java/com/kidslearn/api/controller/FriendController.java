@@ -2,6 +2,7 @@ package com.kidslearn.api.controller;
 
 import com.kidslearn.api.dto.friend.FriendRequestVO;
 import com.kidslearn.api.dto.friend.FriendVO;
+import com.kidslearn.api.dto.friend.UserSearchVO;
 import com.kidslearn.api.service.FriendService;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
@@ -56,5 +57,19 @@ public class FriendController {
         Long userId = (Long) request.getAttribute("userId");
         friendService.removeFriend(userId, friendId);
         return R.ok();
+    }
+
+    @Operation(summary = "搜索用户（邀请码或用户名/昵称）")
+    @GetMapping("/search")
+    public R<List<UserSearchVO>> searchUsers(HttpServletRequest request, @RequestParam String keyword) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(friendService.searchUsers(userId, keyword));
+    }
+
+    @Operation(summary = "获取我的邀请码")
+    @GetMapping("/my-invite-code")
+    public R<String> getMyInviteCode(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(friendService.getOrGenerateInviteCode(userId));
     }
 }

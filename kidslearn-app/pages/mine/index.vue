@@ -55,6 +55,7 @@ const achievementProgress = ref(null)
 const menus = [
   { label: '闯关记录', url: '/pages/mine/records' },
   { label: '错题本', url: '/pages/mine/wrong' },
+  { label: '好友', url: '/pages/mine/friend' },
   { label: 'VIP会员', url: '/pages/mine/vip' },
   { label: '设置', url: '/pages/mine/settings' },
 ]

@@ -2,6 +2,7 @@ package com.kidslearn.api.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kidslearn.api.dto.challenge.CreateChallengeDTO;
@@ -9,9 +10,12 @@ import com.kidslearn.api.dto.challenge.SubmitChallengeAnswerDTO;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
 import com.kidslearn.api.service.AsyncChallengeService;
+import com.kidslearn.api.service.ChallengeSeasonService;
+import com.kidslearn.api.service.EntitlementService;
 import com.kidslearn.api.service.NotificationEventService;
 import com.kidslearn.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AsyncChallengeServiceImpl implements AsyncChallengeService {
@@ -37,14 +42,20 @@ public class AsyncChallengeServiceImpl implements AsyncChallengeService {
     private final UserMapper userMapper;
     private final LeaderboardMapper leaderboardMapper;
     private final LearningAccessService learningAccessService;
+    private final ChallengeSeasonService challengeSeasonService;
     private final ObjectMapper objectMapper;
     private final NotificationEventService notificationEventService;
+    private final EntitlementService entitlementService;
 
     @Override
     @Transactional
     public Map<String, Object> createOrJoin(Long userId, CreateChallengeDTO dto) {
         learningAccessService.checkAccess(userId, LearningAccessService.Scene.CHALLENGE);
         String type = normalizeType(dto == null ? null : dto.getType());
+        // 排位赛为 VIP 权益（CHALLENGE_RANKED）
+        if ("RANKED".equals(type)) {
+            entitlementService.require(userId, EntitlementService.Code.CHALLENGE_RANKED);
+        }
         if ("FRIEND".equals(type)) {
             Long opponentId = dto == null ? null : dto.getOpponentId();
             if (opponentId == null || opponentId.equals(userId)) throw new BusinessException("请选择要挑战的好友");
@@ -76,7 +87,7 @@ public class AsyncChallengeServiceImpl implements AsyncChallengeService {
     }
 
     private Map<String, Object> create(Long userId, Long opponentId, String type, boolean invited) {
-        ChallengeSeasonCatalog.Season season = ChallengeSeasonCatalog.current(LocalDate.now());
+        ChallengeSeasonService.Season season = challengeSeasonService.current();
         ChallengeMatch match = new ChallengeMatch();
         match.setMatchType(type); match.setCreatorId(userId); match.setOpponentId(opponentId);
         match.setStatus(invited ? "INVITED" : "WAITING"); match.setSeasonKey(season.key());
@@ -174,6 +185,10 @@ public class AsyncChallengeServiceImpl implements AsyncChallengeService {
         if (!"COMPLETED".equals(participant.getStatus())) {
             List<ChallengeAnswerRecord> answers = answerMapper.selectList(new LambdaQueryWrapper<ChallengeAnswerRecord>()
                 .eq(ChallengeAnswerRecord::getMatchId, matchId).eq(ChallengeAnswerRecord::getUserId, userId));
+            // 校验至少答 1 题：防止 0 答空结算刷分（兼容退出按已答结算，但完全没作答则不允许完成）
+            if (answers.isEmpty()) {
+                throw new BusinessException("尚未作答，无法完成挑战");
+            }
             participant.setScore(answers.stream().mapToInt(v -> safe(v.getAwardedScore())).sum());
             participant.setCorrectCount((int) answers.stream().filter(v -> Objects.equals(v.getIsCorrect(), 1)).count());
             participant.setDurationMs(answers.stream().mapToLong(v -> v.getDurationMs() == null ? 0 : v.getDurationMs()).sum());
@@ -201,6 +216,53 @@ public class AsyncChallengeServiceImpl implements AsyncChallengeService {
             "CHALLENGE_RESULT", "挑战结果已出", resultContent(first, second), "OPEN_CHALLENGE", String.valueOf(matchId), LocalDateTime.now().plusDays(30));
         notificationEventService.publish("challenge-result:" + matchId + ":" + second.getUserId(), second.getUserId(),
             "CHALLENGE_RESULT", "挑战结果已出", resultContent(second, first), "OPEN_CHALLENGE", String.valueOf(matchId), LocalDateTime.now().plusDays(30));
+
+        // 非好友对局（排位/限时/综合）结算后，胜方向败方发送好友请求，
+        // 让陌生人匹配局有机会沉淀为好友关系。平局无明确胜负双方，跳过（用户可自行发起）。
+        if (!"FRIEND".equals(match.getMatchType())) {
+            int cmp = Integer.compare(safe(first.getScore()), safe(second.getScore()));
+            if (cmp != 0) {
+                Long winner = cmp > 0 ? first.getUserId() : second.getUserId();
+                Long loser = cmp > 0 ? second.getUserId() : first.getUserId();
+                tryAddAsFriend(winner, loser);
+            }
+        }
+    }
+
+    /**
+     * 在挑战结算事务内尝试单向发送好友请求（winner -> loser）。
+     * 吞掉冲突类异常（不影响结算事务），非预期异常 warn 记录堆栈。
+     */
+    private void tryAddAsFriend(Long userId, Long friendId) {
+        try {
+            if (userId.equals(friendId)) return;
+            // 已是好友或已存在任意方向的请求记录，则跳过
+            Long existing = friendMapper.selectCount(new LambdaQueryWrapper<Friend>().and(w -> w
+                .and(inner -> inner.eq(Friend::getUserId, userId).eq(Friend::getFriendId, friendId))
+                .or(inner -> inner.eq(Friend::getUserId, friendId).eq(Friend::getFriendId, userId))));
+            if (existing > 0) return;
+            Friend friend = new Friend();
+            friend.setUserId(userId);
+            friend.setFriendId(friendId);
+            friend.setStatus(0);
+            friend.setCreateTime(LocalDateTime.now());
+            friendMapper.insert(friend);
+            User requester = userMapper.selectById(userId);
+            String name = requester != null && requester.getNickname() != null
+                ? requester.getNickname() : "刚和你对战的小伙伴";
+            notificationEventService.publish(
+                "friend-request:" + friend.getId() + ":" + friendId,
+                friendId, "FRIEND_REQUEST", "新的好友请求",
+                name + " 想加你为好友（来自挑战对手）",
+                "OPEN_FRIEND_REQUESTS", String.valueOf(friend.getId()),
+                LocalDateTime.now().plusDays(30));
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            // 并发或唯一约束冲突，幂等忽略
+            log.debug("结算后加好友冲突跳过: userId={}, friendId={}", userId, friendId);
+        } catch (Exception e) {
+            // 非预期异常：记录堆栈便于排查，但不回滚结算事务
+            log.warn("结算后加好友异常: userId={}, friendId={}", userId, friendId, e);
+        }
     }
 
     private String resultContent(ChallengeParticipant me, ChallengeParticipant other) {
@@ -245,8 +307,9 @@ public class AsyncChallengeServiceImpl implements AsyncChallengeService {
     }
 
     private void addGold(Long userId, int amount) {
-        User user = userMapper.selectById(userId); if (user == null) return;
-        user.setGold(safe(user.getGold()) + amount); userMapper.updateById(user);
+        if (amount <= 0) return;
+        // 原子自增，避免并发结算丢失更新（与购买扣金币保持一致范式）
+        userMapper.update(null, new UpdateWrapper<User>().eq("id", userId).setSql("gold = gold + " + amount));
     }
 
     private void addRank(Long userId, String season, int delta) {
@@ -266,6 +329,11 @@ public class AsyncChallengeServiceImpl implements AsyncChallengeService {
         result.put("status", match.getStatus()); result.put("participantStatus", me.getStatus());
         result.put("myScore", me.getScore()); result.put("opponentScore", other == null ? null : other.getScore());
         result.put("settled", "SETTLED".equals(match.getStatus()));
+        // 题目总数与当前用户已答题数，供结果页展示“你答了 X/Y 题”
+        result.put("totalQuestions", snapshotMapper.selectCount(new LambdaQueryWrapper<ChallengeQuestionSnapshot>()
+            .eq(ChallengeQuestionSnapshot::getMatchId, matchId)));
+        result.put("answeredCount", answerMapper.selectCount(new LambdaQueryWrapper<ChallengeAnswerRecord>()
+            .eq(ChallengeAnswerRecord::getMatchId, matchId).eq(ChallengeAnswerRecord::getUserId, userId)));
         if (other != null) result.put("opponent", opponentMap(other.getUserId()));
         if ("SETTLED".equals(match.getStatus()) && other != null) {
             int compare = Integer.compare(safe(me.getScore()), safe(other.getScore()));
@@ -312,14 +380,14 @@ public class AsyncChallengeServiceImpl implements AsyncChallengeService {
             int compare = Integer.compare(safe(me.getScore()), safe(other.getScore()));
             if (compare > 0) wins++; else if (compare == 0) draws++; else losses++;
         }
-        ChallengeSeasonCatalog.Season season = ChallengeSeasonCatalog.current(LocalDate.now());
+        ChallengeSeasonService.Season season = challengeSeasonService.current();
         Leaderboard row = leaderboardMapper.selectOne(new LambdaQueryWrapper<Leaderboard>().eq(Leaderboard::getUserId, userId)
             .eq(Leaderboard::getRankType, RANK_TYPE).eq(Leaderboard::getRankWeek, season.key()).last("LIMIT 1"));
         long points = row == null || row.getRankValue() == null ? 0 : row.getRankValue();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("tier", RankTierCatalog.resolve(points));
         result.put("stats", Map.of("wins", wins, "draws", draws, "losses", losses, "total", wins + draws + losses));
-        result.put("season", Map.of("name", season.start() + " 至 " + season.end(),
+        result.put("season", Map.of("name", season.name(),
             "remainingText", "剩 " + Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), season.end())) + " 天结算"));
         Set<Long> ranked = new HashSet<>(), friends = new HashSet<>();
         for (ChallengeParticipant p : participantMapper.selectList(new LambdaQueryWrapper<ChallengeParticipant>().eq(ChallengeParticipant::getStatus, "COMPLETED"))) {

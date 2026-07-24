@@ -1,6 +1,7 @@
 package com.kidslearn.api.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.kidslearn.api.entity.Order;
 import com.kidslearn.api.mapper.OrderMapper;
 import com.kidslearn.api.service.OrderService;
@@ -28,6 +29,8 @@ public class OrderServiceImpl implements OrderService {
     public static final int PAY_STATUS_PENDING = 0;
     public static final int PAY_STATUS_PAID = 1;
     public static final int PAY_STATUS_REFUNDED = 2;
+    /** 订单已超时关闭（由定时任务清理未支付订单时写入） */
+    public static final int PAY_STATUS_CLOSED = 3;
 
     private static final DateTimeFormatter ORDER_TIME_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
 
@@ -112,6 +115,11 @@ public class OrderServiceImpl implements OrderService {
                 log.info("订单已退款，跳过重复回调: orderNo={}", orderNo);
                 return toOrderMap(order);
             }
+            // 订单已被定时任务超时关闭，忽略迟到的支付回调，防止错误激活订阅
+            if (order.getPayStatus() == PAY_STATUS_CLOSED) {
+                log.warn("订单已超时关闭，忽略迟到回调: orderNo={}", orderNo);
+                throw new BusinessException("订单已超时关闭，请重新下单");
+            }
         }
 
         if (payStatus == null || (payStatus != PAY_STATUS_PAID && payStatus != PAY_STATUS_REFUNDED)) {
@@ -126,14 +134,28 @@ public class OrderServiceImpl implements OrderService {
             return toOrderMap(order);
         }
 
-        // 支付成功：更新订单状态
-        order.setPayStatus(PAY_STATUS_PAID);
-        order.setPayTime(LocalDateTime.now());
-        order.setUpdateTime(LocalDateTime.now());
-        int rows = orderMapper.updateById(order);
+        // 支付成功：用乐观锁更新订单状态（WHERE pay_status=0），并发回调只有一个能成功激活
+        LocalDateTime now = LocalDateTime.now();
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<Order>()
+            .eq(Order::getId, order.getId())
+            .eq(Order::getPayStatus, PAY_STATUS_PENDING)
+            .set(Order::getPayStatus, PAY_STATUS_PAID)
+            .set(Order::getPayTime, now)
+            .set(Order::getUpdateTime, now));
         if (rows == 0) {
-            throw new BusinessException("订单状态更新失败，可能存在并发问题");
+            // 并发竞争失败：可能已被另一个回调处理（PAID）或被定时任务关闭（CLOSED），重读返回最新状态
+            log.warn("支付回调并发竞争失败，订单已被处理: orderNo={}", orderNo);
+            Order latest = orderMapper.selectById(order.getId());
+            if (latest != null && latest.getPayStatus() != null && latest.getPayStatus() == PAY_STATUS_PAID) {
+                Map<String, Object> result = toOrderMap(latest);
+                result.put("subscription", subscriptionService.getCurrentSubscription(latest.getUserId()));
+                return result;
+            }
+            throw new BusinessException("订单状态更新失败，可能已被关闭");
         }
+
+        order.setPayStatus(PAY_STATUS_PAID);
+        order.setPayTime(now);
 
         // 激活订阅（如果是订阅订单）
         Map<String, Object> result = toOrderMap(order);

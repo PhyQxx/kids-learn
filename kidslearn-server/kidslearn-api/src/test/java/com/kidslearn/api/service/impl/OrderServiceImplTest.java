@@ -6,15 +6,32 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.kidslearn.api.entity.Order;
 import com.kidslearn.api.mapper.OrderMapper;
 import com.kidslearn.api.service.SubscriptionService;
 import java.math.BigDecimal;
 import java.util.Map;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class OrderServiceImplTest {
+
+    /**
+     * 本测试是纯 Mockito 单测（无 Spring 上下文），而 handlePaymentCallback 用
+     * LambdaUpdateWrapper 做乐观锁更新，构造时依赖 MybatisPlus 的 lambda 元数据缓存。
+     * 这里手动初始化 Order 实体的表信息缓存，避免 "can not find lambda cache" 报错。
+     */
+    @BeforeAll
+    static void initLambdaCache() {
+        TableInfoHelper.initTableInfo(
+            new MapperBuilderAssistant(new MybatisConfiguration(), ""),
+            Order.class
+        );
+    }
 
     @Test
     void createsPendingSubscriptionOrderFromPlan() {
@@ -50,13 +67,14 @@ class OrderServiceImplTest {
         order.setProductId(1L);
         order.setPayStatus(0);
         when(orderMapper.selectOne(any())).thenReturn(order);
-        when(orderMapper.updateById(any())).thenReturn(1);
+        // 支付成功走乐观锁 update(null, LambdaUpdateWrapper)，而非 updateById
+        when(orderMapper.update(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any())).thenReturn(1);
         when(subscriptionService.activateSubscription(7L, 1)).thenReturn(Map.of("status", 1));
 
         Map<String, Object> result = service.handlePaymentCallback("ORD123", 1);
 
         assertEquals(1, order.getPayStatus());
-        verify(orderMapper).updateById(order);
+        verify(orderMapper).update(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         verify(subscriptionService).activateSubscription(7L, 1);
         assertEquals(1, result.get("payStatus"));
     }

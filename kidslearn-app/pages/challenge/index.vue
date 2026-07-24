@@ -185,7 +185,16 @@ async function startChallenge(type) {
     try {
       const friends = await getFriendList()
       if (!Array.isArray(friends) || friends.length === 0) {
-        uni.showToast({ title: '暂无已确认好友，请先添加好友', icon: 'none' })
+        // 没有好友时引导去好友页添加，而不是只 toast 后卡住
+        uni.showModal({
+          title: '还没有好友',
+          content: '去添加好友后就能发起挑战啦',
+          confirmText: '去添加',
+          cancelText: '取消',
+          success: ({ confirm }) => {
+            if (confirm) uni.navigateTo({ url: '/pages/mine/friend' })
+          }
+        })
         return
       }
       const selected = await new Promise((resolve) => {

@@ -8,9 +8,12 @@ import com.kidslearn.api.realtime.RealtimeEventPublisher;
 import com.kidslearn.api.service.PetService;
 import com.kidslearn.common.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,6 +21,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PetServiceImpl implements PetService {
+
+    /** 互动操作（玩耍/洗澡）冷却秒数，防止脚本快速刷经验 */
+    private static final long INTERACTION_COOLDOWN_SECONDS = 60;
+    /** 单个互动动作每日上限次数 */
+    private static final int DAILY_INTERACTION_LIMIT = 20;
 
     private final UserPetMapper userPetMapper;
     private final PetMapper petMapper;
@@ -28,6 +36,7 @@ public class PetServiceImpl implements PetService {
     private final UserDecorationInventoryMapper decoInventoryMapper;
     private final UserMapper userMapper;
     private final RealtimeEventPublisher realtimeEventPublisher;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Map<String, Object> getMyPet(Long userId) {
@@ -166,6 +175,7 @@ public class PetServiceImpl implements PetService {
     @Override
     @Transactional
     public Map<String, Object> playWithPet(Long userId) {
+        checkInteractionRateLimit(userId, "play");
         UserPet userPet = findUserPetOrThrow(userId);
 
         int energy = userPet.getEnergy() != null ? userPet.getEnergy() : 100;
@@ -195,6 +205,7 @@ public class PetServiceImpl implements PetService {
     @Override
     @Transactional
     public Map<String, Object> bathPet(Long userId) {
+        checkInteractionRateLimit(userId, "bath");
         UserPet userPet = findUserPetOrThrow(userId);
 
         userPet.setMood(Math.min(4, userPet.getMood() + 1));
@@ -470,6 +481,29 @@ public class PetServiceImpl implements PetService {
         userPetMapper.insert(userPet);
 
         return getMyPet(userId);
+    }
+
+    /**
+     * 互动操作频控：每次冷却 60 秒 + 每日上限 20 次。
+     * 防止脚本快速刷经验/刷宠物等级（play/bath 无道具成本，否则可被无限制调用）。
+     * 顺序：先校验日上限（避免超限时白白占用冷却窗口），再抢冷却锁。
+     */
+    private void checkInteractionRateLimit(Long userId, String action) {
+        String actionLabel = "play".equals(action) ? "玩耍" : "洗澡";
+        String dailyKey = "kidslearn:pet:" + action + ":daily:" + userId + ":" + LocalDate.now();
+        Long count = stringRedisTemplate.opsForValue().increment(dailyKey);
+        if (count != null && count == 1L) {
+            stringRedisTemplate.expire(dailyKey, Duration.ofDays(1));
+        }
+        if (count != null && count > DAILY_INTERACTION_LIMIT) {
+            throw new BusinessException("今日" + actionLabel + "次数已达上限，明天再来吧");
+        }
+        String cooldownKey = "kidslearn:pet:" + action + ":cooldown:" + userId;
+        Boolean acquired = stringRedisTemplate.opsForValue()
+            .setIfAbsent(cooldownKey, "1", INTERACTION_COOLDOWN_SECONDS, java.util.concurrent.TimeUnit.SECONDS);
+        if (!Boolean.TRUE.equals(acquired)) {
+            throw new BusinessException("操作太频繁，请稍后再试");
+        }
     }
 
     private UserPet findUserPetOrThrow(Long userId) {

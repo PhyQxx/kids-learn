@@ -33,6 +33,7 @@
         { "path": "pages/mine/vip", "style": { "navigationStyle": "custom", "navigationBarTitleText": "VIP" } },
         { "path": "pages/mine/settings", "style": { "navigationStyle": "custom", "navigationBarTitleText": "设置" } },
         { "path": "pages/mine/security", "style": { "navigationStyle": "custom", "navigationBarTitleText": "账号安全" } },
+        { "path": "pages/mine/friend", "style": { "navigationStyle": "custom", "navigationBarTitleText": "好友" } },
         { "path": "pages/notification/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "消息通知" } }
     ],
     "globalStyle": {

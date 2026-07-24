@@ -15,8 +15,8 @@ final class ChallengeSeasonCatalog {
         long index = Math.floorDiv(ChronoUnit.WEEKS.between(EPOCH, monday), 4);
         LocalDate start = EPOCH.plusWeeks(index * 4);
         LocalDate end = start.plusDays(27);
-        return new Season("S" + start.toString().replace("-", ""), start, end);
+        return new Season("S" + start.toString().replace("-", ""), start, end, start + " 至 " + end);
     }
 
-    record Season(String key, LocalDate start, LocalDate end) {}
+    record Season(String key, LocalDate start, LocalDate end, String name) {}
 }

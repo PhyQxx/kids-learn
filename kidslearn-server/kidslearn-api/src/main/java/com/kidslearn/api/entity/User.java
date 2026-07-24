@@ -9,6 +9,8 @@ import java.time.LocalDateTime;
 @TableName("user")
 public class User extends BaseEntity {
     private String username;
+    /** 邀请码（用于加好友，8 位字符，排除易混字符 0O1I） */
+    private String inviteCode;
     private String password;
     private String nickname;
     private String avatar;

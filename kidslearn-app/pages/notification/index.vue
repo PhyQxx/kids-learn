@@ -117,6 +117,12 @@ async function readNotification(item) {
     } else {
       uni.navigateTo({ url: '/pages/challenge/index' })
     }
+  } else if (item.actionType === 'OPEN_FRIEND_REQUESTS') {
+    // 好友请求：跳好友页"新请求"tab（tab=1）
+    uni.navigateTo({ url: '/pages/mine/friend?tab=1' })
+  } else if (item.actionType === 'OPEN_FRIEND_LIST') {
+    // 好友请求被接受：跳好友页"好友列表"tab（tab=0）
+    uni.navigateTo({ url: '/pages/mine/friend?tab=0' })
   }
 }
 

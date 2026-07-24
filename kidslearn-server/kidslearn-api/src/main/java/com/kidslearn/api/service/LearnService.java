@@ -37,6 +37,9 @@ public interface LearnService {
 
     Map<String, Object> checkin(Long userId);
 
+    /** 补签昨天漏签（消耗金币，仅恢复连签不断，不发签到奖励） */
+    Map<String, Object> makeupCheckin(Long userId);
+
     Map<String, Object> getCheckinStatus(Long userId);
 
     Map<String, Object> getHint(Long userId, Long questionId);

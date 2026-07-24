@@ -6,6 +6,8 @@ import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
 import com.kidslearn.api.realtime.RealtimeSessionRegistry;
 import com.kidslearn.api.service.AiService;
+import com.kidslearn.api.service.EntitlementService;
+import com.kidslearn.api.service.impl.ParentPinService;
 import com.kidslearn.common.exception.BusinessException;
 import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,6 +39,8 @@ public class ParentController {
     private final SubjectMapper subjectMapper;
     private final RealtimeSessionRegistry realtimeSessionRegistry;
     private final AiService aiService;
+    private final ParentPinService parentPinService;
+    private final EntitlementService entitlementService;
 
     @Operation(summary = "获取学习报告")
     @GetMapping("/report")
@@ -51,6 +55,8 @@ public class ParentController {
     @GetMapping("/ai-summary")
     public R<Map<String, Object>> getAiSummary(HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
+        // AI 家长报告为 VIP 权益（AI_PARENT_SUMMARY）
+        entitlementService.require(userId, EntitlementService.Code.AI_PARENT_SUMMARY);
         Map<String, Object> report = buildReport(userId, null);
         return R.ok(normalizeAiSummary(aiService.generateParentSummary(report, Map.of())));
     }
@@ -222,6 +228,9 @@ public class ParentController {
             HttpServletRequest request,
             @RequestBody Map<String, Object> body) {
         Long userId = (Long) request.getAttribute("userId");
+        // 家长写操作必须校验 PIN，防止孩子绕过前端家长门直接改时间管控
+        String parentPin = body.get("parentPin") == null ? null : String.valueOf(body.get("parentPin"));
+        parentPinService.verify(userId, parentPin);
 
         TimeControl tc = timeControlMapper.selectOne(
             new LambdaQueryWrapper<TimeControl>().eq(TimeControl::getUserId, userId)

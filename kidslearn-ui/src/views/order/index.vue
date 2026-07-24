@@ -9,6 +9,7 @@
             <el-option label="待支付" :value="0" />
             <el-option label="已支付" :value="1" />
             <el-option label="已退款" :value="2" />
+            <el-option label="已关闭" :value="3" />
           </el-select>
           <el-button :icon="Refresh" @click="fetchData" :loading="loading">刷新</el-button>
         </div>
@@ -83,11 +84,11 @@ const detailVisible = ref(false)
 const currentOrder = ref<any>(null)
 
 function statusText(status: number) {
-  return ['待支付', '已支付', '已退款'][status] || '未知'
+  return ['待支付', '已支付', '已退款', '已关闭'][status] || '未知'
 }
 
-function statusType(status: number): 'warning' | 'success' | 'danger' {
-  const types: ('warning' | 'success' | 'danger')[] = ['warning', 'success', 'danger']
+function statusType(status: number): 'warning' | 'success' | 'danger' | 'info' {
+  const types: ('warning' | 'success' | 'danger' | 'info')[] = ['warning', 'success', 'danger', 'info']
   return types[status] || 'info'
 }
 

@@ -92,6 +92,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '挑战赛管理' },
       },
       {
+        path: 'challenge/season',
+        name: 'ChallengeSeason',
+        component: () => import('@/views/challenge/season.vue'),
+        meta: { title: '排位赛赛季' },
+      },
+      {
         path: 'system/user',
         name: 'SystemUser',
         component: () => import('@/views/system/user.vue'),
@@ -175,6 +181,7 @@ const ROUTE_PERMISSIONS: Record<string, string> = {
   '/ranking': 'admin:dashboard:read',
   '/order': 'admin:order:read',
   '/challenge': 'admin:challenge:read',
+  '/challenge/season': 'admin:challenge:read',
   '/system/user': 'admin:user:read',
   '/system/role': 'admin:role:read',
   '/system/config': 'admin:config:read',

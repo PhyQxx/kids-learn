@@ -52,6 +52,9 @@
 <script setup>
 import { ref } from 'vue'
 import { getParentPinStatus, setupParentPin, verifyParentPin } from '@/api/auth'
+import { useUserStore } from '@/store/user'
+
+const userStore = useUserStore()
 
 const props = defineProps({
   targetUrl: { type: String, default: '/pages/parent/index' }
@@ -114,6 +117,8 @@ async function confirm() {
     } else {
       await setupParentPin(password.value.trim(), value)
     }
+    // 缓存验证成功的 PIN，供家长写操作接口（如保存时间管控）透传后端二次校验
+    userStore.setVerifiedParentPin(value)
     loading.value = false
     close()
     uni.navigateTo({ url: props.targetUrl })

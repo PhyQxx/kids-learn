@@ -8,36 +8,45 @@
 
     <view v-if="hasVideos" class="videos-shell">
       <view class="player-panel">
-        <video
-          class="video-player"
-          :src="currentVideo.videoUrl"
-          :poster="currentVideo.coverUrl"
-          :initial-time="currentVideo.progressSeconds"
-          controls
-          @timeupdate="handleTimeUpdate"
-          @ended="handleVideoEnded"
-        />
-        <view class="video-meta">
-          <view class="video-title-row">
-            <text class="video-title text-md text-bold">{{ currentVideo.title }}</text>
-            <text class="duration-pill">{{ currentVideo.durationText }}</text>
-          </view>
-          <text class="video-desc text-sm text-light">{{ currentVideo.description }}</text>
-          <view class="watch-progress">
-            <view class="progress-bar progress-bar-blue">
-              <view class="progress-fill" :style="{ width: currentVideo.progressPercent + '%' }"></view>
-            </view>
-            <text class="progress-text text-xs">{{ currentVideo.completed ? '已完成' : currentVideo.progressPercent + '%' }}</text>
-          </view>
-          <tn-button
-            v-if="currentVideo.courseLevelId"
-            class="quiz-button"
-            type="primary"
-            shape="round"
-            size="lg"
-            @click="goQuiz(currentVideo)"
-          >去练习</tn-button>
+        <!-- 锁定视频：显示升级提示而非黑屏播放器 -->
+        <view v-if="currentVideo.locked" class="video-locked">
+          <text class="locked-icon">🔒</text>
+          <text class="text-md text-bold">这是会员专属课程</text>
+          <text class="text-sm text-light">开通 VIP 即可解锁全部视频课程</text>
+          <tn-button class="locked-cta" type="primary" shape="round" @click="goVip">开通会员</tn-button>
         </view>
+        <template v-else>
+          <video
+            class="video-player"
+            :src="currentVideo.videoUrl"
+            :poster="currentVideo.coverUrl"
+            :initial-time="currentVideo.progressSeconds"
+            controls
+            @timeupdate="handleTimeUpdate"
+            @ended="handleVideoEnded"
+          />
+          <view class="video-meta">
+            <view class="video-title-row">
+              <text class="video-title text-md text-bold">{{ currentVideo.title }}</text>
+              <text class="duration-pill">{{ currentVideo.durationText }}</text>
+            </view>
+            <text class="video-desc text-sm text-light">{{ currentVideo.description }}</text>
+            <view class="watch-progress">
+              <view class="progress-bar progress-bar-blue">
+                <view class="progress-fill" :style="{ width: currentVideo.progressPercent + '%' }"></view>
+              </view>
+              <text class="progress-text text-xs">{{ currentVideo.completed ? '已完成' : currentVideo.progressPercent + '%' }}</text>
+            </view>
+            <tn-button
+              v-if="currentVideo.courseLevelId"
+              class="quiz-button"
+              type="primary"
+              shape="round"
+              size="lg"
+              @click="goQuiz(currentVideo)"
+            >去练习</tn-button>
+          </view>
+        </template>
       </view>
 
       <view class="playlist">
@@ -45,7 +54,7 @@
           v-for="video in videos"
           :key="video.id"
           class="playlist-item card"
-          :class="{ active: video.id === currentVideo.id, completed: video.completed }"
+          :class="{ active: video.id === currentVideo.id, completed: video.completed, locked: video.locked }"
           @tap="selectVideo(video)"
         >
           <image v-if="video.coverUrl" class="playlist-cover" :src="video.coverUrl" mode="aspectFill" />
@@ -53,9 +62,12 @@
             <text>课程</text>
           </view>
           <view class="playlist-info">
-            <text class="playlist-title text-sm text-bold">{{ video.title }}</text>
-            <text class="playlist-sub text-xs text-light">{{ video.durationText }} · {{ video.completed ? '已完成' : video.progressPercent + '%' }}</text>
-            <view class="mini-progress">
+            <text class="playlist-title text-sm text-bold">
+              {{ video.title }}
+              <text v-if="video.locked" class="lock-mark">🔒</text>
+            </text>
+            <text class="playlist-sub text-xs text-light">{{ video.locked ? '会员专属' : (video.durationText + ' · ' + (video.completed ? '已完成' : video.progressPercent + '%')) }}</text>
+            <view v-if="!video.locked" class="mini-progress">
               <view class="mini-progress-fill" :style="{ width: video.progressPercent + '%' }"></view>
             </view>
           </view>
@@ -123,9 +135,13 @@ async function loadVideos() {
   try {
     const res = await getCourseVideos(courseId.value)
     videos.value = normalizeVideoCourses(res)
-    if (!selectedVideoId.value && videos.value[0]) {
-      selectedVideoId.value = videos.value[0].id
-      lastReportedSecond = videos.value[0].progressSeconds || 0
+    // 默认选中第一个未锁定的视频（避免首屏就是黑屏锁定态）
+    if (!selectedVideoId.value) {
+      const firstPlayable = videos.value.find(v => !v.locked) || videos.value[0]
+      if (firstPlayable) {
+        selectedVideoId.value = firstPlayable.id
+        lastReportedSecond = firstPlayable.progressSeconds || 0
+      }
     }
   } catch (e) {
     console.log('videos: API failed')
@@ -133,9 +149,17 @@ async function loadVideos() {
 }
 
 function selectVideo(video) {
+  if (video.locked) {
+    uni.showToast({ title: '该课程为会员专属，开通 VIP 解锁', icon: 'none' })
+    return
+  }
   reportProgress(currentVideo.value, true)
   selectedVideoId.value = video.id
   lastReportedSecond = video.progressSeconds || 0
+}
+
+function goVip() {
+  uni.navigateTo({ url: '/pages/mine/vip' })
 }
 
 function handleTimeUpdate(event) {
@@ -217,6 +241,43 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/* 会员锁定视频提示 */
+.video-locked {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  min-height: 360px;
+  border-radius: $radius-md;
+  background: linear-gradient(135deg, #1f2937, #374151);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #fff;
+
+  .locked-icon {
+    font-size: 48px;
+    margin-bottom: 4px;
+  }
+
+  text {
+    color: #fff;
+  }
+
+  .locked-cta {
+    margin-top: 12px;
+  }
+}
+
+.lock-mark {
+  margin-left: 4px;
+  font-size: 12px;
+}
+
+.playlist-item.locked {
+  opacity: 0.7;
 }
 
 .video-player {

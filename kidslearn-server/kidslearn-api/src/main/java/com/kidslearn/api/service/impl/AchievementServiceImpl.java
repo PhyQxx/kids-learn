@@ -1,6 +1,7 @@
 package com.kidslearn.api.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
 import com.kidslearn.api.service.AchievementService;
@@ -487,10 +488,16 @@ public class AchievementServiceImpl implements AchievementService {
         }
 
         if (gold > 0 || exp > 0 || diamond > 0) {
+            // 原子自增，避免并发领奖丢失更新
+            UpdateWrapper<User> uw = new UpdateWrapper<User>().eq("id", user.getId());
+            if (gold > 0) uw.setSql("gold = gold + " + gold);
+            if (exp > 0) uw.setSql("total_exp = total_exp + " + exp);
+            if (diamond > 0) uw.setSql("diamond = diamond + " + diamond);
+            userMapper.update(null, uw);
+            // 同步内存对象，供 summary 返回
             user.setGold((user.getGold() == null ? 0 : user.getGold()) + gold);
             user.setTotalExp((user.getTotalExp() == null ? 0 : user.getTotalExp()) + exp);
             user.setDiamond((user.getDiamond() == null ? 0 : user.getDiamond()) + diamond);
-            userMapper.updateById(user);
         }
         if (gold > 0) {
             insertRewardLog(user.getId(), 1, null, gold, achievementId);

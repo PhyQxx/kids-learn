@@ -130,6 +130,13 @@ public class LearnController {
         return R.ok(learnService.checkin(userId));
     }
 
+    @Operation(summary = "补签昨日（消耗金币恢复连签）")
+    @PostMapping("/checkin/makeup")
+    public R<Map<String, Object>> makeupCheckin(HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        return R.ok(learnService.makeupCheckin(userId));
+    }
+
     @Operation(summary = "获取签到状态")
     @GetMapping("/checkin/status")
     public R<Map<String, Object>> getCheckinStatus(HttpServletRequest request) {

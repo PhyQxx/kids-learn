@@ -6,7 +6,10 @@ import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/notification")
 @RequiredArgsConstructor
+@Validated
 public class NotificationController {
 
     private final NotificationService notificationService;
@@ -24,8 +28,8 @@ public class NotificationController {
     @GetMapping("/list")
     public R<List<NotificationVO>> getNotifications(
             HttpServletRequest request,
-            @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "20") Integer pageSize) {
+            @RequestParam(defaultValue = "1") @Min(1) Integer page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) Integer pageSize) {
         Long userId = (Long) request.getAttribute("userId");
         return R.ok(notificationService.getNotifications(userId, page, pageSize));
     }

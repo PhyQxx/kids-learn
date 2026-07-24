@@ -127,6 +127,9 @@ import {
 } from '@/api/parent'
 import { normalizeParentAiSummary } from '@/utils/parentAiSummary.mjs'
 import { evaluateLearningAccess, normalizeTimeControl } from '@/utils/timeControl.mjs'
+import { useUserStore } from '@/store/user'
+
+const userStore = useUserStore()
 
 const report = reactive({
   today: { learnMinutes: 0, completedLevels: 0, accuracy: 0 },
@@ -211,10 +214,10 @@ async function saveControl() {
       allowedWindowEnabled: control.allowedWindowEnabled,
       restReminder: control.restReminder,
       autoLockAfterTask: control.autoLockAfterTask
-    })
+    }, userStore.verifiedParentPin)
     uni.showToast({ title: '已保存', icon: 'success' })
   } catch (error) {
-    uni.showToast({ title: '保存失败', icon: 'none' })
+    uni.showToast({ title: error?.msg || error?.message || '保存失败', icon: 'none' })
   } finally {
     saving.value = false
   }

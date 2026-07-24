@@ -35,6 +35,19 @@
       <view v-else class="checked-tip">
         <text class="text-md text-bold">今日已签到</text>
         <text class="text-sm text-light">明天记得继续哦！</text>
+        <!-- 补签入口：仅当昨日漏签（连签中断）时展示 -->
+        <tn-button
+          v-if="canMakeup"
+          type="primary"
+          plain
+          shape="round"
+          size="sm"
+          class="makeup-btn"
+          :loading="makeupLoading"
+          @click="doMakeup"
+        >
+          补签昨日 · 恢复连签（消耗 20 金币）
+        </tn-button>
       </view>
 
       <view class="checkin-close" @tap="close">
@@ -46,7 +59,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getCheckinStatus, postCheckin } from '@/api/learn'
+import { getCheckinStatus, postCheckin, makeupCheckin } from '@/api/learn'
 
 const emit = defineEmits(['close'])
 
@@ -62,6 +75,10 @@ const nextRewardDay = ref(1)
 const nextGold = ref(5)
 const nextExp = ref(5)
 const weekDays = ref([])
+const makeupLoading = ref(false)
+// 是否可补签：由后端 getCheckinStatus 返回（今天已签+昨天漏签+前天有记录），
+// 前端不自行推断，避免与后端 makeupCheckin 的校验逻辑不一致
+const canMakeup = ref(false)
 
 onMounted(async () => {
   try {
@@ -73,6 +90,7 @@ onMounted(async () => {
       nextGold.value = res.nextGoldReward || 5
       nextExp.value = res.nextExpReward || 5
       weekDays.value = res.weekDays || []
+      canMakeup.value = res.canMakeup || false
     }
     // If already checked in today and auto-close is enabled, don't show popup
     if (checkedIn.value && props.autoCloseIfDone) {
@@ -102,6 +120,38 @@ async function doCheckin() {
     uni.showToast({ title: e.message || '签到失败', icon: 'none' })
   } finally {
     loading.value = false
+  }
+}
+
+async function doMakeup() {
+  if (makeupLoading.value) return
+  makeupLoading.value = true
+  try {
+    uni.showModal({
+      title: '补签确认',
+      content: '将消耗 20 金币补签昨日，恢复连签（补签不发签到奖励）。',
+      success: async ({ confirm }) => {
+        if (!confirm) { makeupLoading.value = false; return }
+        try {
+          const res = await makeupCheckin()
+          uni.showToast({ title: '补签成功，连签已恢复', icon: 'success' })
+          // 重新拉取签到状态刷新连签和周历
+          const status = await getCheckinStatus()
+          if (status) {
+            streak.value = status.streak || streak.value
+            weekDays.value = status.weekDays || weekDays.value
+            canMakeup.value = status.canMakeup || false
+          }
+        } catch (e) {
+          uni.showToast({ title: e.message || '补签失败', icon: 'none' })
+        } finally {
+          makeupLoading.value = false
+        }
+      },
+      fail: () => { makeupLoading.value = false }
+    })
+  } catch (e) {
+    makeupLoading.value = false
   }
 }
 
@@ -210,6 +260,10 @@ function close() {
   align-items: center;
   gap: 4px;
   padding: 16px;
+}
+
+.makeup-btn {
+  margin-top: 10px;
 }
 
 .checkin-close {

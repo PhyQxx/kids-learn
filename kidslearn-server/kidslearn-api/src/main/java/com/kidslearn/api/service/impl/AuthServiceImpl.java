@@ -14,6 +14,7 @@ import com.kidslearn.common.util.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -116,7 +117,12 @@ public class AuthServiceImpl implements AuthService {
         user.setLevel(1);
         user.setGold(0);
         user.setDiamond(0);
-        userMapper.insert(user);
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException e) {
+            // 并发注册同用户名：select 查重通过但 insert 撞唯一索引，转友好提示
+            throw new BusinessException("用户名已存在");
+        }
 
         // always create child profile (learning settings)
         Integer ageGroup = dto.getLearnAgeGroup() != null ? dto.getLearnAgeGroup() : 2;
@@ -151,7 +157,12 @@ public class AuthServiceImpl implements AuthService {
         parentProfile.setParentPinHash(passwordHashService.hash(dto.getParentPin()));
         parentProfile.setConsentVersion("2026-07-22-v1");
         parentProfile.setConsentTime(LocalDateTime.now());
-        parentProfileMapper.insert(parentProfile);
+        try {
+            parentProfileMapper.insert(parentProfile);
+        } catch (DuplicateKeyException e) {
+            // 并发注册同手机号：转友好提示（user 已插入，但 phone 唯一索引兜底）
+            throw new BusinessException("该手机号已绑定其他账号");
+        }
 
         // assign default pet
         assignDefaultPet(user.getId());

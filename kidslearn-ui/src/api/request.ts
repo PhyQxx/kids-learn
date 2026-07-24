@@ -310,6 +310,13 @@ export function getChallengeList(params: PageQuery & { type?: string }) { return
 export function saveChallenge(data: AdminRecord) { return post<void>('/admin/challenge/save', data) }
 export function deleteChallenge(id: number) { return del(`/admin/challenge/${id}`) }
 
+// ==================== 排位赛赛季管理 ====================
+export function getChallengeSeasonList(params: PageQuery & { status?: string }) {
+  return get<PageResult<AdminRecord>>('/admin/challenge-season/list', params)
+}
+export function saveChallengeSeason(data: AdminRecord) { return post<void>('/admin/challenge-season/save', data) }
+export function deleteChallengeSeason(id: number) { return del(`/admin/challenge-season/${id}`) }
+
 // ==================== AI 难度评分 ====================
 export function aiRateDifficulty(batchSize?: number) {
   return post<{ rated: number; total: number; remaining: number }>('/admin/question/ai-rate-difficulty', null, { params: { batchSize: batchSize || 50 } })

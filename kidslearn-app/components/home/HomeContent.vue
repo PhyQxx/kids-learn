@@ -214,7 +214,8 @@ async function loadData() {
           icon: s.icon || s.iconUrl || { 'CHINESE': '📖', 'MATH': '🔢', 'ENGLISH': '🔤', 'LOGIC': '🧩', 'SCIENCE': '🔬', 'MUSIC': '🎵' }[code] || '📚',
           bg: bgMap[code] || '#F5F5F5',
           color: colorMap[code] || '#666',
-          locked: s.status === 0 || s.isVip || s.locked
+          // 学科锁定：仅由后端 status(0=下线) 或 locked 标记决定；后端当前不返回 isVip 字段
+          locked: s.status === 0 || s.locked
         }
       })
     }

@@ -120,6 +120,7 @@ const activeTab = ref(0)
 const tabItems = ref([
   { label: '周榜', type: 'weekly' },
   { label: '总榜', type: 'total' },
+  { label: '好友榜', type: 'friend' },
   { label: '挑战榜', type: 'challenge' }
 ])
 

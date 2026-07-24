@@ -34,6 +34,9 @@ export const getWrongTopics = () => get('/learn/wrong-topics')
 // 每日签到
 export const postCheckin = () => post('/learn/checkin')
 
+// 补签昨日（消耗金币恢复连签）
+export const makeupCheckin = () => post('/learn/checkin/makeup')
+
 // 获取签到状态
 export const getCheckinStatus = () => get('/learn/checkin/status')
 

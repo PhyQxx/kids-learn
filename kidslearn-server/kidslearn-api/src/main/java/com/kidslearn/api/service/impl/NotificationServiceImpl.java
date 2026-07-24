@@ -32,12 +32,16 @@ public class NotificationServiceImpl implements NotificationService {
 
     @Override
     public List<NotificationVO> getNotifications(Long userId, Integer page, Integer pageSize) {
+        // 防御性 clamp：即使 Controller 校验被绕过，也保证 page/pageSize 合法，避免负数 OFFSET / 超大 LIMIT
+        int safePage = (page == null || page < 1) ? 1 : Math.min(page, 10_000);
+        int safeSize = (pageSize == null || pageSize < 1) ? 20 : Math.min(pageSize, 100);
+        int offset = (safePage - 1) * safeSize;
         List<Notification> notifications = notificationMapper.selectList(
             new LambdaQueryWrapper<Notification>()
                 .eq(Notification::getUserId, userId)
                 .and(w -> w.isNull(Notification::getExpireTime).or().gt(Notification::getExpireTime, LocalDateTime.now()))
                 .orderByDesc(Notification::getCreateTime)
-                .last("LIMIT " + pageSize + " OFFSET " + (page - 1) * pageSize)
+                .last("LIMIT " + safeSize + " OFFSET " + offset)
         );
 
         List<NotificationVO> result = new ArrayList<>();

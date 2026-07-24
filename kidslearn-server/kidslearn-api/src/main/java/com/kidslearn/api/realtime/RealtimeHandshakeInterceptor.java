@@ -32,8 +32,10 @@ public class RealtimeHandshakeInterceptor implements HandshakeInterceptor {
                 return false;
             }
             Long userId = JwtUtil.getUserId(token);
-            String cachedToken = redisTemplate.opsForValue().get(RedisConstants.USER_TOKEN + userId);
-            if (!token.equals(cachedToken)) {
+            // token 以 Set 形式存储（支持多设备登录），必须用 opsForSet().isMember 校验，
+            // 而非 opsForValue().get（后者取出的是 Set 序列化值，永远不等于单个 token）
+            Boolean isMember = redisTemplate.opsForSet().isMember(RedisConstants.USER_TOKEN + userId, token);
+            if (!Boolean.TRUE.equals(isMember)) {
                 return false;
             }
             attributes.put("userId", userId);

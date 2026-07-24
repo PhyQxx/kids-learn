@@ -1,6 +1,7 @@
 package com.kidslearn.api.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.kidslearn.api.dto.learn.*;
 import com.kidslearn.api.entity.*;
 import com.kidslearn.api.mapper.*;
@@ -14,12 +15,15 @@ import com.kidslearn.common.exception.BusinessException;
 import com.kidslearn.common.util.RichContentUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -54,6 +58,7 @@ public class LearnServiceImpl implements LearnService {
     private final LearningAccessService learningAccessService;
     private final PracticeSessionMapper practiceSessionMapper;
     private final UserQuestionRecordMapper userQuestionRecordMapper;
+    private final StringRedisTemplate stringRedisTemplate;
 
     @Override
     public Map<String, Object> getAccessStatus(Long userId) {
@@ -546,10 +551,19 @@ public class LearnServiceImpl implements LearnService {
             if (user == null) {
                 throw new BusinessException("用户不存在");
             }
-            user.setGold((user.getGold() != null ? user.getGold() : 0) + goldReward);
-            user.setTotalExp((user.getTotalExp() != null ? user.getTotalExp() : 0) + expReward);
-            user.setLevel(calculateLevel(user.getTotalExp()));
-            userMapper.updateById(user);
+            int prevGold = user.getGold() != null ? user.getGold() : 0;
+            int prevExp = user.getTotalExp() != null ? user.getTotalExp() : 0;
+            // 原子自增 gold/total_exp，避免并发结算丢失更新
+            UpdateWrapper<User> uw = new UpdateWrapper<User>().eq("id", userId);
+            if (goldReward > 0) uw.setSql("gold = gold + " + goldReward);
+            if (expReward > 0) uw.setSql("total_exp = total_exp + " + expReward);
+            // level 是 total_exp 的派生值，按自增后的预估值重算（仅展示用，下次更新会自愈）
+            int newLevel = calculateLevel(prevExp + expReward);
+            uw.set("level", newLevel);
+            userMapper.update(null, uw);
+            user.setGold(prevGold + goldReward);
+            user.setTotalExp(prevExp + expReward);
+            user.setLevel(newLevel);
             realtimeEventPublisher.publishBalance(userId, user.getGold(), user.getDiamond());
 
             RewardLog goldLog = new RewardLog();
@@ -898,15 +912,58 @@ public class LearnServiceImpl implements LearnService {
 
         User user = userMapper.selectById(userId);
         if (user != null) {
-            user.setGold(user.getGold() + gold);
-            user.setTotalExp(user.getTotalExp() + exp);
-            userMapper.updateById(user);
+            // 原子自增，修复原代码未判 null 的 NPE 隐患并避免并发丢失更新
+            UpdateWrapper<User> uw = new UpdateWrapper<User>().eq("id", userId);
+            if (gold > 0) uw.setSql("gold = gold + " + gold);
+            if (exp > 0) uw.setSql("total_exp = total_exp + " + exp);
+            userMapper.update(null, uw);
         }
         Map<String, Object> result = new HashMap<>();
         result.put("rewardDay", rewardDay);
         result.put("goldReward", gold);
         result.put("expReward", exp);
         result.put("checkedIn", true);
+        return result;
+    }
+
+    private static final int MAKEUP_CHECKIN_COST = 20;
+
+    @Override
+    @Transactional
+    public Map<String, Object> makeupCheckin(Long userId) {
+        LocalDate yesterday = LocalDate.now().minusDays(1);
+        // 昨天已有记录则无需补签
+        Long existed = dailyCheckinMapper.selectCount(new LambdaQueryWrapper<DailyCheckin>()
+            .eq(DailyCheckin::getUserId, userId).eq(DailyCheckin::getCheckinDate, yesterday));
+        if (existed > 0) {
+            throw new BusinessException("昨日已签到，无需补签");
+        }
+        // 补签前提：前天有签到记录（即连签中断，补回断点），否则属于凭空补签
+        DailyCheckin dayBefore = dailyCheckinMapper.selectOne(new LambdaQueryWrapper<DailyCheckin>()
+            .eq(DailyCheckin::getUserId, userId).eq(DailyCheckin::getCheckinDate, yesterday.minusDays(1)).last("LIMIT 1"));
+        if (dayBefore == null) {
+            throw new BusinessException("补签需在连签中断的次日进行");
+        }
+        // 扣金币（原子，余额不足拒绝）
+        int updated = userMapper.update(null, new UpdateWrapper<User>()
+            .eq("id", userId).ge("gold", MAKEUP_CHECKIN_COST)
+            .setSql("gold = gold - " + MAKEUP_CHECKIN_COST));
+        if (updated == 0) {
+            throw new BusinessException("金币不足，补签需消耗 " + MAKEUP_CHECKIN_COST + " 金币");
+        }
+        // 补签记录：rewardDay 接续前天（不发签到奖励，仅保连签不断）
+        DailyCheckin record = new DailyCheckin();
+        record.setUserId(userId);
+        record.setCheckinDate(yesterday);
+        record.setRewardDay((dayBefore.getRewardDay() % 7) + 1);
+        record.setGoldReward(0);
+        record.setExpReward(0);
+        dailyCheckinMapper.insert(record);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("cost", MAKEUP_CHECKIN_COST);
+        result.put("rewardDay", record.getRewardDay());
+        result.put("madeUp", true);
         return result;
     }
 
@@ -950,6 +1007,15 @@ public class LearnServiceImpl implements LearnService {
         result.put("nextGoldReward", CHECKIN_GOLD[nextRewardDay - 1]);
         result.put("nextExpReward", CHECKIN_EXP[nextRewardDay - 1]);
         result.put("today", today.toString());
+        // 是否可补签：今天已签 + 昨天无记录（连签中断）+ 前天有记录（补签前提），与 makeupCheckin 逻辑一致
+        boolean canMakeup = false;
+        if (todayRecord != null) {
+            LocalDate yesterday = today.minusDays(1);
+            boolean yesterdayChecked = recentList.stream().anyMatch(r -> r.getCheckinDate().equals(yesterday));
+            boolean dayBeforeChecked = recentList.stream().anyMatch(r -> r.getCheckinDate().equals(yesterday.minusDays(1)));
+            canMakeup = !yesterdayChecked && dayBeforeChecked;
+        }
+        result.put("canMakeup", canMakeup);
         List<Map<String, Object>> weekDays = new ArrayList<>();
         int cycleStart = todayRecord != null ? todayRecord.getRewardDay() : nextRewardDay;
         for (int i = 1; i <= 7; i++) {
@@ -1184,11 +1250,30 @@ public class LearnServiceImpl implements LearnService {
 
         String aiAvailable = "false";
         String aiExplanation = null;
-        if (aiService.isAvailable()) {
-            String questionText = RichContentUtil.toPlainText(question.getQuestionContent());
-            aiExplanation = aiService.explainWrongTopic(questionText, wrongAnswer, correctAnswer, optionTexts);
-            if (aiExplanation != null) {
-                aiAvailable = "true";
+        // AI 错题解析为 VIP 权益（AI_WRONG_EXPLAIN），免费用户不调 AI 仅返回原始解析
+        boolean aiEntitled = entitlementService.has(userId, EntitlementService.Code.AI_WRONG_EXPLAIN);
+        if (aiEntitled && aiService.isAvailable()) {
+            // 频控：同一用户 60 秒内只能触发一次 AI 解析，防止脚本刷量消耗 LLM 额度
+            String rateLimitKey = "kidslearn:ai-explain:rate:" + userId;
+            Boolean allowed = stringRedisTemplate.opsForValue()
+                .setIfAbsent(rateLimitKey, "1", 60, TimeUnit.SECONDS);
+            if (Boolean.TRUE.equals(allowed)) {
+                // 缓存：同一题的 AI 解析对所有用户通用，缓存 24 小时，避免重复调用 LLM
+                String cacheKey = "kidslearn:ai-explain:cache:" + questionId;
+                aiExplanation = stringRedisTemplate.opsForValue().get(cacheKey);
+                if (aiExplanation == null) {
+                    String questionText = RichContentUtil.toPlainText(question.getQuestionContent());
+                    aiExplanation = aiService.explainWrongTopic(questionText, wrongAnswer, correctAnswer, optionTexts);
+                    if (aiExplanation != null) {
+                        stringRedisTemplate.opsForValue().set(cacheKey, aiExplanation, Duration.ofHours(24));
+                    }
+                }
+                if (aiExplanation != null) {
+                    aiAvailable = "true";
+                }
+            } else {
+                // 触发频控时不报错，仅返回 aiAvailable=false（前端展示原始解析）
+                aiExplanation = null;
             }
         }
         result.put("aiAvailable", aiAvailable);

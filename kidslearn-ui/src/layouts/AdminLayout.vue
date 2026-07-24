@@ -54,6 +54,7 @@
           </template>
           <el-menu-item v-if="hasAnyPerm(['admin:dashboard:read', 'admin:*'])" index="/ranking">排行榜管理</el-menu-item>
           <el-menu-item v-if="hasPerm('admin:challenge:read')" index="/challenge">挑战赛管理</el-menu-item>
+          <el-menu-item v-if="hasPerm('admin:challenge:read')" index="/challenge/season">排位赛赛季</el-menu-item>
           <el-menu-item v-if="hasPerm('admin:order:read')" index="/order">订单管理</el-menu-item>
         </el-sub-menu>
 

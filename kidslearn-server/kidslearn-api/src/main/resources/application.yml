@@ -38,6 +38,15 @@ knife4j:
 logging:
   level:
     com.kidslearn: info
+    # 降低 MyBatis mapper 层日志级别，避免高频轮询 SQL 刷屏（真正错误仍由业务日志输出）
+    com.kidslearn.api.mapper: warn
+    org.mybatis: warn
+    org.apache.ibatis: warn
+
+# 通知发件箱轮询：把高频空轮询的日志与事务开销降到合理水平
+notification:
+  outbox:
+    poll-ms: 30000
 
 ftp:
   # ftp地址
@@ -56,3 +65,8 @@ ftp:
 payment:
   callback:
     secret: ${PAYMENT_CALLBACK_SECRET:}
+
+# 订单超时清理：未支付订单超过该时长（分钟）后由定时任务关闭
+order:
+  cleanup:
+    timeout-minutes: ${ORDER_CLEANUP_TIMEOUT_MINUTES:30}
