@@ -94,8 +94,9 @@
                 <el-input-number v-model="row.maxTokens" :min="0" :max="32768" :step="100" controls-position="right" size="small" placeholder="默认" style="width:110px" />
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="70" align="center">
+            <el-table-column label="操作" width="150" align="center">
               <template #default="{ row }">
+                <el-button link type="primary" :loading="testingProvider === row.provider" @click="handleTest(row as AiProviderConfig)">测试连接</el-button>
                 <el-button type="danger" link @click="removeProvider(cat, row as AiProviderConfig)">删除</el-button>
               </template>
             </el-table-column>
@@ -110,11 +111,12 @@
 import { onMounted, reactive, ref } from 'vue'
 import { Check, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getAiConfig, saveAiConfig } from '@/api/request'
+import { getAiConfig, saveAiConfig, testAiProvider } from '@/api/request'
 import type { AiProviderConfig, AiCategoryGroup } from '@/api/request'
 
 const loading = ref(false)
 const saving = ref(false)
+const testingProvider = ref('')
 const activeTab = ref('text')
 
 const form = reactive({ timeout: 15 })
@@ -174,6 +176,16 @@ function addProvider(category: string) {
 function removeProvider(cat: AiCategoryGroup, row: AiProviderConfig) {
   const idx = cat.providers.indexOf(row)
   if (idx >= 0) cat.providers.splice(idx, 1)
+}
+
+async function handleTest(provider: AiProviderConfig) {
+  if (!provider.provider || !provider.baseUrl) return void ElMessage.warning('请先填写服务商标识和 API 地址')
+  testingProvider.value = provider.provider
+  try {
+    const res = await testAiProvider({ ...provider })
+    if (res.code === 200) ElMessage.success(res.data?.message || '连接成功')
+    else ElMessage.error(res.msg || '连接失败')
+  } finally { testingProvider.value = '' }
 }
 
 async function handleSave() {

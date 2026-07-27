@@ -1,5 +1,5 @@
 <template>
-  <el-card>
+  <el-card class="admin-crud-page">
     <template #header><span style="font-weight:700">操作日志</span></template>
     <div ref="tableBox">
     <div style="margin-bottom:16px">

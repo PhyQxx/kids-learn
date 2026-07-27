@@ -1,5 +1,5 @@
 <template>
-  <el-card>
+  <el-card class="admin-crud-page">
     <template #header>
       <div style="display:flex;align-items:center;gap:12px">
         <el-breadcrumb separator="/">

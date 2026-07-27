@@ -1,5 +1,5 @@
 <template>
-  <div class="season-page">
+  <div class="season-page admin-feature-page">
     <!-- 可视化时间轴 -->
     <el-card class="timeline-card">
       <template #header>
@@ -74,7 +74,7 @@
               <el-option label="已结算" value="SETTLED" />
             </el-select>
             <el-button :icon="Refresh" @click="fetchData" :loading="loading">刷新</el-button>
-            <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增赛季</el-button>
+            <el-button type="primary" @click="openDialog()">新增赛季</el-button>
           </div>
         </div>
       </template>

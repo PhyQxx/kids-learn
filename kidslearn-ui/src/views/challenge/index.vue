@@ -1,5 +1,5 @@
 <template>
-  <el-card>
+  <el-card class="admin-crud-page">
     <template #header>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700">挑战赛管理</span>
@@ -10,7 +10,7 @@
             <el-option label="每日挑战" value="daily" />
           </el-select>
           <el-button :icon="Refresh" @click="fetchData" :loading="loading">刷新</el-button>
-          <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增挑战</el-button>
+          <el-button type="primary" @click="openDialog()">新增挑战</el-button>
         </div>
       </div>
     </template>

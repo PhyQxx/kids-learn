@@ -20,10 +20,28 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '首页概览' },
       },
       {
+        path: 'tasks',
+        name: 'TaskCenter',
+        component: () => import('@/views/system/TaskCenter.vue'),
+        meta: { title: '任务中心' },
+      },
+      {
         path: 'question-bank',
         name: 'QuestionBank',
         component: () => import('@/views/content/QuestionBank.vue'),
         meta: { title: '题库管理' },
+      },
+      {
+        path: 'question-bank/new',
+        name: 'QuestionCreate',
+        component: () => import('@/views/content/QuestionBank.vue'),
+        meta: { title: '新增题目', permission: 'admin:question:read' },
+      },
+      {
+        path: 'question-bank/:id/edit',
+        name: 'QuestionEdit',
+        component: () => import('@/views/content/QuestionBank.vue'),
+        meta: { title: '编辑题目', permission: 'admin:question:read' },
       },
       {
         path: 'content',
@@ -169,6 +187,7 @@ const router = createRouter({
 // 路由与权限的映射关系
 const ROUTE_PERMISSIONS: Record<string, string> = {
   '/dashboard': 'admin:dashboard:read',
+  '/tasks': 'admin:dashboard:read',
   '/question-bank': 'admin:question:read',
   '/content': 'admin:subject:read',
   '/content/audit': 'admin:content:read',
@@ -208,7 +227,7 @@ router.beforeEach((to, _from, next) => {
   }
 
   // 权限检查（动态导入避免循环依赖）
-  const requiredPermission = ROUTE_PERMISSIONS[to.path]
+  const requiredPermission = (to.meta.permission as string | undefined) || ROUTE_PERMISSIONS[to.path]
   if (requiredPermission && token) {
     import('@/stores/user').then(async ({ useUserStore }) => {
       const userStore = useUserStore()

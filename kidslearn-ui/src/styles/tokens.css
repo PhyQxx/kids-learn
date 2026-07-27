@@ -1,0 +1,86 @@
+:root {
+  color-scheme: light;
+
+  /* Brand */
+  --color-brand-50: #fff1f2;
+  --color-brand-100: #ffe1e4;
+  --color-brand-500: #e9535f;
+  --color-brand-600: #c93f4a;
+  --color-brand-700: #a8323c;
+  --color-brand-800: #872b34;
+
+  /* Neutral */
+  --color-gray-0: #ffffff;
+  --color-gray-50: #f8fafc;
+  --color-gray-100: #f1f5f9;
+  --color-gray-200: #e2e8f0;
+  --color-gray-300: #cbd5e1;
+  --color-gray-400: #94a3b8;
+  --color-gray-500: #667085;
+  --color-gray-600: #475467;
+  --color-gray-700: #344054;
+  --color-gray-900: #1f2937;
+
+  /* Semantic */
+  --color-success-50: #ecfdf3;
+  --color-success-600: #16803d;
+  --color-warning-50: #fffaeb;
+  --color-warning-700: #b54708;
+  --color-danger-50: #fff1f3;
+  --color-danger-600: #d92d20;
+  --color-info-50: #eff8ff;
+  --color-info-700: #175cd3;
+
+  /* Typography */
+  --font-family-sans: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --font-size-caption: 12px;
+  --font-size-body: 14px;
+  --font-size-heading-2: 16px;
+  --font-size-heading-1: 20px;
+  --font-size-display: 28px;
+  --line-height-caption: 18px;
+  --line-height-body: 22px;
+  --line-height-heading-2: 24px;
+  --line-height-heading-1: 28px;
+  --line-height-display: 36px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Shape and elevation */
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-pill: 999px;
+  --shadow-popover: 0 12px 32px rgba(16, 24, 40, 0.14);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --focus-ring: 0 0 0 3px rgba(23, 92, 211, 0.28);
+
+  /* Layout */
+  --sidebar-width: 232px;
+  --sidebar-collapsed-width: 72px;
+  --header-height: 64px;
+  --content-max-width: 1920px;
+
+  /* Semantic surfaces */
+  --admin-bg: var(--color-gray-50);
+  --admin-surface: var(--color-gray-0);
+  --admin-surface-soft: var(--color-gray-50);
+  --admin-border: var(--color-gray-200);
+  --admin-text: var(--color-gray-900);
+  --admin-muted: var(--color-gray-500);
+  --admin-shadow: var(--shadow-card);
+
+  /* Backward-compatible aliases; remove after page migration. */
+  --primary: var(--color-brand-600);
+  --primary-light: var(--color-brand-500);
+  --teal: #25877f;
+  --accent: #f4c430;
+  --bg: var(--color-gray-50);
+}
+

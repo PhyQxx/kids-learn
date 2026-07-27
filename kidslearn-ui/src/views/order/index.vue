@@ -1,5 +1,5 @@
 <template>
-  <el-card>
+  <el-card class="admin-crud-page">
     <template #header>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700">订单管理</span>
@@ -60,12 +60,18 @@
         <el-descriptions-item label="支付时间">{{ currentOrder.payTime || '-' }}</el-descriptions-item>
         <el-descriptions-item label="备注" :span="2">{{ currentOrder.remark || '-' }}</el-descriptions-item>
       </el-descriptions>
+      <section v-if="currentOrder" class="payment-timeline">
+        <h3>支付时间线</h3>
+        <el-timeline>
+          <el-timeline-item v-for="item in orderTimeline" :key="item.label" :timestamp="item.time || '—'" :type="item.type">{{ item.label }}</el-timeline-item>
+        </el-timeline>
+      </section>
     </el-dialog>
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import { getOrderList } from '@/api/request'
 import { useTableHeight } from '@/composables/useTableHeight'
@@ -82,6 +88,15 @@ const filterStatus = ref<number | null>(null)
 
 const detailVisible = ref(false)
 const currentOrder = ref<any>(null)
+const orderTimeline = computed(() => {
+  if (!currentOrder.value) return []
+  const row = currentOrder.value
+  const result: Array<{ label: string; time?: string; type: 'primary' | 'success' | 'warning' | 'danger' | 'info' }> = [{ label: '订单已创建', time: row.createTime, type: 'primary' }]
+  if (row.payTime) result.push({ label: `支付成功${row.payChannel ? ` · ${row.payChannel}` : ''}`, time: row.payTime, type: 'success' })
+  if (row.status === 2) result.push({ label: '订单已退款', time: row.refundTime || row.updateTime, type: 'warning' })
+  if (row.status === 3) result.push({ label: '订单已关闭', time: row.closeTime || row.updateTime, type: 'info' })
+  return result
+})
 
 function statusText(status: number) {
   return ['待支付', '已支付', '已退款', '已关闭'][status] || '未知'
@@ -117,3 +132,7 @@ function viewDetail(row: any) {
 
 onMounted(() => fetchData())
 </script>
+
+<style scoped>
+.payment-timeline { margin-top: var(--space-5); }.payment-timeline h3 { margin-bottom: var(--space-4); font-size: var(--font-size-heading-2); }
+</style>

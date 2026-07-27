@@ -1,17 +1,5 @@
-:root {
-  --primary: #FF6B6B;
-  --primary-light: #FF8E8E;
-  --teal: #4ECDC4;
-  --accent: #FFE66D;
-  --bg: #F7F7F7;
-  --admin-bg: #F5F7FB;
-  --admin-surface: #FFFFFF;
-  --admin-surface-soft: #FAFBFE;
-  --admin-border: #E8ECF3;
-  --admin-text: #1F2937;
-  --admin-muted: #7B8494;
-  --admin-shadow: 0 10px 30px rgba(31, 41, 55, 0.06);
-}
+@import './tokens.css';
+@import './element-overrides.css';
 
 * {
   margin: 0;
@@ -25,30 +13,32 @@ body,
   height: 100%;
   color: var(--admin-text);
   background: var(--admin-bg);
-  font-family: 'PingFang SC', 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-family-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-.el-card {
-  border-color: var(--admin-border);
-  border-radius: 8px;
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }
 
-.el-menu {
-  --el-menu-active-color: var(--primary);
-  --el-menu-hover-bg-color: rgba(255, 107, 107, 0.08);
-  --el-menu-text-color: #4B5563;
+:focus:not(:focus-visible) {
+  outline: none;
 }
 
-.el-menu-item,
-.el-sub-menu__title {
-  height: 44px;
-  margin: 2px 0;
-  border-radius: 8px;
+:focus-visible {
+  outline: 2px solid var(--color-info-700);
+  outline-offset: 2px;
 }
 
-.el-menu-item.is-active {
-  background: rgba(255, 107, 107, 0.1);
-  font-weight: 700;
+::selection {
+  color: var(--color-gray-900);
+  background: var(--color-brand-100);
 }
 
 /* 全局滚动条美化 */
@@ -58,7 +48,7 @@ body,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d1d8e5;
+  background: var(--color-gray-300);
   border-radius: 3px;
 }
 

@@ -5,7 +5,7 @@
       <h1 class="error-code">403</h1>
       <p class="error-message">权限不足</p>
       <p class="error-desc">抱歉，您没有权限访问此页面</p>
-      <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="goHome">
+      <el-button type="primary" @click="goHome">
         返回首页
       </el-button>
     </div>

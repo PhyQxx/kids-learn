@@ -2,7 +2,7 @@
   <div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <span style="font-size:15px;font-weight:600">年级管理</span>
-      <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增年级</el-button>
+      <el-button type="primary" @click="openDialog()">新增年级</el-button>
     </div>
 
     <div ref="tableBox">

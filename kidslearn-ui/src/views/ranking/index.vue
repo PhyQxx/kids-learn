@@ -1,5 +1,5 @@
 <template>
-  <el-card>
+  <el-card class="admin-crud-page">
     <template #header>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700">排行榜管理</span>

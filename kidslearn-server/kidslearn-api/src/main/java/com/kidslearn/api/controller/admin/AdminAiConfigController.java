@@ -8,6 +8,8 @@ import com.kidslearn.api.service.AiService;
 import com.kidslearn.api.service.impl.AdminOperationLogService;
 import com.kidslearn.api.service.impl.QuestionAudioProperties;
 import com.kidslearn.common.result.R;
+import cn.hutool.http.HttpRequest;
+import cn.hutool.http.HttpResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.ArrayList;
@@ -140,6 +142,37 @@ public class AdminAiConfigController {
         adminOperationLogService.write("ai-config", "save", "app-config", null, "saved");
         aiService.clearCache();
         return R.ok();
+    }
+
+    @Operation(summary = "测试AI服务商连接")
+    @PostMapping("/test")
+    public R<Map<String, Object>> testConnection(@RequestBody ProviderConfig provider) {
+        if (provider == null || isBlank(provider.getProvider()) || isBlank(provider.getBaseUrl())) {
+            return R.fail("请先填写服务商标识和 API 地址");
+        }
+        if ("tts".equals(provider.getCategory()) && !provider.getBaseUrl().startsWith("http")) {
+            return R.ok(Map.of("reachable", true, "message", "本地命令路径格式有效，运行时由语音服务执行检查"));
+        }
+        String baseUrl = provider.getBaseUrl().replaceAll("/+$", "");
+        String url = baseUrl.endsWith("/v1") ? baseUrl + "/models" : baseUrl + "/models";
+        String apiKey = trim(provider.getApiKey());
+        if (isBlank(apiKey)) {
+            String prefix = "tts".equals(provider.getCategory()) ? TTS_PREFIX : AI_PREFIX;
+            apiKey = val(loadAllConfigs(), prefix + provider.getProvider().trim() + ".api_key", "");
+        }
+        try (HttpResponse response = HttpRequest.get(url)
+                .header("Authorization", "Bearer " + apiKey)
+                .timeout(5000)
+                .execute()) {
+            int status = response.getStatus();
+            if (status >= 200 && status < 300) {
+                return R.ok(Map.of("reachable", true, "status", status, "message", "连接成功"));
+            }
+            return R.fail(status == 401 || status == 403 ? "认证失败，请检查 API Key" : "服务可访问，但返回 HTTP " + status);
+        } catch (Exception error) {
+            log.warn("AI provider connection test failed: {}", provider.getProvider(), error);
+            return R.fail("连接失败：" + error.getMessage());
+        }
     }
 
     // ===== 构建分类数据 =====

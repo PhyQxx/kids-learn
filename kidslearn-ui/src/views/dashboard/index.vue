@@ -7,10 +7,15 @@
         <p class="header-copy">汇总用户、学习、内容、商业与系统风险，快速判断今天要处理什么。</p>
       </div>
       <div class="header-actions">
+        <span v-if="lastUpdated" class="last-updated">更新于 {{ lastUpdated }}</span>
         <el-segmented v-model="timeRange" :options="timeRangeOptions" />
         <el-button type="primary" plain @click="fetchStats">刷新</el-button>
       </div>
     </section>
+
+    <el-alert v-if="loadError" title="部分概览数据暂时不可用" :description="loadError" type="warning" show-icon :closable="false">
+      <template #default><el-button link type="primary" @click="fetchStats">重新加载</el-button></template>
+    </el-alert>
 
     <section class="metric-grid">
       <article
@@ -132,11 +137,11 @@
             </div>
           </div>
           <div class="todo-list">
-            <div v-for="todo in todos" :key="todo.label" class="todo-item">
+            <button v-for="todo in todos" :key="todo.label" type="button" class="todo-item" @click="router.push(todo.path || '/dashboard')">
               <span class="todo-dot" :class="todo.level"></span>
               <span>{{ todo.label }}</span>
               <b>{{ todo.count }}</b>
-            </div>
+            </button>
           </div>
         </section>
 
@@ -229,6 +234,7 @@ type TodoPoint = {
   label: string
   count: number
   level: string
+  path?: string
 }
 
 type ActivityPoint = {
@@ -239,6 +245,8 @@ type ActivityPoint = {
 
 const router = useRouter()
 const loading = ref(false)
+const loadError = ref('')
+const lastUpdated = ref('')
 const timeRange = ref('近 7 天')
 const timeRangeOptions = ['今日', '近 7 天', '近 30 天']
 
@@ -300,6 +308,7 @@ function hydrateList<T>(value: unknown, fallback: T[] = []) {
 
 async function fetchStats() {
   loading.value = true
+  loadError.value = ''
   try {
     const res = await getDashboardStats()
     if (res.code === 200 && res.data) {
@@ -313,11 +322,17 @@ async function fetchStats() {
       funnelData.value = hydrateList<FunnelPoint>(res.data.funnelData)
       subjectPerformance.value = hydrateList<ProgressPoint>(res.data.subjectPerformance)
       contentHealth.value = hydrateList<HealthPoint>(res.data.contentHealth)
-      todos.value = hydrateList<TodoPoint>(res.data.todos)
+      todos.value = hydrateList<TodoPoint>(res.data.todos).map(item => ({
+        ...item,
+        path: item.path || (item.label.includes('审核') ? '/content/audit' : item.label.includes('题') ? '/question-bank' : item.label.includes('订单') ? '/order' : '/tasks'),
+      }))
       recentActivities.value = hydrateList<ActivityPoint>(res.data.recentActivities)
+      lastUpdated.value = new Date().toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' })
+    } else {
+      loadError.value = res.msg || '服务返回异常，页面保留最近一次成功数据。'
     }
   } catch {
-    // Keep fallback dashboard values when the overview API is unavailable.
+    loadError.value = '网络或服务异常，页面保留最近一次成功数据。'
   } finally {
     loading.value = false
   }
@@ -370,6 +385,8 @@ onMounted(() => fetchStats())
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
+.last-updated { color: var(--admin-muted); font-size: var(--font-size-caption); }
 
 .metric-grid {
   display: grid;
@@ -577,6 +594,19 @@ onMounted(() => fetchStats())
   justify-content: space-between;
   gap: 10px;
 }
+
+.todo-item {
+  width: 100%;
+  padding: var(--space-2);
+  color: inherit;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+}
+
+.todo-item:hover,
+.todo-item:focus-visible { background: var(--color-gray-50); }
 
 .funnel-label,
 .progress-meta {

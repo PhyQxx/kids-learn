@@ -19,6 +19,7 @@ import com.kidslearn.common.result.R;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -64,6 +65,28 @@ public class AdminContentAuditController {
         return R.ok(new PageResult<>(p.getRecords(), p.getTotal(), page, pageSize));
     }
 
+    @Operation(summary = "内容审核详情")
+    @GetMapping("/{id}/detail")
+    public R<Map<String, Object>> detail(@PathVariable Long id) {
+        ContentAudit audit = contentAuditMapper.selectById(id);
+        if (audit == null) {
+            return R.fail("审核记录不存在");
+        }
+        List<ContentAudit> history = contentAuditMapper.selectList(
+            new LambdaQueryWrapper<ContentAudit>()
+                .eq(ContentAudit::getTargetType, audit.getTargetType())
+                .eq(ContentAudit::getTargetId, audit.getTargetId())
+                .ne(ContentAudit::getId, id)
+                .orderByDesc(ContentAudit::getSubmitTime)
+                .last("LIMIT 10")
+        );
+        Map<String, Object> result = new HashMap<>();
+        result.put("audit", audit);
+        result.put("currentContent", buildTargetContent(audit));
+        result.put("history", history);
+        return R.ok(result);
+    }
+
     @Operation(summary = "提交内容审核")
     @PostMapping("/submit")
     public R<Void> submit(@RequestBody ContentAudit audit) {
@@ -105,6 +128,31 @@ public class AdminContentAuditController {
             audit.getTargetType(),
             audit.getTargetId(),
             "audit " + id + " status " + status
+        );
+        return R.ok();
+    }
+
+    @Operation(summary = "撤销内容审核")
+    @PostMapping("/{id}/undo")
+    public R<Void> undoReview(@PathVariable Long id) {
+        ContentAudit audit = contentAuditMapper.selectById(id);
+        if (audit == null) {
+            return R.fail("审核记录不存在");
+        }
+        if (audit.getReviewTime() == null || audit.getReviewTime().isBefore(LocalDateTime.now().minusSeconds(5))) {
+            return R.fail("撤销窗口已结束");
+        }
+        audit.setStatus(STATUS_PENDING);
+        audit.setReviewComment(null);
+        audit.setReviewerId(null);
+        audit.setReviewTime(null);
+        contentAuditMapper.updateById(audit);
+        adminOperationLogService.write(
+            "content-audit",
+            "undo-review",
+            audit.getTargetType(),
+            audit.getTargetId(),
+            "undo audit " + id
         );
         return R.ok();
     }

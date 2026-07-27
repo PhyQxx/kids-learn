@@ -178,7 +178,12 @@ export function getQuestionList(params: PageQuery & {
   gradeLevelId?: number
   courseLevelId?: number
   questionType?: number
+  keyword?: string
+  hasAudio?: boolean
+  hasAnalysis?: boolean
+  difficulty?: number
 }) { return get<PageResult<AdminRecord>>('/admin/question/list', params) }
+export function getQuestionDetail(id: number) { return get<AdminRecord>(`/admin/question/${id}`) }
 export function saveQuestion(data: QuestionSaveDTO) { return post<void>('/admin/question/save', data) }
 export function deleteQuestion(id: number) { return del(`/admin/question/${id}`) }
 export function getQuestionOptions(id: number) { return get<QuestionOptionDTO[]>(`/admin/question/${id}/options`) }
@@ -204,12 +209,16 @@ export function aiGenerateImage(prompt: string, size?: string) {
 export function getContentAuditList(params: PageQuery & { status?: number; targetType?: string }) {
   return get<PageResult<ContentAuditRecord>>('/admin/content-audit/list', params)
 }
+export function getContentAuditDetail(id: number) {
+  return get<{ audit: ContentAuditRecord; currentContent: string; history: ContentAuditRecord[] }>(`/admin/content-audit/${id}/detail`)
+}
 export function submitContentAudit(data: ContentAuditRecord) {
   return post<void>('/admin/content-audit/submit', data)
 }
 export function reviewContentAudit(id: number, status: number, comment?: string) {
   return post<void>(`/admin/content-audit/${id}/review`, null, { params: { status, comment } })
 }
+export function undoContentAuditReview(id: number) { return post<void>(`/admin/content-audit/${id}/undo`) }
 export function precheckContentAudit(id: number) {
   return post<ContentAiPrecheckResult>(`/admin/content-audit/${id}/ai-precheck`)
 }
@@ -271,6 +280,7 @@ export function getConfigList(params: PageQuery) { return get<PageResult<AdminRe
 export function saveConfig(data: AdminRecord) { return post<void>('/admin/config/save', data) }
 export function getAiConfig() { return get<{ provider: string; imageProvider: string; ttsProvider: string; timeout: number; categories: AiCategoryGroup[] }>('/admin/ai/config') }
 export function saveAiConfig(data: AiConfigPayload) { return post<void>('/admin/ai/config', data) }
+export function testAiProvider(data: AiProviderConfig) { return post<{ reachable: boolean; status?: number; message: string }>('/admin/ai/test', data) }
 
 // ==================== 反馈语音配置 ====================
 export interface FeedbackAudioConfig { baseUrl: string; correctList: string; wrongList: string; aiMaxTokens: number }

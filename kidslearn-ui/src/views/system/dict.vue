@@ -1,11 +1,11 @@
 <template>
-  <el-card>
+  <el-card class="admin-crud-page">
     <template #header>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700">字典管理</span>
         <div style="display:flex;gap:12px;align-items:center">
           <el-input v-model="keyword" placeholder="搜索字典名称/类型" style="width:240px" @keyup.enter="fetchTypes" clearable @clear="fetchTypes" />
-          <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openTypeDialog()">新增字典</el-button>
+          <el-button type="primary" @click="openTypeDialog()">新增字典</el-button>
         </div>
       </div>
     </template>

@@ -121,14 +121,48 @@ public class AdminContentController {
             @RequestParam(defaultValue = "20") Integer pageSize,
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) Long gradeLevelId,
-            @RequestParam(required = false) Integer questionType) {
+            @RequestParam(required = false) Integer questionType,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Boolean hasAudio,
+            @RequestParam(required = false) Boolean hasAnalysis,
+            @RequestParam(required = false) Integer difficulty) {
         LambdaQueryWrapper<Question> wrapper = new LambdaQueryWrapper<Question>()
             .eq(subjectId != null, Question::getSubjectId, subjectId)
             .eq(gradeLevelId != null, Question::getGradeLevelId, gradeLevelId)
             .eq(questionType != null, Question::getQuestionType, questionType)
+            .eq(difficulty != null, Question::getDifficulty, difficulty)
             .orderByAsc(Question::getSortOrder);
+        if (keyword != null && !keyword.isBlank()) {
+            String trimmed = keyword.trim();
+            wrapper.and(query -> {
+                query.like(Question::getQuestionContent, trimmed);
+                try {
+                    query.or().eq(Question::getId, Long.valueOf(trimmed));
+                } catch (NumberFormatException ignored) {
+                    // 非数字关键词只匹配题目内容。
+                }
+            });
+        }
+        if (hasAudio != null) {
+            if (hasAudio) wrapper.like(Question::getQuestionContent, "audioUrl");
+            else wrapper.notLike(Question::getQuestionContent, "audioUrl");
+        }
+        if (hasAnalysis != null) {
+            if (hasAnalysis) wrapper.isNotNull(Question::getAnalysis).ne(Question::getAnalysis, "");
+            else wrapper.and(query -> query.isNull(Question::getAnalysis).or().eq(Question::getAnalysis, ""));
+        }
         Page<Question> p = questionMapper.selectPage(new Page<>(page, pageSize), wrapper);
         return R.ok(new PageResult<>(p.getRecords(), p.getTotal(), page, pageSize));
+    }
+
+    @Operation(summary = "题目详情")
+    @GetMapping("/question/{id}")
+    public R<Question> questionDetail(@PathVariable Long id) {
+        Question question = questionMapper.selectById(id);
+        if (question == null) {
+            return R.fail("题目不存在或已删除");
+        }
+        return R.ok(question);
     }
 
     @Operation(summary = "新增/编辑题目")

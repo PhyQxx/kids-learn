@@ -1,9 +1,9 @@
 <template>
-  <el-card>
+  <el-card class="admin-crud-page admin-media-page">
     <template #header>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-weight:700">成就管理</span>
-        <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增成就</el-button>
+        <el-button type="primary" @click="openDialog()">新增成就</el-button>
       </div>
     </template>
     <div ref="tableBox">

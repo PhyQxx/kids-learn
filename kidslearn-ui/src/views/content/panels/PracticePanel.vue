@@ -2,7 +2,7 @@
   <div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
       <span style="font-size:15px;font-weight:600">专项练习管理 ({{ subject?.subjectName }})</span>
-      <el-button type="primary" style="background:#FF6B6B;border-color:#FF6B6B" @click="openDialog()">新增练习</el-button>
+      <el-button type="primary" @click="openDialog()">新增练习</el-button>
     </div>
 
     <div ref="tableBox">

@@ -18,6 +18,7 @@ import com.kidslearn.api.service.impl.AdminOperationLogService;
 import com.kidslearn.common.result.R;
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 
 class AdminContentAuditControllerTest {
@@ -49,6 +50,42 @@ class AdminContentAuditControllerTest {
         AdminContentAuditController controller = controller(mapper, mock(AdminOperationLogService.class));
 
         R<Void> result = controller.review(9L, 4, "bad");
+
+        assertEquals(500, result.getCode());
+    }
+
+    @Test
+    void undoReviewWithinFiveSecondsReturnsAuditToPending() {
+        ContentAuditMapper mapper = mock(ContentAuditMapper.class);
+        AdminOperationLogService logService = mock(AdminOperationLogService.class);
+        AdminContentAuditController controller = controller(mapper, logService);
+        ContentAudit audit = new ContentAudit();
+        audit.setId(9L);
+        audit.setTargetType("QUESTION");
+        audit.setTargetId(12L);
+        audit.setStatus(AdminContentAuditController.STATUS_APPROVED);
+        audit.setReviewComment("ok");
+        audit.setReviewTime(LocalDateTime.now());
+        when(mapper.selectById(9L)).thenReturn(audit);
+
+        R<Void> result = controller.undoReview(9L);
+
+        assertEquals(200, result.getCode());
+        assertEquals(AdminContentAuditController.STATUS_PENDING, audit.getStatus());
+        assertEquals(null, audit.getReviewTime());
+        verify(mapper).updateById(audit);
+        verify(logService).write("content-audit", "undo-review", "QUESTION", 12L, "undo audit 9");
+    }
+
+    @Test
+    void undoReviewRejectsExpiredWindow() {
+        ContentAuditMapper mapper = mock(ContentAuditMapper.class);
+        AdminContentAuditController controller = controller(mapper, mock(AdminOperationLogService.class));
+        ContentAudit audit = new ContentAudit();
+        audit.setReviewTime(LocalDateTime.now().minusSeconds(6));
+        when(mapper.selectById(9L)).thenReturn(audit);
+
+        R<Void> result = controller.undoReview(9L);
 
         assertEquals(500, result.getCode());
     }
